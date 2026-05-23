@@ -80,17 +80,36 @@ const PRODUCT_BADGE_DEFS: Record<ProductBadgeType, BadgeView> = {
 };
 
 /**
- * Priority order — first match wins. Promos rank above achievements
- * because they're time-sensitive, and achievements rank above
- * generic trending / new flags.
+ * Priority order — first match wins. Mirrors zepr's storefront so
+ * the same product surfaces the same headline tag across both
+ * sites. The order encodes a deliberate hierarchy:
+ *
+ *   1. **Structural offers** (`BUNDLE_AND_SAVE`) — a permanent
+ *      multi-buy deal is a meaningful differentiator and trumps
+ *      everything else.
+ *   2. **Achievements** (`BEST_SELLER` → `TOP_RATED` → `MOST_LIKED`
+ *      → `TRENDING_NOW`) — durable signals about the product
+ *      itself. Best Seller leads because sales volume is the
+ *      strongest social proof; the rest follow rough decreasing
+ *      strength of that signal.
+ *   3. **Time-bound promo** (`LIMITED_TIME_DEAL`) — a Hot Deal is
+ *      the weakest differentiator: it says "this is on sale right
+ *      now" but tells you nothing about whether the product is
+ *      good or beloved. Surfaced only when no achievement applies.
+ *
+ * Side effect to remember: this same order drives the card's
+ * current-price tint (via `productBadge.theme.accent`). A product
+ * tagged with both `BEST_SELLER` and `LIMITED_TIME_DEAL` shows the
+ * Best Seller pill *and* the brand-orange price, never the Hot
+ * Deal pink — which matches zepr exactly.
  */
 const PRODUCT_BADGE_PRIORITY: ProductBadgeType[] = [
   "BUNDLE_AND_SAVE",
-  "LIMITED_TIME_DEAL",
   "BEST_SELLER",
   "TOP_RATED",
   "MOST_LIKED",
   "TRENDING_NOW",
+  "LIMITED_TIME_DEAL",
 ];
 
 /**

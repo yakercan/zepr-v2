@@ -2,11 +2,14 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  useCallback,
+  useEffect,
   useRef,
   useState,
   type FocusEvent,
   type FormEvent,
 } from "react";
+import { SearchModal } from "@/components/layout/search-modal";
 import { Backdrop } from "@/components/ui/backdrop";
 import {
   ArrowRightIcon,
@@ -67,19 +70,59 @@ export function SearchBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasValue = value.length > 0;
 
-  /* Backdrop activates the moment focus enters the search form and
-   * deactivates only when focus leaves it entirely. We use a focus-
-   * within check via `relatedTarget` so flips between the input and
-   * the clear / submit buttons inside the form don't make the
-   * backdrop flicker. The dropdown component uses the exact same
-   * `<Backdrop open={…} />` pattern — one shared overlay primitive
-   * across the whole header. */
+  /* Backdrop + search modal both activate the moment focus enters
+   * the search form and deactivate only when focus leaves it
+   * entirely. We use a focus-within check via `relatedTarget` so
+   * flips between the input and the clear / submit buttons (and
+   * the suggestion items inside the modal, which run their own
+   * `mousedown.preventDefault` to never even take focus) don't
+   * flicker the overlay. The dropdown component uses the exact
+   * same `<Backdrop open={…} />` pattern — one shared overlay
+   * primitive across the whole header. */
   const [isFocused, setIsFocused] = useState(false);
   const handleFormFocus = () => setIsFocused(true);
   const handleFormBlur = (e: FocusEvent<HTMLFormElement>) => {
     if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
     setIsFocused(false);
   };
+
+  /* Stable callback that the modal hands to each suggestion item.
+   * Blurring the input fires the form's `onBlur` exactly once,
+   * which flips `isFocused` to false and unmounts both the
+   * backdrop and the modal in a single, clean step — no flicker,
+   * no double-close. */
+  const closeModal = useCallback(() => {
+    inputRef.current?.blur();
+  }, []);
+
+  /* Mutex with the header dropdowns.
+   *
+   * Header dropdowns (Categories, Account, future filters) open
+   * on hover *without* changing focus, so without this hook the
+   * search modal would stay visible alongside the dropdown
+   * panel — two overlapping overlays at once.
+   *
+   * Cleanest decoupling: listen for the native `toggle` event on
+   * any `<details>` in the header (capture phase, since `toggle`
+   * doesn't bubble). When one opens, blur the input — which fires
+   * the form's `onBlur`, closes the modal, and fades the backdrop
+   * in one clean step. Dropdown component stays untouched; this
+   * component just reacts to the DOM.
+   *
+   * Scoped via `closest(".site-header")` so unrelated `<details>`
+   * elsewhere on the page (FAQ accordions, etc.) can't close the
+   * search by accident. */
+  useEffect(() => {
+    function onToggle(e: Event) {
+      const t = e.target as HTMLElement | null;
+      if (!t || t.tagName !== "DETAILS") return;
+      if (!(t as HTMLDetailsElement).open) return;
+      if (!t.closest(".site-header")) return;
+      inputRef.current?.blur();
+    }
+    document.addEventListener("toggle", onToggle, true);
+    return () => document.removeEventListener("toggle", onToggle, true);
+  }, []);
 
   const handleClear = () => {
     setValue("");
@@ -158,6 +201,12 @@ export function SearchBar() {
             </button>
           </div>
         )}
+
+        {/* Suggestion modal — lives inside the form so its links
+            participate in focus-within tracking. Mounted only while
+            focused so we don't ship the suggestion fetch until the
+            user actually engages with the input. */}
+        <SearchModal query={value} open={isFocused} onClose={closeModal} />
       </form>
     </>
   );
