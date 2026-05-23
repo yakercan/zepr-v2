@@ -3,9 +3,9 @@
  *
  * Static for now — same three assets the original zepr storefront
  * uses, hosted on Salespace's CDN. Kept in a dedicated config file
- * so when a CMS (Sanity, Strapi, etc.) lands later, the slider
- * itself doesn't need to change; we just swap this export with a
- * server fetcher returning the same shape.
+ * so when an editorial CMS lands later, the slider itself doesn't
+ * need to change; we just swap this export with a server fetcher
+ * returning the same shape.
  *
  * `href` is optional — banners without a link still render, they
  * just don't wrap in an `<a>`.

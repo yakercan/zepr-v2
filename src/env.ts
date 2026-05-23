@@ -38,10 +38,6 @@ export const env = createEnv({
 
     SHOPIFY_CHECKOUT_DOMAIN: z.string().optional(),
 
-    SANITY_PROJECT_ID: z.string().optional(),
-    SANITY_DATASET: z.string().default("production"),
-    SANITY_API_VERSION: z.string().default("2024-01-01"),
-
     SALESPACE_SEARCH_API_KEY: z.string().optional(),
     SMART_SEARCH_API_KEY: z.string().optional(),
 
@@ -98,10 +94,6 @@ export const env = createEnv({
 
     SHOPIFY_CHECKOUT_DOMAIN:
       process.env.SHOPIFY_CHECKOUT_DOMAIN ?? process.env.PUBLIC_CHECKOUT_DOMAIN,
-
-    SANITY_PROJECT_ID: process.env.SANITY_PROJECT_ID,
-    SANITY_DATASET: process.env.SANITY_DATASET,
-    SANITY_API_VERSION: process.env.SANITY_API_VERSION,
 
     SALESPACE_SEARCH_API_KEY: process.env.SALESPACE_SEARCH_API_KEY,
     SMART_SEARCH_API_KEY: process.env.SMART_SEARCH_API_KEY,
