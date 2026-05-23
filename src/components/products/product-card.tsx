@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AddToCartButton } from "@/components/products/add-to-cart-button";
 import { ProductBadge, RatingBadge } from "@/components/products/badge";
+import { FavoriteButton } from "@/components/products/favorite-button";
 import { ProductCardMedia } from "@/components/products/product-card-media";
 import { Price } from "@/components/ui/price";
 import {
@@ -103,6 +104,14 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
       )}
     >
       <ProductCardMedia product={product} eager={eager}>
+        {/* Favorite toggle — top-right of the tile. Reads
+            card-level `group-hover` (not `group/media`) so the
+            heart reveals on hover anywhere on the card, including
+            the info row. Once favorited it sticks at full opacity
+            so the user can scan a grid and spot saved items at a
+            glance. */}
+        <FavoriteButton productId={product.id} />
+
         {/* Free Shipping — full-width solid green banner pinned to
             the bottom edge of the media. Lives on the image (not
             the meta row) because it answers a delivery question,

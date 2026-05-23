@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, type MouseEvent, type ReactNode } from "react";
+import { PlayIcon } from "@/components/ui/icons";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
+import { MEDIA_OVERLAY_BUBBLE_CLASSES } from "@/lib/styles";
+import { cn } from "@/lib/utils";
 import type { SearchProduct } from "@/types/product";
 
 /**
@@ -107,6 +110,28 @@ export function ProductCardMedia({
           className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 ease-out group-hover/media:opacity-100"
         />
       ) : null}
+
+      {/* "Has a video preview" indicator — visible by default so
+          shoppers know the affordance exists, fades out as soon
+          as the whole card is hovered (the user has signalled
+          attention; the indicator's job of *advertising* the
+          affordance is done). Card-level `group-hover` rather
+          than media-only so the indicator clears in step with
+          the favorite button revealing — both surfaces respond
+          to the same "card focused" signal. `aria-hidden`
+          because the video preview is a hover-only convenience —
+          the product page carries the canonical media. */}
+      {hasVideo && (
+        <div
+          aria-hidden
+          className={cn(
+            MEDIA_OVERLAY_BUBBLE_CLASSES,
+            "pointer-events-none absolute left-2 top-2 h-8 w-8 opacity-100 group-hover:opacity-0",
+          )}
+        >
+          <PlayIcon className="h-4 w-4" />
+        </div>
+      )}
 
       {children}
     </div>

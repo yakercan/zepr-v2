@@ -16,6 +16,7 @@ import {
   PlayIcon,
 } from "@/components/ui/icons";
 import { HOME_BANNERS, type HomeBanner } from "@/config/banners";
+import { MEDIA_OVERLAY_BUBBLE_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 /**
@@ -281,12 +282,7 @@ function ControlButton({
   return (
     <button
       type="button"
-      className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-full",
-        "bg-black/35 text-white backdrop-blur-sm transition-colors",
-        "hover:bg-black/55",
-        className,
-      )}
+      className={cn(MEDIA_OVERLAY_BUBBLE_CLASSES, className)}
       {...props}
     >
       {children}

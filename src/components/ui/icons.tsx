@@ -61,9 +61,11 @@ export function ChevronRightIcon({ className }: IconProps) {
   );
 }
 
-/** Play / Pause for the banner slider's autoplay toggle. Solid-fill
- *  variants so they read cleanly at the small (≈14px) sizes used
- *  inside the slider's overlay control buttons. */
+/** Play / Pause — used by the banner slider's autoplay toggle AND
+ *  by the product card's "this product has a video preview"
+ *  indicator (in a dark overlay bubble). Solid-fill variant so the
+ *  triangle reads cleanly at the small (≈14px) sizes both surfaces
+ *  use. */
 export function PlayIcon({ className }: IconProps) {
   return (
     <svg

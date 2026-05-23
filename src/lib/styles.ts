@@ -34,3 +34,28 @@
  */
 export const SURFACE_OUTLINE_CLASSES =
   "border-2 border-[color:var(--color-border-strong)] transition-colors duration-150 hover:border-[color:var(--color-ink)]";
+
+/**
+ * Translucent circular bubble overlay used for icon buttons that
+ * sit on top of media tiles — banner slider controls, product
+ * card video indicator, favorite (heart) toggle, future
+ * share / save buttons.
+ *
+ * Soft dark glass: `bg-black/35` with a small `backdrop-blur-sm`
+ * so the bubble reads cleanly over any media (light, dark, busy)
+ * without burning out the underlying pixel. `hover:bg-black/55`
+ * gives a subtle pressed-in feel without a separate hover ring.
+ *
+ * Plain `transition` (all GPU-cheap properties) instead of
+ * `transition-colors` so callers that *also* want an opacity
+ * fade-in/out — e.g. the favorite button revealing on card hover —
+ * can layer `opacity-0 group-hover:opacity-100` without having to
+ * fight a `transition-property: color` baseline.
+ *
+ * Default size `h-9 w-9` matches the banner slider's controls
+ * (the original site of the pattern). Override with a different
+ * `h-N w-N` after the constant if a tighter context wants smaller
+ * (e.g. compact product cards inside a search dropdown).
+ */
+export const MEDIA_OVERLAY_BUBBLE_CLASSES =
+  "flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55";
