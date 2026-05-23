@@ -183,7 +183,7 @@ export function CartIcon({ className, itemCount = 0 }: CartIconProps) {
   return (
     <svg
       viewBox="0 0 100 100"
-      className={cn("h-6 w-6 shrink-0", className)}
+      className={cn("h-[26px] w-[26px] shrink-0", className)}
       aria-hidden
     >
       {/* Cart body: closed top when empty, open top when filled. */}
@@ -215,6 +215,79 @@ export function CartIcon({ className, itemCount = 0 }: CartIconProps) {
       {CART_FRUIT_POSITIONS.slice(0, visibleCount).map((p, i) => (
         <circle key={i} cx={p.cx} cy={p.cy} r="12" fill="var(--color-brand)" />
       ))}
+    </svg>
+  );
+}
+
+/**
+ * Cart with a `+` inside the basket — the "add to cart" variant of
+ * {@link CartIcon}. Same cart-body geometry as the "filled" state
+ * of the header icon (open top, handle, wheels) so the two glyphs
+ * read as the same brand object; the contents differ to signal
+ * what the surface does:
+ *
+ *   - `<CartIcon>`     — basket holding fruits (showing count)
+ *   - `<CartAddIcon>`  — basket primed to accept a new item
+ *
+ * Used by the product card's quick-add pill. Every stroke paints
+ * in `currentColor`, so the whole glyph follows whatever color the
+ * parent button is set to — ink at rest, brand on hover via the
+ * `.icon-bubble` utility.
+ */
+export function CartAddIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className={cn("h-[26px] w-[26px] shrink-0", className)}
+      aria-hidden
+    >
+      {/* Cart body — open top, identical to the filled CartIcon
+          variant so the two glyphs share a family resemblance. */}
+      <path
+        d="M20 20 L20 65 Q20 70 25 70 L75 70 Q80 70 80 65 L80 20"
+        stroke="currentColor"
+        strokeWidth="7.5"
+        fill="none"
+      />
+      {/* Handle */}
+      <line
+        x1="20"
+        y1="22"
+        x2="5"
+        y2="15"
+        stroke="currentColor"
+        strokeWidth="7.5"
+        strokeLinecap="round"
+      />
+      {/* Wheels */}
+      <circle cx="35" cy="88" r="6" fill="currentColor" />
+      <circle cx="65" cy="88" r="6" fill="currentColor" />
+      {/* Plus inside the basket — sized to read clearly at the
+          product-card scale (h-5/w-5) without crowding the basket
+          walls. Sits in the upper third of the basket so it reads
+          as "incoming item" rather than centred clutter.
+          `currentColor` (rather than a fixed brand orange) so the
+          whole glyph — cart outline AND inner plus — tracks the
+          parent button's text colour, letting `.icon-bubble` flip
+          everything from ink to brand on hover in one stroke. */}
+      <line
+        x1="50"
+        y1="25"
+        x2="50"
+        y2="55"
+        stroke="currentColor"
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+      <line
+        x1="35"
+        y1="40"
+        x2="65"
+        y2="40"
+        stroke="currentColor"
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

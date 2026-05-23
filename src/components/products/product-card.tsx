@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddToCartButton } from "@/components/products/add-to-cart-button";
 import { ProductBadge, RatingBadge } from "@/components/products/badge";
 import { Price } from "@/components/ui/price";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
@@ -7,6 +8,7 @@ import {
   pickProductBadge,
   qualifiesForFreeShipping,
 } from "@/lib/badges";
+import { SURFACE_OUTLINE_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { SearchProduct } from "@/types/product";
 
@@ -76,10 +78,12 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
       href={`/products/${product.handle}`}
       prefetch={false}
       className={cn(
-        // The card itself wears the outline — same `border-2` weight
-        // + `--color-border-strong` rest / `--color-ink` hover the
-        // main-feed tabs use, so the whole page speaks one visual
-        // language for "interactive surface".
+        // Card outline pulls the shared `SURFACE_OUTLINE_CLASSES`
+        // preset (see `lib/styles.ts`) so the whole page — feed
+        // tabs, product cards, and any future filter chip — speaks
+        // one visual language for "selectable surface": soft grey
+        // rest, ink on hover. Editing the preset updates every
+        // surface at once.
         //
         // `overflow-hidden` on the card lets the image bleed flush
         // to the top + side edges (its corners are clipped by the
@@ -87,9 +91,7 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
         // padding, so the media reads as the dominant surface.
         "group flex flex-col overflow-hidden rounded-2xl",
         "bg-[color:var(--color-surface)]",
-        "border-2 border-[color:var(--color-border-strong)]",
-        "transition-colors duration-150",
-        "hover:border-[color:var(--color-ink)]",
+        SURFACE_OUTLINE_CLASSES,
       )}
     >
       <div
@@ -185,20 +187,38 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
             price in pink, a Best Seller in brand orange, default
             ink otherwise). The compare-at sits next to it in the
             muted compare variant — same `<Price>` component, just
-            a different `variant`. */}
-        <div className="mt-auto flex items-baseline gap-2 pt-2">
-          <Price
-            cents={product.price_min_cents}
-            currency={product.currency}
-            accent={productBadge?.theme.accent}
-          />
-          {hasDiscount && product.compare_at_min_cents !== undefined && (
+            a different `variant`.
+            Add-to-Cart pill sits on the right of the same row, so
+            price + action share one visual block at the card's
+            bottom edge. `justify-between` pins the prices left and
+            the pill right regardless of how long the price string
+            renders. */}
+        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+          <div className="flex items-baseline gap-2">
             <Price
-              cents={product.compare_at_min_cents}
+              cents={product.price_min_cents}
               currency={product.currency}
-              variant="compare"
+              accent={productBadge?.theme.accent}
             />
-          )}
+            {hasDiscount && product.compare_at_min_cents !== undefined && (
+              <Price
+                cents={product.compare_at_min_cents}
+                currency={product.currency}
+                variant="compare"
+              />
+            )}
+          </div>
+          {/* `-mr-1 -mb-1` tucks the pill closer to the card's
+              bottom-right corner without affecting the row's flex
+              metrics. The bubble is now larger than the price
+              text-block, so leaving it centered on the row's
+              padding box made the card read with extra white
+              space; pulling it 4px into the gutter rebalances the
+              composition without disturbing siblings. */}
+          <AddToCartButton
+            product={product}
+            className="-mr-0.5 -mb-1"
+          />
         </div>
       </div>
     </Link>

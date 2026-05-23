@@ -8,6 +8,7 @@ import {
   parseMainFeedTab,
   type MainFeedTabId,
 } from "@/config/main-feed-tabs";
+import { SURFACE_OUTLINE_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,14 +46,16 @@ const TAB_ACTIVE_CLASS = cn(
   "border-[color:var(--color-ink)]",
 );
 
-// Idle: white fill, soft gray outline so the pill reads clearly
-// against the page even when nothing is hovered. Hover deepens the
-// outline + text to ink — colour-only transition keeps it cheap and
-// stops the row from "popping" with bg/scale changes on hover.
+// Idle: white fill, shared `SURFACE_OUTLINE_CLASSES` preset for
+// the soft grey → ink hover transition. The preset includes its
+// own `border-2`, so no separate border-width is needed here.
+// `SURFACE_OUTLINE_CLASSES` is the single source of truth for
+// "selectable surface outline" across tabs, cards, and any future
+// chip / picker — change it once in `lib/styles.ts`, every surface
+// tracks.
 const TAB_IDLE_CLASS = cn(
   "bg-[color:var(--color-surface)] text-[color:var(--color-ink)]",
-  "border-[color:var(--color-border-strong)]",
-  "hover:border-[color:var(--color-ink)]",
+  SURFACE_OUTLINE_CLASSES,
 );
 
 export function MainFeedTabs() {

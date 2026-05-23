@@ -30,7 +30,7 @@ export function CartTrigger() {
     <button
       type="button"
       onClick={openCart}
-      className="header-icon-button relative"
+      className="icon-bubble relative h-10 w-10"
       aria-label={
         count === 0
           ? "Open cart, empty"

@@ -128,12 +128,24 @@
   --page-max-px: 1400px;
   --page-gutter-px: 1.5rem;
 
-  /* Shimmer keyframes registered as a theme token so the
-     `animate-shimmer` utility is available everywhere. The animation
-     is GPU-only — a single transform on the highlight band — and the
-     band itself is a flat 3-stop gradient, so it costs effectively
-     nothing while running. */
+  /* Animation tokens registered through Tailwind 4's theme so the
+   * `animate-*` utilities are available everywhere. Each is GPU-only
+   * (transform / opacity, no layout-affecting properties), so they
+   * stay cheap even on lower-end devices.
+   *
+   *   - `shimmer`    — skeleton highlight band sweep
+   *   - `fade-in/out`— overlay backdrops (cheap opacity-only)
+   *   - `modal-in/out`— modal panels (fade + tiny scale lift)
+   *
+   * In/out timings are asymmetric on purpose: 200ms in feels weighty,
+   * 150ms out feels responsive (dismiss should never feel sluggish).
+   * The easing is a slight ease-out (`cubic-bezier(.16, 1, .3, 1)`) —
+   * snappier than a stock ease, no overshoot. */
   --animate-shimmer: shimmer 1.5s linear infinite;
+  --animate-fade-in: fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-out: fade-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-modal-in: modal-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-modal-out: modal-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes shimmer {
@@ -142,6 +154,38 @@
   }
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
   }
 }
 
@@ -290,6 +334,16 @@
       background-color: var(--color-brand-hover);
     }
   }
+
+  /* Note: the "selectable surface" outline (gray → ink on hover)
+   * deliberately lives as a TypeScript constant in `lib/styles.ts`,
+   * NOT as a CSS class here. Tailwind 4 puts `@layer utilities`
+   * after `@layer components`, so a Tailwind `border-*` utility on
+   * the same element silently overrides a CSS-class border-color —
+   * which is what made the feed-tab outline disappear when the tab
+   * BASE class included `border-transparent`. As a string preset,
+   * it composes predictably with sibling `border-*` utilities at
+   * the call site. */
 }
 
 /* ------------------------------------------------------------------ */
@@ -419,17 +473,30 @@ details[open] > .header-nav-link::before {
 }
 
 /*
- * Icon-only triggers (cart, the account-dropdown summary).
- * Slightly tighter padding than the labelled nav-link variant; same
- * hover halo so the whole header stays visually consistent.
+ * Icon-bubble — generic hover halo for icon-only triggers.
+ *
+ * Soft grey backplate that fades in from a 0.85x scale on hover,
+ * paired with an ink → brand color transition on the icon itself
+ * (icons use `currentColor` strokes so they track this automatically).
+ * Used by:
+ *
+ *   - the header's cart trigger
+ *   - the product card's quick-add pill
+ *   - any future round icon button (favourite toggle, share, share-
+ *     to-collection, etc.)
+ *
+ * Sizing is NOT baked in — pair this class with a Tailwind size
+ * utility (`h-10 w-10` for header-scale, `h-9 w-9` for compact card
+ * pills) so a single class drives every variant.
+ *
+ * The bubble is a pseudo-element rather than a `background-color`
+ * transition so it can scale + fade in smoothly. Children are
+ * z-indexed above the bubble via the `> *` rule.
  */
-.header-icon-button,
-.header-icon-trigger {
+.icon-bubble {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
   position: relative;
   color: var(--color-ink);
   border-radius: 9999px;
@@ -437,8 +504,7 @@ details[open] > .header-nav-link::before {
   transition: color 0.2s ease;
 }
 
-.header-icon-button::before,
-.header-icon-trigger::before {
+.icon-bubble::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -450,30 +516,31 @@ details[open] > .header-nav-link::before {
   z-index: 0;
 }
 
-.header-icon-button > *,
-.header-icon-trigger > * {
+.icon-bubble > * {
   position: relative;
   z-index: 1;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .header-icon-button:hover,
-  .header-icon-trigger:hover {
+  .icon-bubble:hover {
     color: var(--color-brand);
   }
-  .header-icon-button:hover::before,
-  .header-icon-trigger:hover::before {
+  .icon-bubble:hover::before {
     opacity: 1;
     transform: scale(1);
   }
 }
 
-/* When the account dropdown is open, light the trigger up too. The
- * <summary> uses `.header-icon-trigger` and sits inside `<details>`. */
-details[open] > .header-icon-trigger {
-  color: var(--color-brand);
+.icon-bubble:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
-details[open] > .header-icon-trigger::before {
-  opacity: 1;
-  transform: scale(1);
+.icon-bubble:disabled::before {
+  opacity: 0 !important;
+  transform: scale(0.85) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  .icon-bubble:disabled:hover {
+    color: var(--color-ink);
+  }
 }

@@ -16,6 +16,10 @@ import {
   useCartLines,
   useCartSubtotalCents,
 } from "@/lib/cart/store";
+import {
+  useBodyScrollLock,
+  useEscapeClose,
+} from "@/lib/hooks/use-overlay-behaviors";
 import { cn } from "@/lib/utils";
 
 /**
@@ -69,27 +73,11 @@ export function CartDrawer() {
    * we don't render the footer, so the fallback is just defensive. */
   const currency = lines[0]?.currency ?? "USD";
 
-  /* Body scroll lock — only active while the drawer is open. Capture
-   * the previous overflow value on entry so closing restores it. */
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  /* Escape closes. Listener is only attached while open, so closed
-   * drawers don't eat keyboard events from anything else. */
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") closeCart();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  /* Body scroll lock + Escape close — shared primitives, so both
+   * the cart drawer and any future Modal speak the same dialect.
+   * Implementation lives in `use-overlay-behaviors.ts`. */
+  useBodyScrollLock(open);
+  useEscapeClose(open, closeCart);
 
   /* When the drawer opens, move focus into it so keyboard users land
    * on the close button (the first focusable child). Without this,
