@@ -100,14 +100,19 @@ export function Price({
     <span
       style={accent ? { color: accent } : undefined}
       className={cn(
-        "inline-flex items-baseline font-bold leading-none",
+        // Wrapper font-size is the *dollars* size. Symbol + cents
+        // scale off it (see the `em`-relative spans below) so a
+        // caller setting `text-3xl` here gets a proportionally
+        // larger symbol and cents for free. Default `text-lg`
+        // matches the original card price size byte-for-byte.
+        "inline-flex items-baseline font-bold leading-none text-lg",
         "text-[color:var(--color-ink)]",
         className,
       )}
     >
-      <span className="text-xs">{parts.symbol}</span>
-      <span className="text-lg">{parts.dollars}</span>
-      <span className="text-xs">.{parts.cents}</span>
+      <span className="text-[0.667em]">{parts.symbol}</span>
+      <span>{parts.dollars}</span>
+      <span className="text-[0.667em]">.{parts.cents}</span>
     </span>
   );
 }

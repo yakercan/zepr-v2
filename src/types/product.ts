@@ -132,3 +132,132 @@ export interface SearchResult {
    *  presence (`if (result.facets) …`). */
   facets?: SearchFacets;
 }
+
+/* ------------------------------------------------------------------ */
+/* Product Detail Page (PDP)                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Single product image with intrinsic dimensions so Next's `<Image>`
+ * can avoid CLS without a wrapper hack. `altText` mirrors Shopify's
+ * own nullable convention — we render the title as alt when it's
+ * missing.
+ */
+export interface ProductImage {
+  url: string;
+  altText: string | null;
+  width: number;
+  height: number;
+}
+
+/**
+ * One item in a product's media gallery — image or video, unified
+ * into a single shape so the gallery component iterates once and
+ * the renderer branches on `kind`.
+ *
+ *   - Every item has a `preview` image. For images it *is* the
+ *     image; for videos it's the upstream poster frame Shopify
+ *     ships with `Video.previewImage`. The gallery uses it
+ *     unconditionally for thumbnails and as the video's `poster`
+ *     attribute, so empty states and slow networks still show
+ *     something meaningful.
+ *   - `videoSources` is populated only when `kind === "video"`.
+ *     Multiple sources let the browser pick the best codec
+ *     (Shopify returns mp4 + hls when both exist).
+ *
+ * Model3D and ExternalVideo media types from Shopify are skipped
+ * at the normalisation boundary for now; they round-trip cleanly
+ * if/when we surface them later.
+ */
+export type ProductMediaKind = "image" | "video";
+
+export interface ProductMedia {
+  /** Shopify-issued GID — stable, useful as React key. */
+  id: string;
+  kind: ProductMediaKind;
+  preview: ProductImage;
+  /** Playable sources, present only for `kind: "video"`. */
+  videoSources?: { url: string; mimeType: string }[];
+}
+
+/**
+ * The PDP-shaped product view, hydrated from Shopify's Storefront
+ * Graph (see `lib/shopify/products.ts`).
+ *
+ * Deliberately separate from `SearchProduct`:
+ *
+ *   - `SearchProduct` is the *card* view sourced from Salespace's
+ *     search index — small, aggregate, includes facetable fields,
+ *     covers many results in one round-trip.
+ *   - `ProductDetail` is the *page* view sourced from Shopify —
+ *     single product, full media gallery, real-time variant
+ *     pricing and stock, descriptionHtml, metafields. The source of
+ *     truth for "what does this product look like right now".
+ *
+ * Money is normalised to integer cents on the way in (Shopify
+ * returns dollar decimal strings) so the same `<Price>` component
+ * the cards use can render PDP prices unchanged.
+ *
+ * The shape will grow as we add PDP pieces (description, options,
+ * variants, gallery, metafields). Round 1 is intentionally minimal
+ * — the hero strip only.
+ */
+export interface ProductDetail {
+  id: string;
+  handle: string;
+  title: string;
+  /** Brand / supplier name. Optional because not every product has
+   *  one set in Shopify; we hide the field when empty. */
+  vendor?: string;
+
+  /** Admin-authored rich-text description from Shopify. May
+   *  contain `<p>`, `<ul>`, `<a>`, etc. Rendered through
+   *  `dangerouslySetInnerHTML` on the PDP — Shopify admin is a
+   *  trusted source, so no client-side sanitiser. Empty string
+   *  when the product has no description set. */
+  descriptionHtml: string;
+
+  /** At least one variant is purchasable. Drives the "Add to cart"
+   *  CTA enabled state and the "Out of stock" badge. */
+  availableForSale: boolean;
+
+  /** Hero image. Convenience pointer to the first image in
+   *  `media`, surfaced separately for places that only need one
+   *  picture (cart drawer thumbnail, social og:image, etc.) and
+   *  shouldn't reason about gallery internals. Null for the rare
+   *  product with no media at all. */
+  featuredImage: ProductImage | null;
+
+  /** Full ordered gallery — images and videos in the order
+   *  Shopify admin arranged them. Drives `<ProductGallery>`.
+   *  Empty array (not undefined) when no media is set. */
+  media: ProductMedia[];
+
+  /** Product's primary collection — the first one Shopify returns
+   *  for the product. Used to render a category crumb in the PDP
+   *  breadcrumb and (eventually) the "back to {category}" link.
+   *  Undefined when the product isn't in any collection. */
+  primaryCollection?: {
+    handle: string;
+    title: string;
+  };
+
+  /** Optional subcategory label, extracted from a Shopify tag of
+   *  the form `subcategory:Bedding`. Mirrors how the legacy
+   *  storefront stores subcategory data — a free-text taxonomy
+   *  layer that lives in tags rather than a separate Shopify
+   *  collection. Undefined when no `subcategory:` tag is set. */
+  subcategory?: string;
+
+  /** Price range across all variants. When `min === max`, the
+   *  product has a single price; otherwise the PDP renders a
+   *  `$min – $max` band until a variant is picked. */
+  priceMinCents: number;
+  priceMaxCents: number;
+  /** Compare-at (strike-through) price range. Both fields are
+   *  populated together when the product has a non-zero
+   *  compare-at; otherwise both undefined. */
+  compareAtMinCents?: number;
+  compareAtMaxCents?: number;
+  currency: string;
+}

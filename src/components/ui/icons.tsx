@@ -61,6 +61,33 @@ export function ChevronRightIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Filled, soft-edged caret — pointing DOWN by default. Visual
+ * weight is heavier than the standard stroke chevrons; reads
+ * cleanly at small sizes (8-12 px) where a thin chevron would
+ * disappear.
+ *
+ * Used by the breadcrumb (rotate `-rotate-90` for right) and the
+ * product accordion (rotates 180° on `[open]` for the expand
+ * indicator).
+ *
+ * Path copied straight from the legacy zepr `IconSmoothCaret` so
+ * the storefront keeps a consistent caret personality across the
+ * old site and the new one.
+ */
+export function SmoothCaretIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 1024 1024"
+      fill="currentColor"
+      aria-hidden
+      className={cn("h-3 w-3 shrink-0", className)}
+    >
+      <path d="M846.6 329.7c19.9-17.2 49.9-15 67.1 4.9 15.4 17.9 15.2 44 0.5 61.6l-5.4 5.5-365.3 315.5c-15.9 13.7-38.5 15.2-55.8 4.6l-6.3-4.6-366.1-315.5c-19.9-17.1-22.1-47.2-5-67 15.4-17.9 41.3-21.5 60.8-9.6l6.2 4.6 335.1 288.7 334.2-288.7z" />
+    </svg>
+  );
+}
+
 /** Tick — used as the "selected" indicator in single-select filter
  *  dropdowns (sort options today, future sort/sort-direction lists). */
 export function CheckIcon({ className }: IconProps) {

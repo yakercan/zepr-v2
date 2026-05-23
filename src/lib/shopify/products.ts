@@ -1,0 +1,293 @@
+import "server-only";
+
+import { shopifyFetch } from "@/lib/shopify/client";
+import type {
+  ProductDetail,
+  ProductImage,
+  ProductMedia,
+} from "@/types/product";
+
+/**
+ * Shopify Storefront product fetcher — single source of truth for
+ * "give me the product behind handle X".
+ *
+ * Round 1: minimum hero data only — id, title, vendor, hero image,
+ * price + compare-at range, in-stock flag. The query body is
+ * intentionally tiny so the response is small (and fast) until we
+ * actually need richer fields. Each subsequent PDP round adds one
+ * fragment to the query and one mapping line in `normaliseProduct`.
+ *
+ * Caching: 1-hour revalidation matches the page's `revalidate`
+ * export. Tagged `product:${handle}` so a future `revalidateTag()`
+ * call (admin webhook, manual purge) can invalidate one product
+ * without sweeping every page.
+ */
+
+const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
+  query Product($handle: String!) {
+    product(handle: $handle) {
+      id
+      handle
+      title
+      vendor
+      descriptionHtml
+      availableForSale
+      tags
+      collections(first: 1) {
+        nodes {
+          handle
+          title
+        }
+      }
+      featuredImage {
+        url
+        altText
+        width
+        height
+      }
+      media(first: 50) {
+        nodes {
+          id
+          mediaContentType
+          ... on MediaImage {
+            image {
+              url
+              altText
+              width
+              height
+            }
+          }
+          ... on Video {
+            sources {
+              url
+              mimeType
+            }
+            previewImage {
+              url
+              altText
+              width
+              height
+            }
+          }
+        }
+      }
+      priceRange {
+        minVariantPrice {
+          amount
+          currencyCode
+        }
+        maxVariantPrice {
+          amount
+          currencyCode
+        }
+      }
+      compareAtPriceRange {
+        minVariantPrice {
+          amount
+          currencyCode
+        }
+        maxVariantPrice {
+          amount
+          currencyCode
+        }
+      }
+    }
+  }
+`;
+
+/* ---------- Wire shape (matches the GraphQL response exactly) -------- */
+
+interface MoneyV2 {
+  amount: string;
+  currencyCode: string;
+}
+
+interface RawImage {
+  url: string;
+  altText: string | null;
+  width: number;
+  height: number;
+}
+
+type RawMediaContentType =
+  | "IMAGE"
+  | "VIDEO"
+  | "EXTERNAL_VIDEO"
+  | "MODEL_3D";
+
+interface RawMediaNode {
+  id: string;
+  mediaContentType: RawMediaContentType;
+  /** Present on MediaImage. */
+  image?: RawImage | null;
+  /** Present on Video. */
+  sources?: { url: string; mimeType: string }[];
+  previewImage?: RawImage | null;
+}
+
+interface RawProduct {
+  id: string;
+  handle: string;
+  title: string;
+  vendor: string | null;
+  descriptionHtml: string | null;
+  availableForSale: boolean;
+  tags: string[];
+  collections: {
+    nodes: { handle: string; title: string }[];
+  };
+  featuredImage: RawImage | null;
+  media: {
+    nodes: RawMediaNode[];
+  };
+  priceRange: {
+    minVariantPrice: MoneyV2;
+    maxVariantPrice: MoneyV2;
+  };
+  compareAtPriceRange: {
+    minVariantPrice: MoneyV2;
+    maxVariantPrice: MoneyV2;
+  };
+}
+
+interface ProductByHandleResponse {
+  product: RawProduct | null;
+}
+
+/* -------------------- Public API -------------------- */
+
+/**
+ * Fetch one product by its handle.
+ *
+ * Returns `null` for unknown handles so callers can branch into
+ * `notFound()` cleanly. Network failures bubble up — the route
+ * boundary can either render an error UI or rely on Next's default
+ * `error.tsx`.
+ */
+export async function getProductByHandle(
+  handle: string,
+): Promise<ProductDetail | null> {
+  const data = await shopifyFetch<ProductByHandleResponse>(
+    PRODUCT_BY_HANDLE_QUERY,
+    { handle },
+    {
+      revalidate: 3600,
+      tags: [`product:${handle}`],
+    },
+  );
+
+  if (!data.product) return null;
+  return normaliseProduct(data.product);
+}
+
+/* -------------------- Internals -------------------- */
+
+/**
+ * Convert a Shopify `MoneyV2` decimal string to integer cents.
+ * Storefront returns strings like `"12.99"` — `parseFloat` + `*100`
+ * + `Math.round` is the canonical safe path (it sidesteps the
+ * `12.99 * 100 = 1298.9999…` float drift you'd hit with a naive
+ * cast). Returns `0` for the rare missing field.
+ */
+function toCents(money: MoneyV2 | null | undefined): number {
+  if (!money?.amount) return 0;
+  return Math.round(parseFloat(money.amount) * 100);
+}
+
+function normaliseImage(raw: RawImage | null): ProductImage | null {
+  if (!raw) return null;
+  return {
+    url: raw.url,
+    altText: raw.altText,
+    width: raw.width,
+    height: raw.height,
+  };
+}
+
+/**
+ * Pull a subcategory label from the product's tags.
+ *
+ * Legacy convention (carried forward from the original storefront):
+ * a tag like `subcategory:Bedding` carries the subcategory name.
+ * Returns the first match, or `undefined` if no such tag is set.
+ */
+function extractSubcategory(tags: string[]): string | undefined {
+  const SUBCATEGORY_PREFIX = "subcategory:";
+  const tag = tags.find((t) => t.startsWith(SUBCATEGORY_PREFIX));
+  return tag ? tag.slice(SUBCATEGORY_PREFIX.length).trim() : undefined;
+}
+
+/**
+ * Project Shopify's polymorphic Media union into our flat
+ * `ProductMedia` shape. Image and Video kinds are surfaced;
+ * Model3D / ExternalVideo are skipped (no storefront consumer
+ * for them yet, and admitting them silently would mean the
+ * gallery has to grow a "?" branch). We log them in dev so it's
+ * obvious when a product starts using those types.
+ */
+function parseMedia(nodes: RawMediaNode[]): ProductMedia[] {
+  const out: ProductMedia[] = [];
+  for (const node of nodes) {
+    if (node.mediaContentType === "IMAGE" && node.image) {
+      out.push({
+        id: node.id,
+        kind: "image",
+        preview: normaliseImage(node.image)!,
+      });
+    } else if (
+      node.mediaContentType === "VIDEO" &&
+      node.sources?.length &&
+      node.previewImage
+    ) {
+      out.push({
+        id: node.id,
+        kind: "video",
+        preview: normaliseImage(node.previewImage)!,
+        videoSources: node.sources,
+      });
+    } else if (process.env.NODE_ENV === "development") {
+      console.warn(
+        `[shopify] unsupported media type "${node.mediaContentType}" skipped`,
+      );
+    }
+  }
+  return out;
+}
+
+function normaliseProduct(raw: RawProduct): ProductDetail {
+  const priceMinCents = toCents(raw.priceRange.minVariantPrice);
+  const priceMaxCents = toCents(raw.priceRange.maxVariantPrice);
+
+  const compareMinCents = toCents(raw.compareAtPriceRange.minVariantPrice);
+  const compareMaxCents = toCents(raw.compareAtPriceRange.maxVariantPrice);
+  /* Shopify always returns a `compareAtPriceRange` object — even
+   * when the product has no compare-at set, in which case both
+   * sides are `"0.0"`. Treat any zero side as "no compare-at" so
+   * the PDP's strike-through only renders for genuine discounts. */
+  const hasCompareAt = compareMinCents > 0 && compareMaxCents > 0;
+
+  const primaryCollection = raw.collections.nodes[0]
+    ? {
+        handle: raw.collections.nodes[0].handle,
+        title: raw.collections.nodes[0].title,
+      }
+    : undefined;
+
+  return {
+    id: raw.id,
+    handle: raw.handle,
+    title: raw.title,
+    vendor: raw.vendor || undefined,
+    descriptionHtml: raw.descriptionHtml ?? "",
+    primaryCollection,
+    subcategory: extractSubcategory(raw.tags),
+    availableForSale: raw.availableForSale,
+    featuredImage: normaliseImage(raw.featuredImage),
+    media: parseMedia(raw.media.nodes),
+    priceMinCents,
+    priceMaxCents,
+    compareAtMinCents: hasCompareAt ? compareMinCents : undefined,
+    compareAtMaxCents: hasCompareAt ? compareMaxCents : undefined,
+    currency: raw.priceRange.minVariantPrice.currencyCode,
+  };
+}
