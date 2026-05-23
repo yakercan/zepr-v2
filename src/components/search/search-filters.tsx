@@ -93,11 +93,19 @@ interface PriceBounds {
 export interface SearchFiltersProps {
   categories: readonly TaxonomyCategory[];
   facets: SearchFacets | undefined;
+  /**
+   * Hide the Category pill (and its panel content). Category
+   * pages drive subcategory selection through the subcategory
+   * slider above the filter row, so the duplicate pill would
+   * just be a worse version of the same control.
+   */
+  hideCategory?: boolean;
 }
 
 export function SearchFilters({
   categories,
   facets,
+  hideCategory = false,
 }: SearchFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -274,7 +282,7 @@ export function SearchFilters({
   const priceBounds = usePriceBounds(facets);
   const sizeOptions = useSizeOptions(facets);
 
-  const showCategory = categoryOptions.length > 0;
+  const showCategory = !hideCategory && categoryOptions.length > 0;
   // Price filter shows whenever we have *any* signal — either
   // explicit buckets or just min/max bounds for the inputs.
   const showPrice = priceBuckets.length > 0 || priceBounds !== undefined;

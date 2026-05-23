@@ -2,16 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { CartTrigger } from "@/components/cart/cart-trigger";
 import { AccountDropdown } from "@/components/layout/account-dropdown";
+import { CategoriesDropdown } from "@/components/layout/categories-dropdown";
 import { SearchBar } from "@/components/layout/search-bar";
-import { SubcategoryGrid } from "@/components/layout/subcategory-grid";
-import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
-import {
-  BestSellersIcon,
-  CategoriesIcon,
-  FireIcon,
-  HeartIcon,
-} from "@/components/ui/icons";
-import { DEFAULT_CATEGORIES, getLineCategoryIcon } from "@/config/categories";
+import { BestSellersIcon, FireIcon, HeartIcon } from "@/components/ui/icons";
+import { DEFAULT_CATEGORIES } from "@/config/categories";
 import { site } from "@/config/site";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
 import type { TaxonomyCategory } from "@/types/taxonomy";
@@ -103,59 +97,9 @@ function Logo() {
   );
 }
 
-function CategoriesDropdown({
-  categories,
-}: {
-  categories: readonly TaxonomyCategory[];
-}) {
-  return (
-    <Dropdown
-      sideMode
-      panelClassName="w-[48rem]"
-      mainColumnClassName="w-[16rem] shrink-0 py-2 pl-1.5 pr-1.5"
-      sidePanelClassName="min-h-[22rem] p-5"
-      trigger={
-        <>
-          <CategoriesIcon className="text-[color:var(--color-ink)]" />
-          <span className="text-[15px] font-semibold">Categories</span>
-        </>
-      }
-    >
-      {categories.map((cat) => (
-        <DropdownItem
-          key={cat.handle}
-          itemKey={cat.handle}
-          href={`/collections/${cat.handle}`}
-          icon={<CategoryLineIcon handle={cat.handle} />}
-          sidePanel={<SubcategoryGrid category={cat} />}
-        >
-          {cat.name}
-        </DropdownItem>
-      ))}
-    </Dropdown>
-  );
-}
-
 /**
  * Left-column category icon — always the local monochrome line SVG,
  * not the taxonomy's colorful CDN icon. See `getLineCategoryIcon`
  * for the rationale. Renders a neutral placeholder square when no
  * line icon is registered for the handle yet.
  */
-function CategoryLineIcon({ handle }: { handle: string }) {
-  const src = getLineCategoryIcon(handle);
-  if (!src) {
-    return (
-      <span className="inline-block h-5 w-5 rounded bg-[color:var(--color-search)]" />
-    );
-  }
-  return (
-    <Image
-      src={src}
-      alt=""
-      width={20}
-      height={20}
-      className="h-5 w-5 object-contain"
-    />
-  );
-}

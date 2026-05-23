@@ -1,140 +1,93 @@
-import Link from "next/link";
+"use client";
+
+import { DropdownItem } from "@/components/ui/dropdown";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
- * Subcategory grid rendered inside the Categories dropdown's right
- * column.
+ * Right-column panel inside the Categories dropdown.
  *
- * Pure UI — receives the active category and produces a 4-column grid
- * of icons + names plus an "All" tile that links to the category's
- * collection page. Icons use `<ShimmerImage>` so the panel paints a
- * skeleton while CDN PNGs decode (especially on the first hover of a
- * given category — subsequent hovers hit the browser cache and the
- * shimmer never appears).
+ * Vertical list (not a grid of bubbles): each row is a CDN PNG
+ * icon + name, sharing the standard `<DropdownItem>` chrome so
+ * hover / active states match the left column without bespoke
+ * styling.
  *
- * The grid only mounts when the parent `<Dropdown>` swaps the active
- * panel (via a React `key` keyed on category handle), so previous
- * category's icons can't bleed through into the next one.
+ * The first row is "All" — same destination as clicking the
+ * left-column row itself (`/category/<handle>`) but placed
+ * here so users browsing the right column don't have to dart
+ * back to the left column to get to the unfiltered category.
+ *
+ * The list scrolls inside its absolutely-positioned parent
+ * column (see `<Dropdown>` sideMode notes) so a category with
+ * 30 subcategories doesn't blow out the panel height — the
+ * panel always ends where the left column's category list ends.
+ *
+ * The component re-mounts (via the parent's `key`) every time
+ * the active row changes, so the previous category's icons can
+ * never bleed through into the next render.
  */
 export function SubcategoryGrid({ category }: { category: TaxonomyCategory }) {
   const subcategories = category.subcategories ?? [];
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-baseline justify-between">
-        <h3 className="text-base font-semibold text-[color:var(--color-ink)]">
-          {category.name}
-        </h3>
-        <Link
-          href={`/collections/${category.handle}`}
-          className="text-xs font-medium text-[color:var(--color-brand)] hover:underline"
-        >
-          Shop all
-        </Link>
-      </div>
+    <div className="flex flex-col">
+      <h3 className="mb-1 truncate px-3 pt-1 text-base font-semibold text-[color:var(--color-ink)]">
+        {category.name}
+      </h3>
 
-      {subcategories.length === 0 ? (
-        <SubcategoryEmpty category={category} />
-      ) : (
-        <div className="grid grid-cols-4 gap-x-4 gap-y-6">
-          <SubcategoryTile
-            href={`/collections/${category.handle}`}
-            label="All"
-            iconUrl={category.iconUrl}
-            fallback="All"
-          />
-          {subcategories.map((sub) => (
-            <SubcategoryTile
-              key={sub.id}
-              href={`/collections/${category.handle}?subcategory=${encodeURIComponent(sub.name)}`}
-              label={sub.name}
-              iconUrl={sub.iconUrl}
-              fallback={sub.name.charAt(0)}
-            />
-          ))}
-        </div>
-      )}
+      <DropdownItem
+        href={`/category/${category.handle}`}
+        icon={<SubcategoryIcon src={category.iconUrl} fallback="All" />}
+      >
+        All
+      </DropdownItem>
+      {subcategories.map((sub) => (
+        <DropdownItem
+          key={sub.id}
+          href={`/category/${category.handle}?subcategory=${encodeURIComponent(sub.name)}`}
+          icon={<SubcategoryIcon src={sub.iconUrl} fallback={sub.name} />}
+        >
+          {sub.name}
+        </DropdownItem>
+      ))}
     </div>
   );
 }
 
-/* Tile icon size — bumped from 44px → 56px for legibility now that
- * the gray circle backplate is gone. Width === height so the shimmer
- * skeleton inherits a perfect square footprint while loading. */
-const TILE_ICON_PX = 56;
+/* Icon size mirrors the chunkier banner-like feel the user
+ * wanted — bigger than the 16px account-dropdown SVGs but still
+ * compact enough that rows don't tower. Width === height keeps
+ * the shimmer skeleton circular while the PNG decodes. */
+const SUBCATEGORY_ICON_PX = 28;
 
-function SubcategoryTile({
-  href,
-  label,
-  iconUrl,
+function SubcategoryIcon({
+  src,
   fallback,
 }: {
-  href: string;
-  label: string;
-  iconUrl: string | null;
+  src: string | null;
+  /** Single-glyph stand-in (first letter, "All", …) when the
+   *  taxonomy didn't ship an icon for this entry. */
   fallback: string;
 }) {
-  /* Named `group/tile` so hover state is scoped to this tile only —
-   * the dropdown's outer `group/dropdown` won't also fire. */
-  return (
-    <Link
-      href={href}
-      className="group/tile flex flex-col items-center gap-1.5 text-center"
-    >
+  if (!src) {
+    return (
       <span
-        className="flex items-center justify-center transition-transform duration-200 group-hover/tile:scale-[1.06]"
-        style={{ width: TILE_ICON_PX, height: TILE_ICON_PX }}
+        className="flex items-center justify-center rounded-full bg-[color:var(--color-search)] text-[10px] font-semibold text-[color:var(--color-ink-muted)]"
+        style={{ width: SUBCATEGORY_ICON_PX, height: SUBCATEGORY_ICON_PX }}
+        aria-hidden
       >
-        {iconUrl ? (
-          <ShimmerImage
-            src={iconUrl}
-            width={TILE_ICON_PX}
-            height={TILE_ICON_PX}
-            className="object-contain"
-            style={{ width: TILE_ICON_PX, height: TILE_ICON_PX }}
-            skeletonRounded="full"
-          />
-        ) : (
-          <span
-            className="flex h-full w-full items-center justify-center rounded-full bg-[color:var(--color-search)] text-sm font-medium text-[color:var(--color-ink-muted)]"
-            aria-hidden
-          >
-            {fallback}
-          </span>
-        )}
+        {fallback.charAt(0).toUpperCase()}
       </span>
-      <span className="text-xs font-medium leading-tight text-[color:var(--color-ink)] transition-colors duration-200 group-hover/tile:text-[color:var(--color-brand)]">
-        {label}
-      </span>
-    </Link>
-  );
-}
-
-/** Shown when the category has no subcategories yet — encourages the
- *  user to shop the category itself rather than dead-ending. */
-function SubcategoryEmpty({ category }: { category: TaxonomyCategory }) {
+    );
+  }
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
-      {category.iconUrl && (
-        <ShimmerImage
-          src={category.iconUrl}
-          width={64}
-          height={64}
-          className="object-contain opacity-80"
-          style={{ width: 64, height: 64 }}
-          skeletonRounded="full"
-        />
-      )}
-      <p className="max-w-[16rem] text-sm text-[color:var(--color-ink-secondary)]">
-        Browse the full {category.name} collection.
-      </p>
-      <Link
-        href={`/collections/${category.handle}`}
-        className="inline-flex items-center rounded-full bg-[color:var(--color-brand)] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[color:var(--color-brand-hover)]"
-      >
-        Shop {category.name}
-      </Link>
-    </div>
+    <ShimmerImage
+      src={src}
+      width={SUBCATEGORY_ICON_PX}
+      height={SUBCATEGORY_ICON_PX}
+      className="object-contain"
+      style={{ width: SUBCATEGORY_ICON_PX, height: SUBCATEGORY_ICON_PX }}
+      skeletonRounded="full"
+    />
   );
 }

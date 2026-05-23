@@ -28,6 +28,15 @@ const HOVER_OPEN_DELAY_MS = 80;
 const HOVER_CLOSE_DELAY_MS = 80;
 
 /**
+ * Width of the left column in `sideMode`. Shared between the
+ * left column's own `width` and the right column's `left` offset
+ * (the right column is `absolute`-positioned so it can scroll
+ * independently of the left). Single source of truth — change it
+ * once if the categories panel ever needs more breathing room.
+ */
+const SIDE_MODE_LEFT_PX = 256;
+
+/**
  * Generic header dropdown.
  *
  * Built on a native `<details>` element so:
@@ -240,17 +249,32 @@ export function Dropdown({
 
   const panel =
     sideMode ? (
+      // Layout invariants for sideMode (don't change without
+      // also revisiting `SIDE_MODE_LEFT_PX` below):
+      //
+      //   - The wrapper is `relative` so the right column can be
+      //     `absolute` against it. Putting the right column out
+      //     of flex flow means it doesn't contribute to the
+      //     wrapper's height — the wrapper sizes to the left
+      //     column's natural height alone, and the right column
+      //     fills that vertical space and scrolls internally
+      //     when its content overflows. Net effect: the panel
+      //     always "ends where the category list ends".
+      //   - The left column owns the visible separator (right
+      //     border) instead of a flex `divide-x`, since the right
+      //     column isn't a flex sibling any more.
       <div
         className={cn(
-          "flex divide-x divide-[color:var(--color-border)]",
+          "relative flex",
           panelClassName ?? "w-[44rem]",
         )}
       >
         <div
           className={cn(
-            "py-2",
-            mainColumnClassName ?? "w-[16rem] shrink-0 pl-1.5 pr-1",
+            "shrink-0 border-r border-[color:var(--color-border)] py-2",
+            mainColumnClassName ?? "pl-1.5 pr-1.5",
           )}
+          style={{ width: SIDE_MODE_LEFT_PX }}
         >
           {children}
         </div>
@@ -261,7 +285,11 @@ export function Dropdown({
             category swap shows a clean shimmer-first state. */}
         <div
           key={activeSide?.key ?? "empty"}
-          className={cn("flex-1 p-5", sidePanelClassName)}
+          className={cn(
+            "absolute inset-y-0 right-0 overflow-y-auto",
+            sidePanelClassName ?? "p-3",
+          )}
+          style={{ left: SIDE_MODE_LEFT_PX }}
         >
           {activeSide?.content}
         </div>
@@ -396,21 +424,19 @@ export function DropdownItem({
   const inner = (
     <span
       className={cn(
-        // Single hover treatment for every dropdown row, regardless
-        // of variant or sideMode: light grey backplate + medium
-        // font weight. Categories rows already had this via the
-        // `isActive` sideMode highlight; pulling `hover:font-medium`
-        // into the base styles makes plain rows (account menu, future
-        // settings dropdowns, etc.) read the same way. Layout shift
-        // from the weight bump is absorbed by the `flex-1 truncate`
-        // text span below — the row width never moves.
+        // Shared hover / active treatment across every dropdown row:
+        // light-grey backplate + brand-coloured text. Switching to
+        // colour (instead of the previous bold-weight bump) means
+        // the row never shifts width on hover, so the truncate
+        // span below is just for long labels — no layout-shift
+        // compensation needed.
         "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm",
-        "transition-colors hover:font-medium",
+        "transition-colors",
         variant === "danger"
           ? "text-red-600 hover:bg-red-50"
           : isActive || active
-            ? "bg-[color:var(--color-search)] font-medium text-[color:var(--color-ink)]"
-            : "text-[color:var(--color-ink)] hover:bg-[color:var(--color-search)]",
+            ? "bg-[color:var(--color-search)] text-[color:var(--color-brand)]"
+            : "text-[color:var(--color-ink)] hover:bg-[color:var(--color-search)] hover:text-[color:var(--color-brand)]",
         className,
       )}
     >
