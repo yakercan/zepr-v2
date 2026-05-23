@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ProductBadge } from "@/components/products/badge";
+import { ProductBadge, RatingBadge } from "@/components/products/badge";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import {
   FREE_SHIPPING_BADGE,
@@ -28,9 +28,8 @@ import type { SearchProduct } from "@/types/product";
  *   │   ── group-hover: image scale 1.03 (parallax)        │
  *   │   ── sold-out scrim when not available               │
  *   ├──────────────────────────────────────────────────────┤
- *   │  [BADGE] [FREE SHIPPING]                             │
- *   │  title    (line-clamp-2, ink)                        │
- *   │  rating   (★ 4.7 (123))                              │
+ *   │  [BADGE] [FREE SHIPPING] [★ 4.7] Product title that  │
+ *   │  wraps onto the second line if it's long (clamp-2)   │
  *   │  price    (tinted with badge accent · strikethrough) │
  *   └──────────────────────────────────────────────────────┘
  *
@@ -125,35 +124,36 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
         )}
       </div>
 
-      <div className="flex flex-col gap-1.5 p-3">
-        {/* Badge row above the title — one product badge (optional)
-            plus the free-shipping pill (optional). When neither
-            applies we skip the row entirely so the title sits flush
-            with the top of the info section. `flex-wrap` lets the
-            second pill drop to a new line on the narrowest tiles
-            instead of being clipped. */}
-        {(productBadge || showFreeShipping) && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {productBadge && <ProductBadge badge={productBadge} />}
-            {showFreeShipping && <ProductBadge badge={FREE_SHIPPING_BADGE} />}
-          </div>
-        )}
-
+      <div className="flex flex-col gap-1 p-3">
+        {/* Badges sit *inline* with the title — they flow as
+            inline-flex pills inside the `<h3>` so the title text
+            wraps naturally around them, and the line-clamp clips
+            the whole composition (badges + text) as a single block
+            of two lines max. `align-middle` lines each pill up with
+            the title's x-height instead of dropping it to the
+            baseline. Order: promo (loudest) → free shipping (trust)
+            → rating (attribute) → title. */}
         <h3 className="line-clamp-2 text-sm font-medium leading-snug text-[color:var(--color-ink)]">
+          {productBadge && (
+            <ProductBadge
+              badge={productBadge}
+              className="mr-1.5 align-middle"
+            />
+          )}
+          {showFreeShipping && (
+            <ProductBadge
+              badge={FREE_SHIPPING_BADGE}
+              className="mr-1.5 align-middle"
+            />
+          )}
+          {product.rating && (
+            <RatingBadge
+              value={product.rating.value}
+              className="mr-1.5 align-middle"
+            />
+          )}
           {product.title}
         </h3>
-
-        {product.rating && product.rating.value > 0 && (
-          <div className="flex items-center gap-1 text-xs text-[color:var(--color-ink-muted)]">
-            <span className="text-amber-500" aria-hidden>
-              ★
-            </span>
-            <span>{product.rating.value.toFixed(1)}</span>
-            {product.rating_count !== undefined && product.rating_count > 0 && (
-              <span>({product.rating_count.toLocaleString("en-US")})</span>
-            )}
-          </div>
-        )}
 
         <div className="mt-0.5 flex items-baseline gap-2">
           {/* Current price tinted with the product badge's accent —

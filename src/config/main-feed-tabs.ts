@@ -13,6 +13,7 @@
  * the user actively picks a different sort.
  */
 export type MainFeedTabId =
+  | "feed"
   | "best_sellers"
   | "hot_deals"
   | "top_rated"
@@ -26,6 +27,12 @@ export interface MainFeedTab {
 }
 
 export const MAIN_FEED_TABS: readonly MainFeedTab[] = [
+  // `feed` is the personalised / blended landing-page sort the
+  // Salespace API surfaces under `?sort=feed`. It's the default
+  // landing experience, so it lives first — the rest of the tabs
+  // exist to let the shopper narrow into a single signal
+  // (popularity, deals, rating, recency).
+  { id: "feed",         label: "Feed",         sort: "feed" },
   { id: "best_sellers", label: "Best Sellers", sort: "best_sellers:desc" },
   { id: "hot_deals",    label: "Hot Deals",    sort: "hot_deals:desc" },
   { id: "top_rated",    label: "Top Rated",    sort: "best_rated:desc" },

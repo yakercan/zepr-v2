@@ -19,8 +19,10 @@ import { cn } from "@/lib/utils";
  * just rewrites the address bar entry. The grid below reads the
  * same `?tab` param and swaps its data accordingly (added next).
  *
- * The default tab (`best_sellers`) is encoded as the *absence* of
- * the query param so the canonical home URL stays clean `/`.
+ * The default tab (`feed`) is encoded as the *absence* of the
+ * query param so the canonical home URL stays clean `/`. Every
+ * other tab — including Best Sellers — round-trips through
+ * `?tab=<id>`.
  *
  * Visual: reversed-colour pills — active is ink-on-white, idle is
  * white-on-ink. Sticks to the left edge of the page-container so the
