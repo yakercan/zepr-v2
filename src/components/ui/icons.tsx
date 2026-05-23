@@ -186,7 +186,11 @@ export function CartIcon({ className, itemCount = 0 }: CartIconProps) {
       className={cn("h-[26px] w-[26px] shrink-0", className)}
       aria-hidden
     >
-      {/* Cart body: closed top when empty, open top when filled. */}
+      {/* Cart body: closed top when empty, open top when filled.
+          `round` caps + joins so the open-top variant's free ends
+          fan softly (instead of butt-cut squares) and the closed-
+          top variant's corners read in the same family as the
+          handle / wheels — no stray sharp joints. */}
       <path
         d={
           isEmpty
@@ -195,21 +199,23 @@ export function CartIcon({ className, itemCount = 0 }: CartIconProps) {
         }
         stroke="currentColor"
         strokeWidth="7.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         fill="none"
       />
-      {/* Handle */}
+      {/* Handle — slight upward tilt off the cart's top-left corner. */}
       <line
         x1="20"
-        y1="22"
+        y1="19"
         x2="5"
-        y2="15"
+        y2="12"
         stroke="currentColor"
         strokeWidth="7.5"
         strokeLinecap="round"
       />
       {/* Wheels */}
-      <circle cx="35" cy="88" r="6" fill="currentColor" />
-      <circle cx="65" cy="88" r="6" fill="currentColor" />
+      <circle cx="35" cy="88" r="6.5" fill="currentColor" />
+      <circle cx="65" cy="88" r="6.5" fill="currentColor" />
       {/* Fruit dots — brand orange, drawn last so they paint above
           the cart body. Count drives `slice`, never overflow. */}
       {CART_FRUIT_POSITIONS.slice(0, visibleCount).map((p, i) => (
@@ -242,26 +248,29 @@ export function CartAddIcon({ className }: IconProps) {
       aria-hidden
     >
       {/* Cart body — open top, identical to the filled CartIcon
-          variant so the two glyphs share a family resemblance. */}
+          variant so the two glyphs share a family resemblance.
+          `round` caps soften the free ends at the open top. */}
       <path
         d="M20 20 L20 65 Q20 70 25 70 L75 70 Q80 70 80 65 L80 20"
         stroke="currentColor"
         strokeWidth="7.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         fill="none"
       />
-      {/* Handle */}
+      {/* Handle — slight upward tilt off the cart's top-left corner. */}
       <line
         x1="20"
-        y1="22"
+        y1="19"
         x2="5"
-        y2="15"
+        y2="12"
         stroke="currentColor"
         strokeWidth="7.5"
         strokeLinecap="round"
       />
       {/* Wheels */}
-      <circle cx="35" cy="88" r="6" fill="currentColor" />
-      <circle cx="65" cy="88" r="6" fill="currentColor" />
+      <circle cx="35" cy="88" r="6.5" fill="currentColor" />
+      <circle cx="65" cy="88" r="6.5" fill="currentColor" />
       {/* Plus inside the basket — sized to read clearly at the
           product-card scale (h-5/w-5) without crowding the basket
           walls. Sits in the upper third of the basket so it reads
