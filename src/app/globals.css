@@ -180,3 +180,152 @@
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Header                                                              */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Glassmorphic header background.
+ *
+ * Default state: translucent white over a backdrop-blur (the
+ * "modern startup" look). On hover of the header itself OR when any
+ * `<details>` inside the header is open (categories dropdown, account
+ * dropdown, future filters), the bg fades to fully opaque white so the
+ * dropdown panel reads as a continuous surface with the header strip.
+ *
+ * No React state — the open-state read uses CSS `:has(details[open])`,
+ * which is broadly supported in modern browsers. Result: state-free
+ * SiteHeader, zero re-renders on dropdown toggle.
+ */
+.site-header {
+  background-color: rgb(255 255 255 / 0.65);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  transition: background-color 200ms ease;
+}
+
+.site-header:hover,
+.site-header:has(details[open]) {
+  background-color: rgb(255 255 255 / 1);
+}
+
+/*
+ * Pill-shaped nav-link trigger shared by Best Sellers / Hot Deals
+ * static links AND by the categories / account dropdown summaries.
+ *
+ * The hover halo is a pseudo-element so it can scale + fade in
+ * smoothly instead of snapping like a `background-color` transition
+ * does. The pill is bg-transparent at rest, so the header's blur shows
+ * through; on hover it picks up a soft grey backplate.
+ */
+.header-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  position: relative;
+  font-weight: 600;
+  color: var(--color-ink);
+  border-radius: 9999px;
+  background-color: transparent;
+  transition: color 0.2s ease;
+}
+
+.header-nav-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #f6f6f6;
+  border-radius: 9999px;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 0;
+}
+
+.header-nav-link > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .header-nav-link:hover {
+    color: var(--color-brand);
+  }
+  .header-nav-link:hover::before {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Open dropdown gets the same pressed-in look as a hover, so the
+ * trigger reads as "currently active". `[open]` lives on the parent
+ * <details>, so we walk up via `:where`. */
+details[open] > .header-nav-link {
+  color: var(--color-brand);
+}
+details[open] > .header-nav-link::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/*
+ * Icon-only triggers (wishlist, cart, the account-dropdown summary).
+ * Slightly tighter padding than the labelled nav-link variant; same
+ * hover halo so the whole header stays visually consistent.
+ */
+.header-icon-button,
+.header-icon-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  position: relative;
+  color: var(--color-ink);
+  border-radius: 9999px;
+  background-color: transparent;
+  transition: color 0.2s ease;
+}
+
+.header-icon-button::before,
+.header-icon-trigger::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #f6f6f6;
+  border-radius: 9999px;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 0;
+}
+
+.header-icon-button > *,
+.header-icon-trigger > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .header-icon-button:hover,
+  .header-icon-trigger:hover {
+    color: var(--color-brand);
+  }
+  .header-icon-button:hover::before,
+  .header-icon-trigger:hover::before {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* When the account dropdown is open, light the trigger up too. The
+ * <summary> uses `.header-icon-trigger` and sits inside `<details>`. */
+details[open] > .header-icon-trigger {
+  color: var(--color-brand);
+}
+details[open] > .header-icon-trigger::before {
+  opacity: 1;
+  transform: scale(1);
+}
