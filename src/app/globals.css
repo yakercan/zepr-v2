@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/*
+ * Touch-aware "hover" variant.
+ *
+ * Tailwind's stock `hover:` only fires on devices that report a real
+ * hover capability, which means "reveal on touch" patterns (a cart
+ * badge that animates in, a press feedback overlay) just don't show
+ * up on phones. `touch:` is the inverse — it activates only on
+ * `(hover: none)` devices — so we can pair the two without forking
+ * call sites into two components.
+ */
+@custom-variant touch {
+  @media (hover: none) {
+    @slot;
+  }
+}
+
+/*
+ * Desktop-locked breakpoint variants.
+ *
+ * The desktop layout is min-width-clamped to 1280px on `<html>` (see
+ * the `html[data-device="desktop"]` rule below), which guarantees the
+ * body has at least that much room to lay out into. But Tailwind's
+ * built-in `sm:` / `md:` / `lg:` / `xl:` variants still fire on
+ * *viewport* width — so narrowing a desktop window below 1280px would
+ * collapse `lg:grid-cols-3` to a single column even though the body
+ * is comfortably 1280px wide and just being scrolled.
+ *
+ * We override each viewport-based variant so that in desktop mode the
+ * utility applies unconditionally. Net effect: in desktop mode the
+ * layout is frozen at its 1280px appearance no matter how small the
+ * window gets — the OS just shows a horizontal scrollbar, exactly
+ * mirroring the `min-width` clamp. Mobile mode keeps its true
+ * responsive behavior.
+ */
+@custom-variant sm {
+  @media (min-width: 640px) {
+    @slot;
+  }
+  &:where(html[data-device="desktop"] *) {
+    @slot;
+  }
+}
+
+@custom-variant md {
+  @media (min-width: 768px) {
+    @slot;
+  }
+  &:where(html[data-device="desktop"] *) {
+    @slot;
+  }
+}
+
+@custom-variant lg {
+  @media (min-width: 1024px) {
+    @slot;
+  }
+  &:where(html[data-device="desktop"] *) {
+    @slot;
+  }
+}
+
+@custom-variant xl {
+  @media (min-width: 1280px) {
+    @slot;
+  }
+  &:where(html[data-device="desktop"] *) {
+    @slot;
+  }
+}
+
+@theme {
+  --font-sans: "Helvetica Neue", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Arial, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+
+  --color-page: #f4f4f5;
+  --color-surface: #ffffff;
+  --color-ink: #141414;
+  --color-ink-secondary: #505050;
+  --color-ink-muted: #737373;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+
+  --color-brand: #f65f14;
+  --color-brand-hover: #e65510;
+  --color-brand-light: #fff4ed;
+  --color-brand-border: #ffd4b8;
+
+  --color-search: #f3f4f6;
+  --color-search-hover: #e8eaed;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --page-max-px: 1440px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html,
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+
+  ::selection {
+    background-color: rgb(246 95 20 / 0.2);
+    color: var(--color-ink);
+  }
+
+  /*
+   * Desktop-mode min-width clamp.
+   *
+   * The desktop layout is designed against a known minimum (header,
+   * dashboard, modals all assume room to breathe), so when the device
+   * resolver picks `desktop` we lock the page to at least 1280px.
+   * Below that the OS just shows a horizontal scrollbar instead of
+   * components collapsing in unintended ways.
+   *
+   * Mobile mode (`data-device="mobile"`) intentionally has no clamp
+   * and stays fluid down to 320px — the mobile-specific layouts own
+   * that range with their own responsive rules.
+   */
+  html[data-device="desktop"] {
+    min-width: 1280px;
+  }
+
+  /*
+   * iOS Safari auto-zooms when a form control's computed `font-size`
+   * is below 16px at focus time. Bump every text-shaped input on
+   * mobile mode to 16px so the heuristic is satisfied — for typical
+   * compact UI (`text-sm` = 14px) that's a ~14% visual increase, which
+   * also happens to improve readability on a phone.
+   */
+  html[data-device="mobile"] input,
+  html[data-device="mobile"] textarea,
+  html[data-device="mobile"] select {
+    font-size: 16px;
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  /*
+   * iOS Safari paints a grey rectangle on every tap by default. Kill
+   * it across all interactive primitives — we own press feedback via
+   * the `touch:` variant defined above.
+   */
+  @media (hover: none) {
+    button,
+    [role="button"],
+    a,
+    summary,
+    label {
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
