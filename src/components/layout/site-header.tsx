@@ -41,7 +41,7 @@ export async function SiteHeader() {
 
   return (
     <header className="site-header sticky top-0 z-50 border-b border-[color:var(--color-border)]">
-      <div className="mx-auto flex h-16 max-w-[var(--page-max-px)] items-center gap-4 px-6">
+      <div className="page-container flex h-16 items-center gap-4">
         <Logo />
 
         <nav
@@ -67,24 +67,14 @@ export async function SiteHeader() {
         <SearchBarStub />
 
         <div className="flex shrink-0 items-center gap-1">
-          <Link
-            href="/account/wishlist"
-            className="header-icon-button"
-            aria-label="Wishlist"
-          >
-            <HeartIcon />
+          <Link href="/favorites" className="header-nav-link">
+            <HeartIcon className="text-[color:var(--color-ink)]" />
+            <span className="text-[15px] font-semibold">Favorites</span>
           </Link>
 
           <AccountDropdown />
 
-          <Link
-            href="/cart"
-            className="header-icon-button"
-            aria-label="Cart"
-          >
-            <CartIcon />
-            {/* badge slot — wired up when the cart store lands */}
-          </Link>
+          <CartLink itemCount={0} />
         </div>
       </div>
     </header>
@@ -96,15 +86,19 @@ export async function SiteHeader() {
 /* ------------------------------------------------------------------ */
 
 function Logo() {
+  /* Square mark (orange tile + white "Zepr"). Same intrinsic asset
+   * size on disk as the wordmark — the 1:1 aspect just renders tighter
+   * in the header. Marked `priority` because it's above-the-fold on
+   * every route. */
   return (
     <Link href="/" className="shrink-0" aria-label={site.name}>
       <Image
-        src="/zepr-wordmark.svg"
+        src="/zepr-logo.svg"
         alt={site.name}
-        width={88}
+        width={40}
         height={40}
         priority
-        className="h-10 w-auto"
+        className="h-10 w-10"
       />
     </Link>
   );
@@ -164,6 +158,39 @@ function CategoryLineIcon({ handle }: { handle: string }) {
       height={20}
       className="h-5 w-5 object-contain"
     />
+  );
+}
+
+/**
+ * Cart trigger. Pure server component for now — it accepts a count
+ * prop so when the real cart source (cookie + Storefront API or a
+ * lightweight client store) lands, only the call site changes. The
+ * `<CartIcon>` itself handles all visual variants (empty / 1-4
+ * fruits) and a small numeric badge appears once the count exceeds
+ * the four-fruit max so the user still sees the real number.
+ */
+function CartLink({ itemCount }: { itemCount: number }) {
+  const showBadge = itemCount > 0;
+  return (
+    <Link
+      href="/cart"
+      className="header-icon-button relative"
+      aria-label={
+        itemCount === 0
+          ? "Cart, empty"
+          : `Cart, ${itemCount} item${itemCount === 1 ? "" : "s"}`
+      }
+    >
+      <CartIcon itemCount={itemCount} />
+      {showBadge && itemCount > 4 && (
+        <span
+          aria-hidden
+          className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--color-brand)] px-1 text-[10px] font-bold leading-none text-white"
+        >
+          {itemCount > 99 ? "99+" : itemCount}
+        </span>
+      )}
+    </Link>
   );
 }
 

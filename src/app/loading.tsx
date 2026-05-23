@@ -7,7 +7,7 @@
 export default function Loading() {
   return (
     <div
-      className="flex min-h-[40vh] items-center justify-center px-6 py-16"
+      className="page-container flex min-h-[40vh] items-center justify-center py-16"
       role="status"
       aria-label="Loading"
     >

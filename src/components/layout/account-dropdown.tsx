@@ -129,8 +129,8 @@ function AccountPanelLoggedIn() {
 function DiscoverItems() {
   return (
     <>
-      <DropdownItem href="/account/wishlist" icon={<WishlistIcon />}>
-        Wishlist
+      <DropdownItem href="/favorites" icon={<WishlistIcon />}>
+        Favorites
       </DropdownItem>
       <DropdownItem href="/order-tracking" icon={<TrackingIcon />}>
         Order Tracking

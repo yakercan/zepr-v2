@@ -95,7 +95,24 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
 
-  --page-max-px: 1440px;
+  /* Page-level layout tokens.
+   *
+   *   --page-max-px    — max content width on wide viewports. The
+   *                       page is centered when the viewport exceeds
+   *                       this; under it, the viewport is the limit.
+   *   --page-gutter-px — inline padding inside the page container.
+   *                       Acts as the minimum left/right gutter on
+   *                       narrow viewports, and as additional inset
+   *                       on top of the centered-container gutter on
+   *                       wide ones.
+   *
+   * Both are surfaced via the single `.page-container` utility below,
+   * so any layout that wants to align with the page bleed uses one
+   * className and inherits both at once. Don't hand-roll
+   * `mx-auto max-w-[…] px-…` combinations elsewhere — change a token
+   * here and every page tracks. */
+  --page-max-px: 1360px;
+  --page-gutter-px: 1.5rem;
 
   /* Shimmer keyframes registered as a theme token so the
      `animate-shimmer` utility is available everywhere. The animation
@@ -198,6 +215,34 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Page container                                                      */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Single source of truth for top-level page bleed. Every full-width
+ * region (header, footer, hero strips, content sections) should use
+ * this class instead of hand-rolling `mx-auto max-w-[…] px-…`. That
+ * way, adjusting `--page-max-px` or `--page-gutter-px` in `@theme`
+ * propagates to every page in one step — no drifting numbers, no
+ * "why didn't the gutter change" surprises.
+ *
+ *   max-width:        from --page-max-px (centered when exceeded)
+ *   padding-inline:   from --page-gutter-px (the actual gutter)
+ *   margin-inline:    auto (keeps the container centered)
+ *   width:            100% (so it fills the viewport up to max-width)
+ *
+ * Sections that want narrower inner content (e.g. a readable text
+ * column) should nest their own narrower `max-w-screen-*` inside this
+ * — never replace the outer gutter.
+ */
+.page-container {
+  margin-inline: auto;
+  max-width: var(--page-max-px);
+  padding-inline: var(--page-gutter-px);
+  width: 100%;
+}
+
+/* ------------------------------------------------------------------ */
 /* Header                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -287,7 +332,7 @@ details[open] > .header-nav-link::before {
 }
 
 /*
- * Icon-only triggers (wishlist, cart, the account-dropdown summary).
+ * Icon-only triggers (cart, the account-dropdown summary).
  * Slightly tighter padding than the labelled nav-link variant; same
  * hover halo so the whole header stays visually consistent.
  */

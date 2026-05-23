@@ -90,12 +90,83 @@ export function UserIcon({ className }: IconProps) {
   );
 }
 
-export function CartIcon({ className }: IconProps) {
+/* ------------------------------------------------------------------ */
+/* Cart                                                                */
+/* ------------------------------------------------------------------ */
+
+/** Number of fruit dots the cart can visually display. Anything past
+ *  this just keeps showing 4 — the badge text (rendered next to the
+ *  icon) is the source of truth for the actual count. */
+const CART_MAX_VISIBLE_FRUITS = 4;
+
+/** Static 2x2 layout for the fruit dots inside the cart body. Order
+ *  matters: the first slot fills first, so 1 item → bottom-right,
+ *  2 → bottom-row, 3 → adds top-right, 4 → fills the grid. */
+const CART_FRUIT_POSITIONS = [
+  { cx: 63, cy: 52 },
+  { cx: 37, cy: 52 },
+  { cx: 63, cy: 24 },
+  { cx: 37, cy: 24 },
+] as const;
+
+export interface CartIconProps extends IconProps {
+  /** Cart line-item count. `0` renders a closed-top empty cart;
+   *  ≥1 opens the top and drops `min(count, 4)` fruit dots inside. */
+  itemCount?: number;
+}
+
+/**
+ * Shopping cart with up to four orange "fruit" dots inside that scale
+ * with the line-item count. Mirrors the symbol the original zepr
+ * desktop header uses — the cart body, handle, and wheels render in
+ * `currentColor` (so it tints with `text-ink` / hover state), and the
+ * fruits use `var(--color-brand)` directly so they're always brand
+ * orange regardless of the surrounding text color.
+ *
+ * Cart top closes (full rounded box) when empty so the icon reads as
+ * an obvious "nothing here yet" state; opens (top edge removed) the
+ * moment there's at least one item, exposing the fruits inside.
+ */
+export function CartIcon({ className, itemCount = 0 }: CartIconProps) {
+  const safeCount = Math.max(0, Math.floor(itemCount));
+  const visibleCount = Math.min(safeCount, CART_MAX_VISIBLE_FRUITS);
+  const isEmpty = visibleCount === 0;
+
   return (
-    <svg {...svgProps(className)}>
-      <path d="M6 6h15l-1.7 9.5a2 2 0 0 1-2 1.6h-9.2a2 2 0 0 1-2-1.6L3.5 3.6A1 1 0 0 0 2.5 3H1" />
-      <circle cx="10" cy="20.5" r="1.4" />
-      <circle cx="18" cy="20.5" r="1.4" />
+    <svg
+      viewBox="0 0 100 100"
+      className={cn("h-6 w-6 shrink-0", className)}
+      aria-hidden
+    >
+      {/* Cart body: closed top when empty, open top when filled. */}
+      <path
+        d={
+          isEmpty
+            ? "M20 25 Q20 20 25 20 L75 20 Q80 20 80 25 L80 65 Q80 70 75 70 L25 70 Q20 70 20 65 Z"
+            : "M20 20 L20 65 Q20 70 25 70 L75 70 Q80 70 80 65 L80 20"
+        }
+        stroke="currentColor"
+        strokeWidth="7.5"
+        fill="none"
+      />
+      {/* Handle */}
+      <line
+        x1="20"
+        y1="22"
+        x2="5"
+        y2="15"
+        stroke="currentColor"
+        strokeWidth="7.5"
+        strokeLinecap="round"
+      />
+      {/* Wheels */}
+      <circle cx="35" cy="88" r="6" fill="currentColor" />
+      <circle cx="65" cy="88" r="6" fill="currentColor" />
+      {/* Fruit dots — brand orange, drawn last so they paint above
+          the cart body. Count drives `slice`, never overflow. */}
+      {CART_FRUIT_POSITIONS.slice(0, visibleCount).map((p, i) => (
+        <circle key={i} cx={p.cx} cy={p.cy} r="12" fill="var(--color-brand)" />
+      ))}
     </svg>
   );
 }
