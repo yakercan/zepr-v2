@@ -1,11 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PlayIcon, SmoothCaretIcon } from "@/components/ui/icons";
-import { MEDIA_OVERLAY_BUBBLE_CLASSES } from "@/lib/styles";
+import {
+  MEDIA_HOVER_ZOOM_CLASSES,
+  MEDIA_LAYER_FADE_CLASSES,
+  MEDIA_OVERLAY_BUBBLE_CLASSES,
+  MEDIA_STAGE_CLASSES,
+} from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { ProductMedia } from "@/types/product";
+
+/** Crossfade duration in ms — also the lifespan of the outgoing layer
+ *  inside `<GalleryMain>`. Keep these in lockstep: the outgoing layer
+ *  is released exactly when the incoming has reached full opacity. */
+const CROSSFADE_DURATION_MS = 300;
 
 /**
  * Product media gallery — images + videos with a vertical
@@ -77,6 +87,36 @@ export function ProductGallery({
   className,
 }: ProductGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0);
+  /* Pointer at the *previously*-active layer for the duration of the
+   * crossfade. Keeping that frame painted at full opacity beneath the
+   * incoming one prevents the gallery's search-tint backdrop from
+   * bleeding through during the transition (the cause of the
+   * mid-fade flash). `null` whenever no transition is in flight. */
+  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
+
+  /* Capture the outgoing index synchronously inside the state setter
+   * so the previously-active layer is still marked "outgoing" on the
+   * very first render that promotes its replacement to "active" —
+   * without that, the previous layer would render as a plain
+   * inactive layer (opacity 0) for one frame and the flash would be
+   * back. */
+  const navigate = useCallback((next: number) => {
+    setActiveIndex((curr) => {
+      if (curr !== next) setOutgoingIndex(curr);
+      return next;
+    });
+  }, []);
+
+  /* Release the outgoing reference once the incoming has reached full
+   * opacity. Re-running on each change naturally cancels in-flight
+   * timers via the cleanup return, so rapid navigations always keep
+   * `outgoingIndex` pinned to the most recently displaced layer
+   * rather than an older one. */
+  useEffect(() => {
+    if (outgoingIndex === null) return;
+    const t = setTimeout(() => setOutgoingIndex(null), CROSSFADE_DURATION_MS);
+    return () => clearTimeout(t);
+  }, [outgoingIndex]);
 
   if (media.length === 0) {
     return (
@@ -93,7 +133,6 @@ export function ProductGallery({
   // Defensive — keeps the gallery valid if the media list shrinks
   // out from under the current index (e.g. on revalidation).
   const safeIndex = Math.min(activeIndex, media.length - 1);
-  const active = media[safeIndex];
   const hasThumbs = media.length > 1;
 
   return (
@@ -108,22 +147,23 @@ export function ProductGallery({
         <GalleryThumbs
           media={media}
           activeIndex={safeIndex}
-          onSelect={setActiveIndex}
+          onSelect={navigate}
           title={title}
         />
       )}
       <GalleryMain
         media={media}
         activeIndex={safeIndex}
+        outgoingIndex={outgoingIndex}
         title={title}
         onPrev={
           hasThumbs && safeIndex > 0
-            ? () => setActiveIndex(safeIndex - 1)
+            ? () => navigate(safeIndex - 1)
             : undefined
         }
         onNext={
           hasThumbs && safeIndex < media.length - 1
-            ? () => setActiveIndex(safeIndex + 1)
+            ? () => navigate(safeIndex + 1)
             : undefined
         }
       />
@@ -151,10 +191,18 @@ export function ProductGallery({
  *
  *     ┌────── viewport ──────┐
  *     │ ┌──────────────────┐ │
- *     │ │ active (opacity1)│ │  ← all items stacked at inset-0
- *     │ │ (others opacity0)│ │  ← only the active one is visible
+ *     │ │ active   z-10    │ │  ← fades 0 → 100 on activation
+ *     │ │ outgoing z-0     │ │  ← stays at 100 for the transition
+ *     │ │ other   z--10    │ │  ← held at 0 (covered)
  *     │ └──────────────────┘ │
  *     └──────────────────────┘
+ *
+ * Why an outgoing layer: a naive opacity crossfade leaks the
+ * parent backdrop at midpoint (both layers semi-transparent over
+ * `--color-search`), which reads as a brief flash. Pinning the
+ * previously-active layer at full opacity directly under the
+ * incoming one keeps the viewport opaque end-to-end, so the
+ * transition fades cleanly from frame A to frame B.
  *
  * Video handling: every `<video>` stays mounted so navigation
  * doesn't trigger reloads or poster flashes. An effect drives
@@ -171,12 +219,17 @@ export function ProductGallery({
 function GalleryMain({
   media,
   activeIndex,
+  outgoingIndex,
   title,
   onPrev,
   onNext,
 }: {
   media: ReadonlyArray<ProductMedia>;
   activeIndex: number;
+  /** Index of the previously-active layer to keep painted at full
+   *  opacity for the duration of the crossfade. `null` outside of
+   *  a transition. */
+  outgoingIndex: number | null;
   title: string;
   /** Undefined when there's no previous media to step to. */
   onPrev?: () => void;
@@ -206,21 +259,29 @@ function GalleryMain({
   }, [activeIndex]);
 
   return (
-    <div
-      className={cn(
-        "group/media relative aspect-square overflow-hidden rounded-2xl",
-        "bg-[color:var(--color-search)]",
-      )}
-    >
+    <div className={cn(MEDIA_STAGE_CLASSES, "rounded-2xl")}>
       {media.map((item, i) => {
         const isActive = i === activeIndex;
+        const isOutgoing = !isActive && i === outgoingIndex;
         return (
           <div
             key={item.id}
             aria-hidden={!isActive}
             className={cn(
-              "absolute inset-0 transition-opacity duration-300 ease-out",
-              isActive ? "opacity-100" : "opacity-0",
+              "absolute inset-0",
+              MEDIA_LAYER_FADE_CLASSES,
+              /* Active + outgoing both render at full opacity. The
+               * incoming layer (now active) animates 0 → 100 because
+               * its prior class was `opacity-0`; the outgoing layer
+               * stays at 100 (no value change ⇒ no transition fires)
+               * until it slips back to the inactive pool ~300ms
+               * later, when the active above already covers it. */
+              isActive || isOutgoing ? "opacity-100" : "opacity-0",
+              /* z-stack: active on top, outgoing immediately below as
+               * the opaque backdrop for the fade, everything else
+               * tucked underneath so any delayed fade-out is hidden
+               * from view. */
+              isActive ? "z-10" : isOutgoing ? "z-0" : "-z-10",
             )}
           >
             {item.kind === "image" ? (
@@ -231,11 +292,7 @@ function GalleryMain({
                 height={item.preview.height}
                 priority={i === 0}
                 sizes="(min-width: 768px) 45vw, 100vw"
-                className={cn(
-                  "h-full w-full object-cover",
-                  "transition-transform duration-300 ease-out",
-                  "group-hover/media:scale-[1.03]",
-                )}
+                className={MEDIA_HOVER_ZOOM_CLASSES}
               />
             ) : (
               <video
@@ -248,11 +305,7 @@ function GalleryMain({
                 playsInline
                 controls
                 preload="metadata"
-                className={cn(
-                  "h-full w-full object-cover",
-                  "transition-transform duration-300 ease-out",
-                  "group-hover/media:scale-[1.03]",
-                )}
+                className={MEDIA_HOVER_ZOOM_CLASSES}
               >
                 {item.videoSources?.map((src) => (
                   <source key={src.url} src={src.url} type={src.mimeType} />
@@ -283,7 +336,9 @@ function ViewerNavButton({
       aria-label={direction === "prev" ? "Previous media" : "Next media"}
       className={cn(
         MEDIA_OVERLAY_BUBBLE_CLASSES,
-        "absolute top-1/2 -translate-y-1/2",
+        /* Sits above every media layer (active is z-10) so the
+         * controls stay clickable through the crossfade. */
+        "absolute top-1/2 z-20 -translate-y-1/2",
         direction === "prev" ? "left-3" : "right-3",
       )}
     >

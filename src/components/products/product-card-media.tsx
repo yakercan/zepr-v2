@@ -3,7 +3,12 @@
 import { useRef, type MouseEvent, type ReactNode } from "react";
 import { PlayIcon } from "@/components/ui/icons";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
-import { MEDIA_OVERLAY_BUBBLE_CLASSES } from "@/lib/styles";
+import {
+  MEDIA_HOVER_ZOOM_CLASSES,
+  MEDIA_LAYER_FADE_CLASSES,
+  MEDIA_OVERLAY_BUBBLE_CLASSES,
+  MEDIA_STAGE_CLASSES,
+} from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { SearchProduct } from "@/types/product";
 
@@ -69,7 +74,7 @@ export function ProductCardMedia({
 
   return (
     <div
-      className="group/media relative aspect-square overflow-hidden bg-[color:var(--color-search)]"
+      className={MEDIA_STAGE_CLASSES}
       onMouseEnter={hasVideo ? handleEnter : undefined}
       onMouseLeave={hasVideo ? handleLeave : undefined}
     >
@@ -78,14 +83,18 @@ export function ProductCardMedia({
         alt={product.title}
         loading={eager ? "eager" : "lazy"}
         wrapperClassName="block h-full w-full"
-        className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover/media:scale-[1.03]"
+        className={MEDIA_HOVER_ZOOM_CLASSES}
         skeletonRounded="lg"
       />
 
       {/* Hover overlay — picks ONE based on what's available.
           Sits above the primary, below the children, so badges /
           scrims always paint on top of the swap. Renders nothing
-          for products with no hover media (zero markup cost). */}
+          for products with no hover media (zero markup cost).
+          The overlay carries the fade timing only (not the hover
+          zoom): scaling sits on the primary underneath so the
+          tile reads as zooming as a whole while the overlay
+          dissolves in on top. */}
       {product.hover_video_url ? (
         <video
           ref={videoRef}
@@ -94,7 +103,11 @@ export function ProductCardMedia({
           loop
           playsInline
           preload="none"
-          className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 ease-out group-hover/media:opacity-100"
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover",
+            MEDIA_LAYER_FADE_CLASSES,
+            "opacity-0 group-hover/media:opacity-100",
+          )}
         />
       ) : product.hover_image_url ? (
         // Plain `<img>` for the same reason `<ShimmerImage>` uses
@@ -107,7 +120,11 @@ export function ProductCardMedia({
           src={product.hover_image_url}
           alt=""
           loading="lazy"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 ease-out group-hover/media:opacity-100"
+          className={cn(
+            "pointer-events-none absolute inset-0 h-full w-full object-cover",
+            MEDIA_LAYER_FADE_CLASSES,
+            "opacity-0 group-hover/media:opacity-100",
+          )}
         />
       ) : null}
 

@@ -38,6 +38,61 @@ export const SURFACE_OUTLINE_CLASSES =
   "border-2 border-[color:var(--color-border-strong)] transition-colors duration-150 hover:border-[color:var(--color-ink)]";
 
 /**
+ * Square media stage — the container that owns the `group/media`
+ * named hover scope, the absolute-positioning context for stacked
+ * layers, the overflow clip for the hover zoom, and the placeholder
+ * tint behind any not-yet-loaded image.
+ *
+ * Reused by every surface that paints a product media tile:
+ *
+ *   - product card (sharp corners; lives inside an outer rounded
+ *     card frame, no need to round here).
+ *   - PDP gallery main viewer (overridden with `rounded-2xl` — the
+ *     stage IS the visible frame on that surface).
+ *
+ * The `group/media` *named* group is the contract callers rely on:
+ * any child with `group-hover/media:…` only reacts to the cursor
+ * being over this tile, not over a sibling badge, the info row, or
+ * the surrounding page chrome.
+ */
+export const MEDIA_STAGE_CLASSES =
+  "group/media relative aspect-square overflow-hidden bg-[color:var(--color-search)]";
+
+/**
+ * Hover-zoom for a media element inside a `<MEDIA_STAGE_CLASSES />`
+ * tile — fills the parent and scales to 103% on hover with a 300ms
+ * ease-out transform transition.
+ *
+ * The exact same class string is reused 1:1 on the product card's
+ * primary image and on every media layer inside the PDP gallery —
+ * so a shopper who learns the affordance on a card sees the
+ * identical motion on the product page. Change the scale or
+ * timing here once and every surface tracks.
+ */
+export const MEDIA_HOVER_ZOOM_CLASSES =
+  "h-full w-full object-cover transition-transform duration-300 ease-out group-hover/media:scale-[1.03]";
+
+/**
+ * Opacity crossfade timing for stacked media layers — 300ms
+ * ease-out, matching `MEDIA_HOVER_ZOOM_CLASSES` so a hover that
+ * triggers both a zoom and a swap reads as one motion rather than
+ * two.
+ *
+ * Pair with `absolute inset-0` (to stack the layer) and an opacity
+ * driver at the call site — either CSS-only
+ * (`opacity-0 group-hover/media:opacity-100`, used by the product
+ * card's hover overlay) or state-driven (`opacity-0` ↔
+ * `opacity-100`, used by the PDP gallery's active / outgoing
+ * layers).
+ *
+ * Lives on a different element than `MEDIA_HOVER_ZOOM_CLASSES` —
+ * each element transitions one property, so the two timings don't
+ * conflict in `transition-property`.
+ */
+export const MEDIA_LAYER_FADE_CLASSES =
+  "transition-opacity duration-300 ease-out";
+
+/**
  * Translucent circular bubble overlay used for icon buttons that
  * sit on top of media tiles — banner slider controls, product
  * card video indicator, favorite (heart) toggle, future
