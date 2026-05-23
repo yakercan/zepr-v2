@@ -8,26 +8,41 @@ import { cn } from "@/lib/utils";
  * `ProductBadge` (text label) and `RatingBadge` (star + number)
  * both render through this primitive so the chrome — padding,
  * border weight, corner radius, baseline alignment — stays in one
- * place. The only knobs are accent colour and contents.
+ * place. Two visual modes:
+ *
+ *   • `outline` (default) — transparent fill, accent border + text.
+ *     Used in the meta row above/inline-with the title where the
+ *     pill needs to read like a tag, not a CTA.
+ *   • `solid` — accent fill, white text. Used as a louder callout
+ *     overlaid on the media (e.g. the Free Shipping pill anchored
+ *     to the bottom of the image).
  *
  * Kept module-private because every badge type the storefront
  * grows into (verified seller, in-stock, etc.) should compose this
  * helper, not re-implement the chrome.
  */
+type BadgeVariant = "outline" | "solid";
+
 function BadgeChrome({
   accent,
+  variant = "outline",
   className,
   children,
 }: {
   accent: string;
+  variant?: BadgeVariant;
   className?: string;
   children: ReactNode;
 }) {
+  const style =
+    variant === "solid"
+      ? { backgroundColor: accent, borderColor: accent, color: "#ffffff" }
+      : { borderColor: accent, color: accent };
   return (
     <span
-      style={{ borderColor: accent, color: accent }}
+      style={style}
       className={cn(
-        "inline-flex shrink-0 items-center rounded-sm border bg-transparent",
+        "inline-flex shrink-0 items-center rounded-sm border",
         "px-2 py-0.5 leading-none whitespace-nowrap",
         className,
       )}
@@ -38,18 +53,27 @@ function BadgeChrome({
 }
 
 /**
- * Outline pill carrying a `BadgeView`'s label (product badge or
- * free-shipping). Uppercase + tight tracking so it reads as a tag.
+ * Pill carrying a `BadgeView`'s label (product badge or
+ * free-shipping). Uppercase so it reads as a tag rather than a
+ * sentence. Defaults to the outlined variant; pass
+ * `variant="solid"` for the louder filled callout (e.g. the
+ * media-overlay Free Shipping pill).
  */
 export function ProductBadge({
   badge,
+  variant,
   className,
 }: {
   badge: BadgeView;
+  variant?: BadgeVariant;
   className?: string;
 }) {
   return (
-    <BadgeChrome accent={badge.theme.accent} className={className}>
+    <BadgeChrome
+      accent={badge.theme.accent}
+      variant={variant}
+      className={className}
+    >
       <span className="text-xs font-medium uppercase">{badge.label}</span>
     </BadgeChrome>
   );

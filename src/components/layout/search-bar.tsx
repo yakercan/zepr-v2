@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import {
+  useRef,
+  useState,
+  type FocusEvent,
+  type FormEvent,
+} from "react";
+import { Backdrop } from "@/components/ui/backdrop";
 import {
   ArrowRightIcon,
   CloseIcon,
@@ -61,6 +67,20 @@ export function SearchBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasValue = value.length > 0;
 
+  /* Backdrop activates the moment focus enters the search form and
+   * deactivates only when focus leaves it entirely. We use a focus-
+   * within check via `relatedTarget` so flips between the input and
+   * the clear / submit buttons inside the form don't make the
+   * backdrop flicker. The dropdown component uses the exact same
+   * `<Backdrop open={…} />` pattern — one shared overlay primitive
+   * across the whole header. */
+  const [isFocused, setIsFocused] = useState(false);
+  const handleFormFocus = () => setIsFocused(true);
+  const handleFormBlur = (e: FocusEvent<HTMLFormElement>) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setIsFocused(false);
+  };
+
   const handleClear = () => {
     setValue("");
     inputRef.current?.focus();
@@ -78,62 +98,67 @@ export function SearchBar() {
   };
 
   return (
-    <form
-      role="search"
-      action="/search"
-      method="get"
-      onSubmit={handleSubmit}
-      className="relative mx-auto h-10 min-w-0 max-w-2xl flex-1"
-    >
-      <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--color-ink-secondary)]" />
+    <>
+      <Backdrop open={isFocused} />
+      <form
+        role="search"
+        action="/search"
+        method="get"
+        onSubmit={handleSubmit}
+        onFocus={handleFormFocus}
+        onBlur={handleFormBlur}
+        className="relative mx-auto h-10 min-w-0 max-w-2xl flex-1"
+      >
+        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--color-ink-secondary)]" />
 
-      <input
-        ref={inputRef}
-        name="q"
-        type="search"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Search products, brands, and more"
-        autoComplete="off"
-        className={cn(
-          "h-10 w-full rounded-full bg-[color:var(--color-search)] pl-9 pr-15 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none transition-colors",
-          // Hover === focus visually: white fill + 2px ink ring. Makes
-          // the input look "ready" the moment the cursor touches it,
-          // and removes the tiny visual jump that used to happen on
-          // hover → focus when only the fill flipped.
-          "hover:bg-white hover:ring-2 hover:ring-[color:var(--color-ink)]",
-          "focus:bg-white focus:ring-2 focus:ring-[color:var(--color-ink)]",
+        <input
+          ref={inputRef}
+          name="q"
+          type="search"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Search products, brands, and more"
+          autoComplete="off"
+          className={cn(
+            "h-10 w-full rounded-full bg-[color:var(--color-search)] pl-9 pr-15 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none transition-colors",
+            // Hover === focus visually: white fill + 2px ink ring. Makes
+            // the input look "ready" the moment the cursor touches it,
+            // and removes the tiny visual jump that used to happen on
+            // hover → focus when only the fill flipped.
+            "hover:bg-white hover:ring-2 hover:ring-[color:var(--color-ink)]",
+            "focus:bg-white focus:ring-2 focus:ring-[color:var(--color-ink)]",
+          )}
+        />
+
+        {hasValue && (
+          <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            {/* Same footprint + hover halo on both buttons; text color
+                tells them apart — neutral × for clear, brand-orange →
+                for submit so the primary action stays obvious. */}
+            <button
+              type="button"
+              onClick={handleClear}
+              aria-label="Clear search"
+              className={cn(
+                SEARCH_BAR_BUTTON_BASE,
+                "text-[color:var(--color-ink-secondary)] hover:text-[color:var(--color-ink)]",
+              )}
+            >
+              <CloseIcon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="submit"
+              aria-label="Search"
+              className={cn(
+                SEARCH_BAR_BUTTON_BASE,
+                "text-[color:var(--color-brand)] hover:text-[color:var(--color-brand-hover)]",
+              )}
+            >
+              <ArrowRightIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
         )}
-      />
-
-      {hasValue && (
-        <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
-          {/* Same footprint + hover halo on both buttons; text color
-              tells them apart — neutral × for clear, brand-orange →
-              for submit so the primary action stays obvious. */}
-          <button
-            type="button"
-            onClick={handleClear}
-            aria-label="Clear search"
-            className={cn(
-              SEARCH_BAR_BUTTON_BASE,
-              "text-[color:var(--color-ink-secondary)] hover:text-[color:var(--color-ink)]",
-            )}
-          >
-            <CloseIcon className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="submit"
-            aria-label="Search"
-            className={cn(
-              SEARCH_BAR_BUTTON_BASE,
-              "text-[color:var(--color-brand)] hover:text-[color:var(--color-brand-hover)]",
-            )}
-          >
-            <ArrowRightIcon className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-    </form>
+      </form>
+    </>
   );
 }

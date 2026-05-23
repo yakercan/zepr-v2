@@ -52,8 +52,7 @@ export type ProductBadgeType =
   | "MOST_LIKED"
   | "TRENDING_NOW"
   | "LIMITED_TIME_DEAL"
-  | "BUNDLE_AND_SAVE"
-  | "NEW_ARRIVAL";
+  | "BUNDLE_AND_SAVE";
 
 /**
  * Two accents only:
@@ -78,7 +77,6 @@ const PRODUCT_BADGE_DEFS: Record<ProductBadgeType, BadgeView> = {
   TRENDING_NOW:      { label: "Trending",      theme: { accent: "var(--color-brand)" } },
   LIMITED_TIME_DEAL: { label: "Hot Deal",      theme: { accent: "var(--color-secondary)" } },
   BUNDLE_AND_SAVE:   { label: "Bundle & Save", theme: { accent: "var(--color-brand)" } },
-  NEW_ARRIVAL:       { label: "New",           theme: { accent: "var(--color-brand)" } },
 };
 
 /**
@@ -93,7 +91,6 @@ const PRODUCT_BADGE_PRIORITY: ProductBadgeType[] = [
   "TOP_RATED",
   "MOST_LIKED",
   "TRENDING_NOW",
-  "NEW_ARRIVAL",
 ];
 
 /**
