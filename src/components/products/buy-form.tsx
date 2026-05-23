@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { DeliveryBadge } from "@/components/products/delivery-badge";
 import { VariantPicker } from "@/components/products/variant-picker";
 import { Price } from "@/components/ui/price";
 import {
@@ -104,6 +105,11 @@ export function BuyForm({ product, className, onVariantChange }: BuyFormProps) {
       <h1 className="text-lg font-bold leading-snug text-[color:var(--color-ink)] md:text-xl">
         {product.title}
       </h1>
+
+      <DeliveryBadge
+        deliveryTime={product.deliveryTime}
+        priceCents={priceMinCents}
+      />
 
       <div className="flex flex-wrap items-baseline gap-3">
         <Price

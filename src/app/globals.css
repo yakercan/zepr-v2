@@ -99,8 +99,13 @@
    * badge. Stored as a token so the next places that need a
    * "positive trust signal" (verified seller, money-back guarantee,
    * in-stock pill, etc.) can share the exact same hue without
-   * re-picking a green each time. */
+   * re-picking a green each time. The `-soft` pair gives a paper-
+   * thin wash + matching hairline for trust callouts (PDP delivery
+   * badge today, future order-confirmation banner, etc.) so they
+   * don't compete with the panel chrome around them. */
   --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+  --color-success-soft-border: #bbf7d0;
 
   --color-search: #f3f4f6;
   --color-search-hover: #e8eaed;

@@ -122,6 +122,9 @@ const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
           }
         }
       }
+      deliveryTime: metafield(namespace: "custom", key: "delivery_time") {
+        value
+      }
     }
   }
 `;
@@ -203,6 +206,10 @@ interface RawProduct {
   variants: {
     nodes: RawVariantNode[];
   };
+  /** `custom.delivery_time` metafield — a free-text "min-max"
+   *  day range like `"7-14"`. Shopify returns `null` when the
+   *  metafield isn't set on this product. */
+  deliveryTime: { value: string } | null;
 }
 
 interface ProductByHandleResponse {
@@ -387,6 +394,7 @@ function normaliseProduct(raw: RawProduct): ProductDetail {
     media: parseMedia(raw.media.nodes),
     options: parseOptions(raw.options),
     variants: parseVariants(raw.variants.nodes),
+    deliveryTime: raw.deliveryTime?.value?.trim() || undefined,
     priceMinCents,
     priceMaxCents,
     compareAtMinCents: hasCompareAt ? compareMinCents : undefined,

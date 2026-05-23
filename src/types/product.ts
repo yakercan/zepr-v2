@@ -310,6 +310,14 @@ export interface ProductDetail {
    *  collection. Undefined when no `subcategory:` tag is set. */
   subcategory?: string;
 
+  /** Shopify `custom.delivery_time` metafield — a free-text
+   *  "min-max" day-range string (e.g. `"7-14"`). The PDP
+   *  delivery badge parses it into a real "Arrives Jun 5 –
+   *  Jun 10" projection client-side. Optional because not
+   *  every product has the metafield set; the badge falls
+   *  back to a safe default range when missing. */
+  deliveryTime?: string;
+
   /** Price range across all variants. When `min === max`, the
    *  product has a single price; otherwise the PDP renders a
    *  `$min – $max` band until a variant is picked. */
