@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PlayIcon, SmoothCaretIcon } from "@/components/ui/icons";
+import { PlayBadgeIcon, SmoothCaretIcon } from "@/components/ui/icons";
 import {
   MEDIA_HOVER_ZOOM_CLASSES,
   MEDIA_LAYER_FADE_CLASSES,
@@ -12,10 +12,14 @@ import {
 import { cn } from "@/lib/utils";
 import type { ProductMedia } from "@/types/product";
 
-/** Crossfade duration in ms — also the lifespan of the outgoing layer
- *  inside `<GalleryMain>`. Keep these in lockstep: the outgoing layer
- *  is released exactly when the incoming has reached full opacity. */
-const CROSSFADE_DURATION_MS = 300;
+/* The gallery runs a snappier cadence than the shared
+ * `MEDIA_*_CLASSES` defaults (300ms — tuned for product cards).
+ * `MEDIA_DURATION_CLASS` overrides the CSS timing via tailwind-merge,
+ * and `CROSSFADE_DURATION_MS` mirrors it on the React side so the
+ * outgoing-layer release timer is released exactly when the incoming
+ * one reaches full opacity. Keep the two numbers in lockstep. */
+const MEDIA_DURATION_CLASS = "duration-200";
+const CROSSFADE_DURATION_MS = 200;
 
 /**
  * Product media gallery — images + videos with a vertical
@@ -270,11 +274,12 @@ function GalleryMain({
             className={cn(
               "absolute inset-0",
               MEDIA_LAYER_FADE_CLASSES,
+              MEDIA_DURATION_CLASS,
               /* Active + outgoing both render at full opacity. The
                * incoming layer (now active) animates 0 → 100 because
                * its prior class was `opacity-0`; the outgoing layer
                * stays at 100 (no value change ⇒ no transition fires)
-               * until it slips back to the inactive pool ~300ms
+               * until it slips back to the inactive pool a beat
                * later, when the active above already covers it. */
               isActive || isOutgoing ? "opacity-100" : "opacity-0",
               /* z-stack: active on top, outgoing immediately below as
@@ -292,9 +297,14 @@ function GalleryMain({
                 height={item.preview.height}
                 priority={i === 0}
                 sizes="(min-width: 768px) 45vw, 100vw"
-                className={MEDIA_HOVER_ZOOM_CLASSES}
+                className={cn(MEDIA_HOVER_ZOOM_CLASSES, MEDIA_DURATION_CLASS)}
               />
             ) : (
+              /* Videos here render with native controls, so they
+               * intentionally skip the hover-zoom that images get —
+               * scaling the element would also scale the browser
+               * controls bar, which fights the user's click target.
+               * Sizing utility only. */
               <video
                 ref={(el) => {
                   videoRefs.current[i] = el;
@@ -305,7 +315,7 @@ function GalleryMain({
                 playsInline
                 controls
                 preload="metadata"
-                className={MEDIA_HOVER_ZOOM_CLASSES}
+                className="h-full w-full object-cover"
               >
                 {item.videoSources?.map((src) => (
                   <source key={src.url} src={src.url} type={src.mimeType} />
@@ -425,6 +435,11 @@ function GalleryThumbs({
               className="h-full w-full object-cover"
             />
             {item.kind === "video" && (
+              /* Legacy storefront's video-thumbnail badge: dark scrim
+               * + filled white disc with a soft-cornered triangle
+               * cut out (the triangle inherits the scrim's tint
+               * through the cutout, which is why the icon sits over
+               * `bg-black/30`). */
               <span
                 aria-hidden
                 className={
@@ -432,7 +447,7 @@ function GalleryThumbs({
                   "bg-black/30 text-white"
                 }
               >
-                <PlayIcon className="h-4 w-4" />
+                <PlayBadgeIcon className="h-8 w-8" />
               </span>
             )}
           </button>

@@ -38,6 +38,25 @@ export const SURFACE_OUTLINE_CLASSES =
   "border-2 border-[color:var(--color-border-strong)] transition-colors duration-150 hover:border-[color:var(--color-ink)]";
 
 /**
+ * Static "card" surface — rounded, soft grey 2px border, white
+ * fill. Same visual shape as a product card, but without the
+ * hover-to-ink behaviour, so it reads as a quiet info panel rather
+ * than an interactive control.
+ *
+ * Used by both PDP columns (gallery + accordion on the left, buy
+ * form on the right) so the two surfaces frame the page as a pair.
+ * Padding is left to the caller — surfaces with tight inner
+ * components (gallery, accordion) want `p-5 md:p-6`, denser
+ * surfaces may want something tighter.
+ *
+ * Distinct constant from `SURFACE_OUTLINE_CLASSES` on purpose: this
+ * one has no hover transition, so it won't fight an outer
+ * `group-hover` if a future caller wraps it in one.
+ */
+export const PANEL_SURFACE_CLASSES =
+  "rounded-2xl border-2 border-[color:var(--color-border-strong)] bg-white";
+
+/**
  * Square media stage — the container that owns the `group/media`
  * named hover scope, the absolute-positioning context for stacked
  * layers, the overflow clip for the hover zoom, and the placeholder
@@ -63,11 +82,17 @@ export const MEDIA_STAGE_CLASSES =
  * tile — fills the parent and scales to 103% on hover with a 300ms
  * ease-out transform transition.
  *
- * The exact same class string is reused 1:1 on the product card's
- * primary image and on every media layer inside the PDP gallery —
- * so a shopper who learns the affordance on a card sees the
- * identical motion on the product page. Change the scale or
- * timing here once and every surface tracks.
+ * Default duration is the product card's, since the card is by far
+ * the busiest media surface in the app. Surfaces that want a
+ * different cadence (e.g. the PDP gallery, which uses a snappier
+ * 200ms) override by appending `duration-N` to the className — the
+ * `tailwind-merge` inside `cn(…)` collapses the conflict to the
+ * latter value.
+ *
+ * The exact same class string is reused 1:1 on the card's primary
+ * image and on every media layer inside the gallery, so a shopper
+ * who learns the affordance on a card sees the identical *shape*
+ * of motion on the product page (only the duration shifts).
  */
 export const MEDIA_HOVER_ZOOM_CLASSES =
   "h-full w-full object-cover transition-transform duration-300 ease-out group-hover/media:scale-[1.03]";
@@ -76,7 +101,8 @@ export const MEDIA_HOVER_ZOOM_CLASSES =
  * Opacity crossfade timing for stacked media layers — 300ms
  * ease-out, matching `MEDIA_HOVER_ZOOM_CLASSES` so a hover that
  * triggers both a zoom and a swap reads as one motion rather than
- * two.
+ * two. Override duration at the call site (see
+ * `MEDIA_HOVER_ZOOM_CLASSES` for the same opt-out pattern).
  *
  * Pair with `absolute inset-0` (to stack the layer) and an opacity
  * driver at the call site — either CSS-only

@@ -8,7 +8,13 @@ import { ProductGallery } from "@/components/products/product-gallery";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { RichText } from "@/components/ui/rich-text";
 import { getProductByHandle } from "@/lib/shopify/products";
+import { PANEL_SURFACE_CLASSES } from "@/lib/styles";
+import { cn } from "@/lib/utils";
 import type { ProductDetail } from "@/types/product";
+
+/** Shared inner padding for both PDP columns so the gallery / buy
+ *  form sit at the same vertical inset inside their panels. */
+const PDP_PANEL_PADDING = "p-5 md:p-6";
 
 /**
  * Product Detail Page — Shopify-backed.
@@ -63,12 +69,20 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
       <Breadcrumb items={breadcrumbItems} className="mb-4" />
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-[1fr_1.1fr] md:gap-12 md:items-start">
-        {/* Left column — gallery + long-form copy. `min-w-0`
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-[1.2fr_1fr] md:gap-12 md:items-start">
+        {/* Left column — gallery + long-form copy. Wrapped in the
+            same `PANEL_SURFACE_CLASSES` panel as the right column
+            so the two sides frame the page as a pair. `min-w-0`
             because grid tracks otherwise refuse to shrink past
             their content's intrinsic min-width, which collapses
             the right column when the description has long words. */}
-        <div className="flex min-w-0 flex-col gap-6">
+        <div
+          className={cn(
+            PANEL_SURFACE_CLASSES,
+            PDP_PANEL_PADDING,
+            "flex min-w-0 flex-col gap-6",
+          )}
+        >
           <ProductGallery media={product.media} title={product.title} />
           <ProductAccordion>
             {product.descriptionHtml && (
@@ -92,20 +106,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
          *                        small breathing gap).
          *   - When the left column scrolls past its end, the grid
          *     row ends, the sticky context releases, and the page
-         *     continues into the related rail. */}
+         *     continues into the related rail.
+         *
+         * The buy form's panel framing matches the left column; the
+         * modal variant renders <BuyForm> bare because the modal
+         * shell already owns its own surface treatment. */}
         <div className="md:sticky md:top-20 md:self-start">
-          {/* PDP-specific framing for the buy form: same white
-           *  surface and 2px grey outline as the storefront's
-           *  product cards (see `SURFACE_OUTLINE_CLASSES`), so the
-           *  PDP feels visually consistent with the feed. The
-           *  modal renders <BuyForm> bare because the modal shell
-           *  already owns the white surface treatment. */}
-          <div
-            className={
-              "rounded-2xl border-2 border-[color:var(--color-border-strong)] " +
-              "bg-white p-5 md:p-6"
-            }
-          >
+          <div className={cn(PANEL_SURFACE_CLASSES, PDP_PANEL_PADDING)}>
             <BuyForm product={product} />
           </div>
         </div>

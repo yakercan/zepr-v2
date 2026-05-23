@@ -262,7 +262,7 @@ function Controls({
         onClick={onTogglePause}
       >
         {paused ? (
-          <PlayIcon className="h-4 w-4" />
+          <PlayIcon className="h-5 w-5" />
         ) : (
           <PauseIcon className="h-4 w-4" />
         )}

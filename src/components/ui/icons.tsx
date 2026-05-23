@@ -98,11 +98,18 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
-/** Play / Pause — used by the banner slider's autoplay toggle AND
- *  by the product card's "this product has a video preview"
- *  indicator (in a dark overlay bubble). Solid-fill variant so the
- *  triangle reads cleanly at the small (≈14px) sizes both surfaces
- *  use. */
+/** Play triangle — soft-cornered, filled positive shape. The
+ *  storefront's universal "play" affordance, used by:
+ *
+ *    - product card's "this product has a video preview" indicator
+ *    - banner slider's autoplay toggle (paired with `<PauseIcon>`)
+ *    - any future hover/poster overlay
+ *
+ *  Drop into a `MEDIA_OVERLAY_BUBBLE_CLASSES` bubble whenever the
+ *  surrounding chrome already provides the "disc" — the bubble's
+ *  glass and the icon's triangle compose into the same shape the
+ *  badge variant draws as one unit, without the second disc-on-disc
+ *  stacking that `<PlayBadgeIcon>` is built to avoid. */
 export function PlayIcon({ className }: IconProps) {
   return (
     <svg
@@ -111,11 +118,45 @@ export function PlayIcon({ className }: IconProps) {
       fill="currentColor"
       aria-hidden
     >
-      <path d="M8 5v14l11-7z" />
+      <path d="M11.2 6.9a1.8 1.8 0 00-2.8 1.5v7.2a1.8 1.8 0 002.8 1.5l5.4-3.6a1.8 1.8 0 000-3l-5.4-3.6z" />
     </svg>
   );
 }
 
+/** Play badge — solid disc with the same soft-cornered triangle
+ *  cut out using `evenodd` fill rule. The triangle area becomes
+ *  transparent, so dropping this over a dark overlay paints the
+ *  triangle in whatever the overlay tint is (the legacy
+ *  storefront's "video thumbnail" affordance).
+ *
+ *  Use the disc/triangle pairing — not the bare `<PlayIcon>` —
+ *  whenever the play indicator sits on a media tile (gallery
+ *  thumbnail, future video card poster) and should read as a
+ *  proper "tap to play" affordance with no external chrome around
+ *  it. */
+export function PlayBadgeIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={cn("h-5 w-5 shrink-0", className)}
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+      />
+    </svg>
+  );
+}
+
+/** Pause — twin vertical bars with soft-rounded ends. Paired with
+ *  `<PlayIcon>` in the banner slider's autoplay toggle; the
+ *  rounded ends echo the play triangle's soft corners so the two
+ *  icons read as the same family when the toggle flips between
+ *  them. `<rect rx>` is the cleanest expression of "rounded
+ *  rectangle" — no path math required. */
 export function PauseIcon({ className }: IconProps) {
   return (
     <svg
@@ -124,7 +165,8 @@ export function PauseIcon({ className }: IconProps) {
       fill="currentColor"
       aria-hidden
     >
-      <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
+      <rect x="6" y="5" width="4" height="14" rx="1.5" />
+      <rect x="14" y="5" width="4" height="14" rx="1.5" />
     </svg>
   );
 }

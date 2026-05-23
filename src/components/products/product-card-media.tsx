@@ -146,7 +146,7 @@ export function ProductCardMedia({
             "pointer-events-none absolute left-2 top-2 h-8 w-8 opacity-100 group-hover:opacity-0",
           )}
         >
-          <PlayIcon className="h-4 w-4" />
+          <PlayIcon className="h-5 w-5" />
         </div>
       )}
 
