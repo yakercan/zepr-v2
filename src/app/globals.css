@@ -133,17 +133,18 @@
    * (transform / opacity, no layout-affecting properties), so they
    * stay cheap even on lower-end devices.
    *
-   *   - `shimmer`    — skeleton highlight band sweep
-   *   - `fade-in/out`— overlay backdrops (cheap opacity-only)
-   *   - `modal-in/out`— modal panels (fade + tiny scale lift)
+   *   - `shimmer`      — skeleton highlight band sweep
+   *   - `modal-in/out` — modal panels (fade + tiny scale lift)
+   *
+   * Backdrop overlays use a plain `transition-opacity` (see
+   * `<Backdrop>`) rather than keyframe animation, so no fade-in/out
+   * tokens are needed for them.
    *
    * In/out timings are asymmetric on purpose: 200ms in feels weighty,
    * 150ms out feels responsive (dismiss should never feel sluggish).
    * The easing is a slight ease-out (`cubic-bezier(.16, 1, .3, 1)`) —
    * snappier than a stock ease, no overshoot. */
   --animate-shimmer: shimmer 1.5s linear infinite;
-  --animate-fade-in: fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  --animate-fade-out: fade-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-modal-in: modal-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-modal-out: modal-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -155,16 +156,6 @@
   100% {
     transform: translateX(100%);
   }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes fade-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
 }
 
 @keyframes modal-in {

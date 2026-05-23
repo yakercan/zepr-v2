@@ -4,39 +4,42 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Price } from "@/components/ui/price";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
-import { addCartLine } from "@/lib/cart/store";
-import { openCart } from "@/lib/cart/drawer-store";
+import { addProductToCart } from "@/lib/cart/store";
 import type { SearchProduct } from "@/types/product";
 
 /**
- * Variant picker that opens when the shopper clicks Add-to-Cart on
- * a multi-variant product from any list surface (feed, search,
- * collection, related rails).
+ * Product modal — quick variant picker that opens from a product
+ * card's Add-to-Cart pill when (and only when) the product carries
+ * real option groups (`hasVariants(product) === true`). Single-
+ * configuration products skip the modal and add directly; that
+ * branch lives in `<AddToCartButton>`.
  *
- * The Salespace search payload doesn't carry full variant data
- * today — only a `price_min / price_max` range that tells us
- * "options exist". So this iteration is intentionally a stub:
+ * Card flow only. PDPs (full product pages) keep their own inline
+ * Add-to-Cart with the pickers already on-page, so they never
+ * route through this modal.
  *
- *   - Renders the product header (image + title + range price)
- *     identically to what the PDP would show, so the modal already
- *     feels like part of the real flow.
- *   - Has a placeholder "options coming soon" section where the
- *     variant pickers (size / colour / etc.) will land once we wire
- *     the PDP fetch.
- *   - The primary CTA still adds the *base* line to the cart so
- *     end-to-end testing works today. When variants land, that CTA
- *     reads the selected variant id from local state.
- *   - Demonstrates the **stacking model** of `<Modal>`: when a
- *     destructive variation is added (currently behind the "Need
- *     help choosing?" link), we can pop a `layer="preview"` modal
- *     above this one without either component knowing about the
- *     other.
+ * Contents today:
  *
- * Animation, focus management, body-scroll lock, Escape close, and
- * backdrop-click close all live in `<Modal>` — this component just
- * owns its content.
+ *   - Product header (image + title + price + optional price range)
+ *     so the modal already feels like the real flow.
+ *   - Placeholder "option pickers" section where the real swatches
+ *     (Color, Size, Material…) will land. The data is already on
+ *     `product.options` — when the picker UI ships it reads
+ *     straight from there, no extra fetch.
+ *   - Primary CTA currently adds the base configuration. When the
+ *     picker is wired in, the CTA will compose
+ *     `productId:variantId` as the cart-line id and pass that to
+ *     `addCartLine` directly.
+ *   - Secondary "Need help choosing?" link demonstrates the
+ *     **stacking model** of `<Modal>` — opens a `layer="preview"`
+ *     modal above this one with no awareness between them.
+ *
+ * Drawer pop is handled globally by `addProductToCart` — this
+ * component only closes itself on success. Animation, focus
+ * management, body-scroll lock, Escape close, and backdrop-click
+ * close all live in `<Modal>`; this component just owns content.
  */
-export function VariantSelectorModal({
+export function ProductModal({
   product,
   open,
   onClose,
@@ -47,19 +50,9 @@ export function VariantSelectorModal({
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
 
-  function handleAddBase() {
-    addCartLine({
-      id: product.id,
-      productId: product.id,
-      handle: product.handle,
-      title: product.title,
-      imageUrl: product.image_url,
-      priceCents: product.price_min_cents,
-      compareAtCents: product.compare_at_min_cents,
-      currency: product.currency,
-    });
+  function handleAdd() {
+    addProductToCart(product);
     onClose();
-    openCart();
   }
 
   const hasRange = product.price_max_cents > product.price_min_cents;
@@ -69,7 +62,7 @@ export function VariantSelectorModal({
       <Modal
         open={open}
         onClose={onClose}
-        title="Select options"
+        title="Quick add"
         className="max-w-md"
       >
         <div className="flex flex-col gap-4 p-5">
@@ -100,12 +93,24 @@ export function VariantSelectorModal({
             </div>
           </div>
 
-          {/* Placeholder for the real variant pickers (size / colour /
-              etc.). Reserved height so the modal's vertical rhythm
-              survives the eventual upgrade. */}
-          <div className="rounded-lg bg-[color:var(--color-search)] px-4 py-6 text-center text-sm text-[color:var(--color-ink-muted)]">
-            Option pickers coming soon — adding the base configuration
-            for now.
+          {/* Picker stub — lists the actual option groups carried
+              on `product.options` (Color, Size, Material…). When
+              the real swatches ship they slot into this same
+              container, so the modal's vertical rhythm carries
+              over. Reserved height keeps the layout stable. */}
+          <div className="rounded-lg bg-[color:var(--color-search)] px-4 py-6 text-sm text-[color:var(--color-ink-muted)]">
+            <p className="text-center">
+              Option pickers coming soon — adding the base
+              configuration for now.
+            </p>
+            {product.options && (
+              <p className="mt-2 text-center text-xs text-[color:var(--color-ink-muted)]">
+                You&rsquo;ll choose:{" "}
+                <span className="font-medium text-[color:var(--color-ink-secondary)]">
+                  {Object.keys(product.options).join(" · ")}
+                </span>
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
@@ -118,7 +123,7 @@ export function VariantSelectorModal({
             </button>
             <button
               type="button"
-              onClick={handleAddBase}
+              onClick={handleAdd}
               className="btn-primary"
             >
               Add to cart
@@ -127,11 +132,11 @@ export function VariantSelectorModal({
         </div>
       </Modal>
 
-      {/* Stacked modal — opens *on top* of the variant picker via
+      {/* Stacked modal — opens *on top* of the product modal via
           `layer="preview"`. Demonstrates the layered z-index model:
-          the variant modal stays mounted underneath; this one fades
-          in cleanly above it; closing this one returns focus to the
-          variant modal without re-running its open animation. */}
+          the parent modal stays mounted underneath; this one fades
+          in cleanly above it; closing returns focus to the parent
+          without re-running its open animation. */}
       <Modal
         open={helpOpen}
         onClose={() => setHelpOpen(false)}
@@ -143,8 +148,8 @@ export function VariantSelectorModal({
           <p className="text-sm text-[color:var(--color-ink-secondary)]">
             Once option pickers ship, this dialog will surface the
             size / fit / colour guidance the PDP carries — so you
-            don&rsquo;t need to leave the cart flow to pick the right
-            variant.
+            don&rsquo;t need to leave the cart flow to pick the
+            right variant.
           </p>
           <button
             type="button"

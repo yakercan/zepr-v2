@@ -130,6 +130,10 @@ interface RawSearchProduct {
   available?: boolean;
   badges?: string[];
   metafields?: Record<string, string | number | undefined>;
+  /** Option groups keyed by option name — see `SearchProduct.options`.
+   *  The sync pipeline strips "Default Title" single-variant products,
+   *  so an empty object (or missing field) means no picker needed. */
+  options?: Record<string, unknown>;
 }
 
 function normalizeSearchResponse(
@@ -182,7 +186,29 @@ function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
     badges: raw.badges,
     rating: parseReview(raw.metafields?.["custom.review"]),
     rating_count: parseRatingCount(raw.metafields?.["custom.rating_count"]),
+    options: parseOptions(raw.options),
   };
+}
+
+/**
+ * The raw payload may carry `options` as `unknown` (the upstream
+ * type is loose). We narrow it to `Record<string, string[]>` and
+ * drop anything that doesn't fit. Returning `undefined` when
+ * there's nothing usable lets `SearchProduct.options` stay
+ * optional and lets `hasVariants()` collapse the check to a
+ * single truthy + length test.
+ */
+function parseOptions(
+  raw: Record<string, unknown> | undefined,
+): Record<string, string[]> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, string[]> = {};
+  for (const [name, values] of Object.entries(raw)) {
+    if (!Array.isArray(values)) continue;
+    const strings = values.filter((v): v is string => typeof v === "string");
+    if (strings.length > 0) out[name] = strings;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function parseReview(raw: string | number | undefined): SearchProductReview | undefined {

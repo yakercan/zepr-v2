@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { Backdrop } from "@/components/ui/backdrop";
 import { CloseIcon } from "@/components/ui/icons";
 import {
   useBodyScrollLock,
@@ -28,27 +29,47 @@ import { cn } from "@/lib/utils";
  *   1. **Stackable.** A modal can open another modal (e.g. a confirm
  *      dialog *inside* the variant picker). The `layer` prop picks
  *      the z-index tier so each level sits cleanly above the last.
- *      The tiers leave room for the existing cart drawer
- *      (z-[60]/[70]) to coexist when needed.
+ *      The tiers sit well above the header (z-50) and the cart
+ *      drawer (z-[60]/[70]) so all three can coexist.
  *   2. **Animated in *and* out.** Closing instantly is jarring —
  *      the panel rides a 150ms fade-out + tiny scale-down while the
- *      backdrop fades, then the whole DOM tree unmounts. Driven by
- *      CSS keyframes (`animate-modal-in`, `animate-modal-out`,
- *      `animate-fade-in`, `animate-fade-out`) so the GPU does the
- *      work and React never has to RAF-dance state changes.
+ *      backdrop opacity-fades in sync, then the whole DOM tree
+ *      unmounts. Panel runs CSS keyframes, backdrop runs an opacity
+ *      transition (driven by the shared `<Backdrop>`). Both are GPU-
+ *      cheap and React never has to RAF-dance state.
  *   3. **Drop-in primitive.** Body scroll lock, Escape close, and
  *      backdrop-click close are all wired internally via the shared
  *      `useBodyScrollLock` / `useEscapeClose` hooks. Call sites only
  *      manage `open` and `onClose`.
  *
- * Stacking model:
+ * **Backdrop choice — `<Backdrop coverHeader>`.** The same primitive
+ * the cart drawer uses for "above the header" overlay (the inverse
+ * of the dropdown backdrop, which sits *behind* the header so the
+ * sticky bar stays crisp). Modals are full-page takeovers, so the
+ * header fades with the rest of the page underneath. Reusing the
+ * shared `<Backdrop>` means a single source of truth for that
+ * `coverHeader` look across the app.
  *
- *   - `layer="base"`    — z-[100]/[110]  (the typical case)
- *   - `layer="preview"` — z-[120]/[130]  (modal opened *from* a modal)
- *   - `layer="confirm"` — z-[140]/[150]  (final confirm dialog on top)
+ * Stacking model (per layer):
  *
- * The pairs (backdrop / panel) sit one tier apart so panels of the
- * same layer can't accidentally render below a sibling's backdrop.
+ *   - `layer="base"`    — backdrop z-[100], panel z-[110]
+ *   - `layer="preview"` — backdrop z-[120], panel z-[130]
+ *   - `layer="confirm"` — backdrop z-[140], panel z-[150]
+ *
+ * The pairs sit one tier apart so a preview backdrop renders
+ * *above* its parent base panel (dimming it), and the preview
+ * panel sits above that backdrop. Each modal's panel z-index goes
+ * on the panel wrapper itself (not on an outer dialog div) —
+ * `position: fixed` on the wrapper creates its stacking context
+ * directly, no extra layer of nesting needed.
+ *
+ * Why the panel wrapper carries the z-index explicitly: page
+ * content using `position: relative; z-index: 1` (e.g.
+ * `.icon-bubble > *`) propagates to the root stacking context. If
+ * the modal's outer fixed div had `z-index: auto`, a `z:1` glyph
+ * would paint *above* it. Carrying the layer's z-index on the
+ * panel wrapper places the whole modal at the correct level in
+ * the root context.
  *
  * Mount lifecycle:
  *
@@ -56,7 +77,7 @@ import { cn } from "@/lib/utils";
  *   - `open=false` → keep mounted, swap to "out" animation, unmount
  *     when the panel's animation ends. Listening on the panel (not
  *     the backdrop) guarantees the panel finishes its exit even if
- *     the backdrop's animation has different timing.
+ *     the backdrop's opacity transition has different timing.
  *   - We listen for `onAnimationEnd` on the panel ONLY when
  *     `e.target === e.currentTarget`; child animations (e.g. shimmer
  *     on a loading state inside the modal) won't trigger unmount.
@@ -142,6 +163,18 @@ export function Modal({
     [open],
   );
 
+  /* React portals render into a different DOM subtree, but
+   * synthetic events still bubble up through the *React* tree to
+   * the component that mounted the modal. The shared `<Backdrop>`
+   * handles its own stopPropagation internally; we still need to
+   * stop click + mousedown on the panel wrapper so clicks landing
+   * on the panel chrome (header / close button / inside the
+   * content) can't bubble out to whatever rendered the modal
+   * (e.g. a `<Link>` around a product card). */
+  const stop = useCallback((e: React.SyntheticEvent) => {
+    e.stopPropagation();
+  }, []);
+
   /* SSR portal target. The whole modal is purely interactive — no
    * point in rendering on the server. */
   const isClient = useIsClient();
@@ -149,69 +182,68 @@ export function Modal({
 
   const zPair = LAYER_Z[layer];
 
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={ariaLabel ?? title ?? "Dialog"}
-      className="fixed inset-0"
-    >
-      {/* Backdrop — owns its own click handler. `onMouseDown` (not
-          `onClick`) so a long-press / drag inside the panel that
-          ends outside doesn't accidentally trigger a close. */}
-      <div
-        aria-hidden
-        onMouseDown={onClose}
-        className={cn(
-          "fixed inset-0 bg-black/40",
-          zPair.backdrop,
-          open ? "animate-fade-in" : "animate-fade-out",
-        )}
+  return (
+    <>
+      {/* Shared coverHeader backdrop — same primitive the cart
+          drawer uses. Per-layer z-index passed via `className` so
+          tailwind-merge replaces the component's default `z-[60]`
+          with our higher modal tier. */}
+      <Backdrop
+        open={open}
+        coverHeader
+        onClick={onClose}
+        className={zPair.backdrop}
       />
 
-      {/* Centered flex wrapper. The wrapper is `pointer-events-none`
-          so clicks pass through to the backdrop below; the inner
-          panel re-enables pointer events on itself only. This keeps
-          backdrop-click semantics intact even though the wrapper
-          sits *over* the backdrop in the DOM. */}
-      <div
-        className={cn(
-          "pointer-events-none fixed inset-0 flex items-center justify-center p-4",
-          zPair.panel,
-        )}
-      >
+      {createPortal(
         <div
-          ref={panelRef}
-          onAnimationEnd={handlePanelAnimationEnd}
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabel ?? title ?? "Dialog"}
+          onClick={stop}
+          onMouseDown={stop}
           className={cn(
-            "pointer-events-auto relative flex w-full max-w-md flex-col overflow-hidden",
-            "rounded-2xl border border-[color:var(--color-border)]",
-            "bg-[color:var(--color-surface)] shadow-2xl",
-            open ? "animate-modal-in" : "animate-modal-out",
-            className,
+            // `pointer-events-none` on the centring wrapper so a
+            // click on the empty space around the panel passes
+            // through to the backdrop below. The panel itself
+            // re-enables pointer events on itself.
+            "pointer-events-none fixed inset-0 flex items-center justify-center p-4",
+            zPair.panel,
           )}
         >
-          {title ? (
-            <div className="flex items-center justify-between border-b border-[color:var(--color-border)] px-5 py-4">
-              <h2 className="text-base font-semibold text-[color:var(--color-ink)]">
-                {title}
-              </h2>
-              {!hideClose && <ModalCloseButton onClick={onClose} />}
-            </div>
-          ) : (
-            !hideClose && (
-              <ModalCloseButton
-                onClick={onClose}
-                className="absolute right-3 top-3"
-              />
-            )
-          )}
+          <div
+            ref={panelRef}
+            onAnimationEnd={handlePanelAnimationEnd}
+            className={cn(
+              "pointer-events-auto relative flex w-full max-w-md flex-col overflow-hidden",
+              "rounded-2xl border border-[color:var(--color-border)]",
+              "bg-[color:var(--color-surface)] shadow-2xl",
+              open ? "animate-modal-in" : "animate-modal-out",
+              className,
+            )}
+          >
+            {title ? (
+              <div className="flex items-center justify-between border-b border-[color:var(--color-border)] px-5 py-4">
+                <h2 className="text-base font-semibold text-[color:var(--color-ink)]">
+                  {title}
+                </h2>
+                {!hideClose && <ModalCloseButton onClick={onClose} />}
+              </div>
+            ) : (
+              !hideClose && (
+                <ModalCloseButton
+                  onClick={onClose}
+                  className="absolute right-3 top-3"
+                />
+              )
+            )}
 
-          {children}
-        </div>
-      </div>
-    </div>,
-    document.body,
+            {children}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 

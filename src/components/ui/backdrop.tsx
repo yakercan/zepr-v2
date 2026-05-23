@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
@@ -67,10 +67,27 @@ export function Backdrop({
   const isClient = useIsClient();
   if (!isClient) return null;
 
+  /* The backdrop lives in a portal but React's synthetic events
+   * bubble through the *component* tree, not the DOM tree. Without
+   * stopping here, a click on the backdrop bubbles into whatever
+   * rendered the parent component — e.g. a modal that's nested
+   * inside a `<Link>` would close the modal AND navigate the
+   * underlying card. We stop both click and mousedown so the
+   * backdrop acts as a true shielding overlay regardless of where
+   * it's mounted in the React tree. */
+  function handleClick(e: MouseEvent<HTMLDivElement>) {
+    e.stopPropagation();
+    onClick?.();
+  }
+  function handleMouseDown(e: MouseEvent<HTMLDivElement>) {
+    e.stopPropagation();
+  }
+
   return createPortal(
     <div
       aria-hidden
-      onClick={onClick}
+      onClick={handleClick}
+      onMouseDown={handleMouseDown}
       className={cn(
         "fixed inset-0 bg-black/20",
         "transition-opacity duration-150 ease-out",

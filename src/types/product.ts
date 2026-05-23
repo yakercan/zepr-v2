@@ -43,6 +43,17 @@ export interface SearchProduct {
   /** Server-tagged badges (e.g. "BEST_SELLER", "TOP_RATED"). The
    *  product card surfaces at most one to keep the corner clean. */
   badges?: string[];
+
+  /** Option groups keyed by option name — e.g.
+   *  `{ Color: ["Pink","Blue"], Size: ["S","M","L"] }`. The
+   *  Salespace sync pipeline strips single-variant "Default Title"
+   *  products, so any product with at least one entry here has
+   *  real variants to pick from. We surface the full map (not just
+   *  a count) so the variant picker modal can render the actual
+   *  swatches without a second fetch. Card-level "needs picker?"
+   *  checks should go through `hasVariants()` in `lib/products`
+   *  rather than touching this shape directly. */
+  options?: Record<string, string[]>;
 }
 
 export interface SearchResult {

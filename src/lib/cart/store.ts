@@ -1,7 +1,9 @@
 "use client";
 
+import { openCart } from "@/lib/cart/drawer-store";
 import { createStore } from "@/lib/external-store";
 import type { CartLine } from "@/types/cart";
+import type { SearchProduct } from "@/types/product";
 
 /**
  * Cart state, persisted to `localStorage` and shared across every
@@ -129,10 +131,19 @@ function update(updater: (prev: readonly CartLine[]) => readonly CartLine[]): vo
  * exists, its quantity is incremented; otherwise a new line is
  * appended. `id` is the dedupe key, so callers that want one line
  * per variant should compose `id` as `productId + ":" + variantId`.
+ *
+ * Pops the cart drawer as a confirmation. This is the canonical
+ * "added to cart" feedback signal across the whole storefront —
+ * every add path (product card, modal, PDP, future BOGO promos,
+ * "buy again" rails) gets it for free without each callsite
+ * remembering to call `openCart()`. Pass `silent: true` for
+ * background adds (e.g. cart restore, server sync) that shouldn't
+ * trigger UI.
  */
 export function addCartLine(
   line: Omit<CartLine, "quantity">,
   quantity = 1,
+  options: { silent?: boolean } = {},
 ): void {
   if (quantity <= 0) return;
   update((prev) => {
@@ -144,6 +155,39 @@ export function addCartLine(
     }
     return [...prev, { ...line, quantity }];
   });
+  if (!options.silent) openCart();
+}
+
+/**
+ * Add a `SearchProduct` (from search / feed / category surfaces) to
+ * the cart at its base configuration. Wraps `addCartLine` with the
+ * standard product-to-line mapping so every callsite shares it —
+ * if the line shape ever gains a field (variant id, gift wrap,
+ * subscription cadence) only this function changes.
+ *
+ * For variant-resolved adds the picker UI builds its own
+ * `Omit<CartLine, "quantity">` (with a composed `productId:variantId`
+ * id) and calls `addCartLine` directly.
+ */
+export function addProductToCart(
+  product: SearchProduct,
+  quantity = 1,
+  options: { silent?: boolean } = {},
+): void {
+  addCartLine(
+    {
+      id: product.id,
+      productId: product.id,
+      handle: product.handle,
+      title: product.title,
+      imageUrl: product.image_url,
+      priceCents: product.price_min_cents,
+      compareAtCents: product.compare_at_min_cents,
+      currency: product.currency,
+    },
+    quantity,
+    options,
+  );
 }
 
 export function removeCartLine(id: string): void {
