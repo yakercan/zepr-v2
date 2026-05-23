@@ -38,7 +38,13 @@ export async function SiteHeader() {
         <Logo />
 
         <nav
-          className="flex shrink-0 items-center gap-1"
+          // `self-stretch` so the nav fills the header row's
+          // full height. Its `<details>` dropdown child then
+          // stretches against the nav (also `self-stretch`),
+          // which lets the dropdown panel anchor cleanly to the
+          // header's bottom edge via `top-full` — no hand-tuned
+          // offset needed.
+          className="flex shrink-0 items-center gap-1 self-stretch"
           aria-label="Primary navigation"
         >
           <Link href="/search" className="header-nav-link">
@@ -59,7 +65,10 @@ export async function SiteHeader() {
 
         <SearchBar />
 
-        <div className="flex shrink-0 items-center gap-1">
+        {/* Same `self-stretch` trick as the nav above — lets the
+         *  AccountDropdown's `<details>` reach the header's
+         *  bottom edge so its panel sits flush. */}
+        <div className="flex shrink-0 items-center gap-1 self-stretch">
           <Link href="/favorites" className="header-nav-link">
             <HeartIcon className="text-[color:var(--color-ink)]" />
             <span className="text-[15px] font-semibold">Favorites</span>

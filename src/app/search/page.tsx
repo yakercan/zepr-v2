@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import {
   SearchResults,
@@ -9,11 +8,13 @@ import { DEFAULT_CATEGORIES } from "@/config/categories";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
 
 /**
- * `/search?q=…&sort=…&subcategory=…&price_min=…&price_max=…&size=…&page=N`
+ * `/search[?q=…][&sort=…&subcategory=…&price_min=…&price_max=…&size=…&page=N]`
  *
- * Thin shell. Validates `?q`, generates a per-query `<title>`
- * + `noindex`, fetches the taxonomy (cached, same call the
- * header uses) and forwards the rest into `<SearchResults>`.
+ * Thin shell. Generates a per-query `<title>` + `noindex`,
+ * fetches the taxonomy (cached, same call the header uses) and
+ * forwards everything into `<SearchResults>`. Empty `?q` is a
+ * valid browse state — the upstream just returns top-ranked
+ * products and the filter bar still works as expected.
  *
  * `<Suspense key={query}>` is the only boundary on the page:
  *
@@ -56,12 +57,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q, page, sort, subcategory, price_min, price_max, size } =
     await searchParams;
   const query = (q ?? "").trim();
-
-  if (!query) {
-    // Whitespace-only or missing query → home. Avoids rendering a
-    // stranded filter bar with no results context.
-    redirect("/");
-  }
 
   // Taxonomy may be empty/null when the API is unreachable; fall
   // back to the static `DEFAULT_CATEGORIES` so the filter bar

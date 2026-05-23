@@ -73,7 +73,14 @@ const DropdownCloseContext = createContext<DropdownCloseContextValue | null>(
   null,
 );
 
-function useDropdownClose(): () => void {
+/**
+ * Hook for children inside a `<Dropdown>` who need to close the
+ * dropdown after acting (e.g. a clickable header in a sideMode
+ * panel that navigates and shouldn't leave the panel hanging
+ * open). Outside a Dropdown the hook is a no-op so consumers can
+ * be used in stand-alone contexts too.
+ */
+export function useDropdownClose(): () => void {
   const ctx = useContext(DropdownCloseContext);
   return ctx?.close ?? noop;
 }
@@ -282,12 +289,16 @@ export function Dropdown({
             side panel to unmount when the user hovers a new row, so
             old icons can't bleed through while the new ones decode.
             Pairs with the shimmer skeletons inside the panel: every
-            category swap shows a clean shimmer-first state. */}
+            category swap shows a clean shimmer-first state.
+            The column is a `flex flex-col` with `overflow-hidden`
+            so consumers can pin a header (shrink-0) above a
+            scrollable list (flex-1 overflow-y-auto) — the
+            categories panel uses this for its sticky title. */}
         <div
           key={activeSide?.key ?? "empty"}
           className={cn(
-            "absolute inset-y-0 right-0 overflow-y-auto",
-            sidePanelClassName ?? "p-3",
+            "absolute inset-y-0 right-0 flex flex-col overflow-hidden",
+            sidePanelClassName,
           )}
           style={{ left: SIDE_MODE_LEFT_PX }}
         >
@@ -316,26 +327,38 @@ export function Dropdown({
           onToggle={onToggle}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
-          /* Named group so nested `group-hover/*` scopes (e.g. the
-             subcategory tiles in the side panel) only react to their
-             own hover, not to "anywhere in the dropdown". */
-          className="group/dropdown relative"
+          /* `self-stretch` so the details fills the header row's
+             full height. The visible pill stays compact because
+             the `header-nav-link` styles live on the *inner*
+             span; the summary itself is just a transparent
+             full-height hit target. Net effect: `top-full` on
+             the panel below lands at the header row's bottom,
+             so the dropdown opens flush against the header
+             without a hand-tuned offset. Named group so nested
+             `group-hover/*` scopes (e.g. the subcategory tiles
+             in the side panel) only react to their own hover,
+             not to "anywhere in the dropdown". */
+          className="group/dropdown relative self-stretch"
         >
           <summary
             aria-label={ariaLabel}
             aria-expanded={open}
             onClick={onSummaryClick}
-            className={cn(
-              "flex cursor-pointer list-none items-center gap-1.5 select-none",
-              triggerClassName ?? "header-nav-link",
-            )}
+            className="flex h-full cursor-pointer list-none items-center select-none"
           >
-            {trigger}
-            <ChevronDownIcon className="h-3.5 w-3.5 text-[color:var(--color-ink-secondary)] transition-transform duration-200 group-open/dropdown:-rotate-180" />
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5",
+                triggerClassName ?? "header-nav-link",
+              )}
+            >
+              {trigger}
+              <ChevronDownIcon className="h-3.5 w-3.5 text-[color:var(--color-ink-secondary)] transition-transform duration-200 group-open/dropdown:-rotate-180" />
+            </span>
           </summary>
           <div
             className={cn(
-              "absolute top-[calc(100%+8px)] z-40 overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-white shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)]",
+              "absolute top-full z-40 overflow-hidden rounded-xl border border-[color:var(--color-border)] bg-white shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)]",
               align === "right" ? "right-0" : "left-0",
             )}
           >
@@ -425,18 +448,18 @@ export function DropdownItem({
     <span
       className={cn(
         // Shared hover / active treatment across every dropdown row:
-        // light-grey backplate + brand-coloured text. Switching to
-        // colour (instead of the previous bold-weight bump) means
-        // the row never shifts width on hover, so the truncate
-        // span below is just for long labels — no layout-shift
-        // compensation needed.
-        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm",
+        // very-light backplate + brand-coloured text. Bolder
+        // `font-medium` weight is baked in by default — the row
+        // already reads as a primary nav target rather than secondary
+        // body text, so we don't switch weights on hover (avoids
+        // layout shift; truncate span below only handles long labels).
+        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium",
         "transition-colors",
         variant === "danger"
           ? "text-red-600 hover:bg-red-50"
           : isActive || active
-            ? "bg-[color:var(--color-search)] text-[color:var(--color-brand)]"
-            : "text-[color:var(--color-ink)] hover:bg-[color:var(--color-search)] hover:text-[color:var(--color-brand)]",
+            ? "bg-[#fafafa] text-[color:var(--color-brand)]"
+            : "text-[color:var(--color-ink)] hover:bg-[#fafafa] hover:text-[color:var(--color-brand)]",
         className,
       )}
     >

@@ -56,7 +56,11 @@ export async function SearchResults({
 
   const result = await searchProducts(
     {
-      q: query,
+      // Empty `q` is forwarded as `undefined` so the upstream
+      // treats the request as a generic browse (top-ranked
+      // products) instead of a query for the literal empty
+      // string. The filter bar still works either way.
+      q: query || undefined,
       limit,
       // Absent `?sort` → fall back to the implicit Best Sellers
       // ranking. The pill UI shows "Sort by: Best Sellers" in
@@ -69,6 +73,8 @@ export async function SearchResults({
     },
     // Per-query cache tag so a future revalidation can target a
     // single query without nuking the whole products cache.
+    // Empty query rolls up under `search:` so the browse view
+    // shares a single bucket.
     { tags: [`search:${query}`] },
   );
 
@@ -110,13 +116,19 @@ function NoResults({ query }: { query: string }) {
       role="status"
       className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-16 text-center"
     >
-      <p className="text-sm text-[color:var(--color-ink-muted)]">
-        We couldn’t find anything matching{" "}
-        <span className="font-semibold text-[color:var(--color-ink)]">
-          “{query}”
-        </span>
-        .
-      </p>
+      {query ? (
+        <p className="text-sm text-[color:var(--color-ink-muted)]">
+          We couldn’t find anything matching{" "}
+          <span className="font-semibold text-[color:var(--color-ink)]">
+            “{query}”
+          </span>
+          .
+        </p>
+      ) : (
+        <p className="text-sm text-[color:var(--color-ink-muted)]">
+          No products to show right now.
+        </p>
+      )}
       <p className="mt-1 text-sm text-[color:var(--color-ink-muted)]">
         Try a different keyword, check your spelling, or clear a filter.
       </p>

@@ -121,6 +121,13 @@ export function CartDrawer() {
             "bg-[color:var(--color-surface)] shadow-2xl",
             "transition-transform duration-200 ease-out",
             "border-l border-[color:var(--color-border)]",
+            // Soft round only on the inboard side; the outboard
+            // edge stays flush with the viewport so the drawer
+            // still looks anchored to the screen. `overflow-hidden`
+            // is required so the footer (with its own surface bg)
+            // gets clipped to the corner curve instead of painting
+            // a square edge over it.
+            "overflow-hidden rounded-l-xl",
             open ? "translate-x-0" : "translate-x-full",
           )}
         >

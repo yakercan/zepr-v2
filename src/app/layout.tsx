@@ -14,6 +14,13 @@ export const metadata: Metadata = {
   },
   description: site.description,
   metadataBase: new URL(`https://${site.domain}`),
+  /* Favicon shares the same asset as the in-header Logo so the
+   * tab icon and the storefront mark can't drift apart. Pointing
+   * `metadata.icons` at the public file keeps a single source of
+   * truth — no `app/icon.svg` duplicate to keep in sync. */
+  icons: {
+    icon: "/zepr-logo.svg",
+  },
 };
 
 export const viewport: Viewport = {

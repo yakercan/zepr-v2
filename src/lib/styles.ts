@@ -108,19 +108,15 @@ const PILL_IDLE_CLASSES = cn(
  * selection without the visual weight of the fully-inverted
  * "fill" variant.
  *
- * Used by:
+ * Used by every pill surface in the app:
  *
- *   - filter-bar pills (Sort by, Category, Price, Size) — the
- *     selected / open state shouldn't outshout the surrounding
- *     content the way a fully-inked pill would
- *   - selection chips inside large filter panels (a grid of
- *     subcategory / size / price-bucket buttons that the user
- *     toggles into the staged state before hitting "Show
- *     results")
+ *   - homepage main-feed tabs (Feed, Best Sellers, Hot Deals, …)
+ *   - filter-bar pills (Sort by, Category, Price, Size)
+ *   - selection chips inside large filter panels
  *
- * The fill variant stays for the homepage main-feed tabs, where
- * the "this is the only feed you're seeing right now" message
- * benefits from the heavier visual weight.
+ * The `fill` variant is kept around for the rare CTA pill where
+ * a fully-inked selection makes sense, but the storefront's
+ * default selectable look is `outline`.
  */
 const PILL_OUTLINE_ACTIVE_CLASSES = cn(
   "bg-[color:var(--color-surface)] text-[color:var(--color-ink)]",

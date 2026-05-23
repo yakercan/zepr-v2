@@ -19,10 +19,11 @@
  * site re-tunes.
  */
 
-/** How many products land per "page". 20 fits a 5-column grid
- *  cleanly (4 rows) and a 4-column grid (5 rows) — both common
- *  layout choices. */
-export const PRODUCTS_PAGE_SIZE = 20;
+/** How many products land per "page". 40 fits an 8-row × 5-col
+ *  grid (most desktop layouts) or a 10-row × 4-col grid — both
+ *  give the user a meaningful chunk to browse before reaching
+ *  the "See more" button. */
+export const PRODUCTS_PAGE_SIZE = 40;
 
 /**
  * Parse the `?page=` query string value into a sane positive

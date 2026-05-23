@@ -134,18 +134,22 @@ export function SearchBar() {
    * form still routes correctly if JS fails — preserving graceful
    * degradation for free.
    *
-   * Blur whatever's currently focused *inside the form* — not
-   * just the input. Pressing Enter blurs the input, but clicking
-   * the submit (→) button moves DOM focus to the button itself,
-   * so blurring the input does nothing and the suggestion modal
-   * lingers. Querying `:focus` from the form covers both paths
-   * in one branch — the form's `onBlur` then fires with
-   * `relatedTarget=null`, collapsing backdrop + modal cleanly. */
+   * Empty submit lands on `/search` (no `?q=`), so the user
+   * stays on the search surface and can browse / filter. A
+   * trimmed query routes to `/search?q=…` as usual.
+   *
+   * Blurring targets whatever's currently focused *inside the
+   * form* — not just the input. Pressing Enter blurs the input,
+   * but clicking the submit (→) button moves DOM focus to the
+   * button itself, so blurring the input does nothing and the
+   * suggestion modal lingers. Querying `:focus` from the form
+   * covers both paths in one branch — the form's `onBlur` then
+   * fires with `relatedTarget=null`, collapsing backdrop + modal
+   * cleanly. */
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmed = value.trim();
-    if (!trimmed) return;
-    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    router.push(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/search");
     const focused = e.currentTarget.querySelector(":focus");
     if (focused instanceof HTMLElement) focused.blur();
   };
@@ -183,22 +187,32 @@ export function SearchBar() {
           )}
         />
 
-        {hasValue && (
+        {/* Right-side button group.
+         *
+         *   - Submit (→) renders while the bar is focused OR has a
+         *     value, so users see a clear "press to search" target
+         *     the moment they engage with the field — even before
+         *     typing the first character. Empty submit is a soft
+         *     dismiss (see `handleSubmit`).
+         *   - Clear (×) renders only when there's something to
+         *     clear; otherwise it'd just look broken. Order keeps
+         *     submit to the right (primary CTA position) regardless.
+         */}
+        {(isFocused || hasValue) && (
           <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
-            {/* Same footprint + hover halo on both buttons; text color
-                tells them apart — neutral × for clear, brand-orange →
-                for submit so the primary action stays obvious. */}
-            <button
-              type="button"
-              onClick={handleClear}
-              aria-label="Clear search"
-              className={cn(
-                SEARCH_BAR_BUTTON_BASE,
-                "text-[color:var(--color-ink-secondary)] hover:text-[color:var(--color-ink)]",
-              )}
-            >
-              <CloseIcon className="h-3.5 w-3.5" />
-            </button>
+            {hasValue && (
+              <button
+                type="button"
+                onClick={handleClear}
+                aria-label="Clear search"
+                className={cn(
+                  SEARCH_BAR_BUTTON_BASE,
+                  "text-[color:var(--color-ink-secondary)] hover:text-[color:var(--color-ink)]",
+                )}
+              >
+                <CloseIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               type="submit"
               aria-label="Search"

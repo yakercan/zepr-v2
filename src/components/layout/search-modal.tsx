@@ -89,7 +89,14 @@ export function SearchModal({ query, open, onClose }: SearchModalProps) {
       role="dialog"
       aria-label="Search suggestions"
       className={cn(
-        "absolute left-0 right-0 top-full z-40 mt-2",
+        // Anchor flush against the header's bottom edge — same
+        // position the category / account dropdown panels land at.
+        // The form is h-10 inside an h-16 row, so its bottom sits
+        // (16 - 10) / 2 = 12px above the row's bottom edge. Bumping
+        // the panel's top by 12px lines it up with the header
+        // bottom. Hand-tuned rather than `self-stretch`'d because
+        // the input itself must stay h-10.
+        "absolute left-0 right-0 top-[calc(100%+12px)] z-40",
         "max-h-[70vh] overflow-y-auto",
         "rounded-2xl border border-[color:var(--color-border)]",
         "bg-white shadow-lg shadow-black/10",

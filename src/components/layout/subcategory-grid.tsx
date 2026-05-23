@@ -1,63 +1,84 @@
 "use client";
 
-import { DropdownItem } from "@/components/ui/dropdown";
+import Link from "next/link";
+import { DropdownItem, useDropdownClose } from "@/components/ui/dropdown";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
  * Right-column panel inside the Categories dropdown.
  *
- * Vertical list (not a grid of bubbles): each row is a CDN PNG
- * icon + name, sharing the standard `<DropdownItem>` chrome so
- * hover / active states match the left column without bespoke
- * styling.
+ * Layout:
  *
- * The first row is "All" — same destination as clicking the
- * left-column row itself (`/category/<handle>`) but placed
- * here so users browsing the right column don't have to dart
- * back to the left column to get to the unfiltered category.
+ *   - **Clickable title** (shrink-0) — the category name itself
+ *     is the "All" affordance: clicking it navigates to
+ *     `/category/<handle>` (the unfiltered category) and closes
+ *     the dropdown. Hovers brand-orange to telegraph the link.
+ *     A soft drop-shadow under the bottom border lifts it above
+ *     the scrolling list.
+ *   - **Scrolling list** (flex-1 overflow-y-auto) — vertical
+ *     "PNG icon + name" rows, one per subcategory, separated by
+ *     hairline dividers. Empty (no subcategories) collapses to
+ *     just the title — still a useful entry point.
  *
- * The list scrolls inside its absolutely-positioned parent
- * column (see `<Dropdown>` sideMode notes) so a category with
- * 30 subcategories doesn't blow out the panel height — the
- * panel always ends where the left column's category list ends.
- *
- * The component re-mounts (via the parent's `key`) every time
- * the active row changes, so the previous category's icons can
- * never bleed through into the next render.
+ * Subcategory rows reuse `<DropdownItem>` so the shared hover /
+ * active treatment carries over for free. The component
+ * re-mounts (via the parent's `key`) on every category swap, so
+ * the previous category's icons can never bleed through into the
+ * next render.
  */
 export function SubcategoryGrid({ category }: { category: TaxonomyCategory }) {
   const subcategories = category.subcategories ?? [];
+  const close = useDropdownClose();
 
   return (
-    <div className="flex flex-col">
-      <h3 className="mb-1 truncate px-3 pt-1 text-base font-semibold text-[color:var(--color-ink)]">
-        {category.name}
-      </h3>
-
-      <DropdownItem
+    <div className="flex h-full flex-col">
+      <Link
         href={`/category/${category.handle}`}
-        icon={<SubcategoryIcon src={category.iconUrl} fallback="All" />}
+        onClick={close}
+        className={
+          // Sticky header treatment: bottom border + soft drop
+          // shadow. The shadow is intentionally subtle — it
+          // reads as a quiet lift rather than a hard rule. Hover
+          // tints to brand-orange so the title clearly registers
+          // as the "browse all" target.
+          "block shrink-0 truncate border-b border-[color:var(--color-border)] px-4 py-3 text-base font-semibold text-[color:var(--color-ink)] transition-colors hover:text-[color:var(--color-brand)] shadow-[0_4px_8px_-6px_rgba(0,0,0,0.08)]"
+        }
       >
-        All
-      </DropdownItem>
-      {subcategories.map((sub) => (
-        <DropdownItem
-          key={sub.id}
-          href={`/category/${category.handle}?subcategory=${encodeURIComponent(sub.name)}`}
-          icon={<SubcategoryIcon src={sub.iconUrl} fallback={sub.name} />}
-        >
-          {sub.name}
-        </DropdownItem>
-      ))}
+        {category.name}
+      </Link>
+
+      {/* Inset dividers — a hairline placed between items rather
+       *  than `divide-y` on the wrapper so the line can be
+       *  margin-inset to match the row's inner padding (and the
+       *  hover bg's rounded corners). Aligns the divider with
+       *  where the item *visually* starts instead of butting it
+       *  against the panel edges. */}
+      <div className="flex-1 overflow-y-auto py-1">
+        {subcategories.map((sub, i) => (
+          <div key={sub.id}>
+            {i > 0 && (
+              <div
+                aria-hidden
+                className="mx-3 h-px bg-[color:var(--color-border)]"
+              />
+            )}
+            <DropdownItem
+              href={`/category/${category.handle}?subcategory=${encodeURIComponent(sub.name)}`}
+              icon={<SubcategoryIcon src={sub.iconUrl} fallback={sub.name} />}
+            >
+              {sub.name}
+            </DropdownItem>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-/* Icon size mirrors the chunkier banner-like feel the user
- * wanted — bigger than the 16px account-dropdown SVGs but still
- * compact enough that rows don't tower. Width === height keeps
- * the shimmer skeleton circular while the PNG decodes. */
+/* Icon size — compact enough that rows don't tower but still
+ * large enough for the PNG to read at a glance. Width === height
+ * so the shimmer skeleton stays circular while the image decodes. */
 const SUBCATEGORY_ICON_PX = 28;
 
 function SubcategoryIcon({
@@ -65,8 +86,8 @@ function SubcategoryIcon({
   fallback,
 }: {
   src: string | null;
-  /** Single-glyph stand-in (first letter, "All", …) when the
-   *  taxonomy didn't ship an icon for this entry. */
+  /** Single-glyph stand-in when the taxonomy didn't ship an
+   *  icon for this entry. */
   fallback: string;
 }) {
   if (!src) {

@@ -50,10 +50,11 @@ export function CategoriesDropdown({
     <Dropdown
       sideMode
       // 48rem total → left column (locked at 16rem inside the
-      // Dropdown) + 32rem of right-column space for the list +
-      // its built-in row padding.
+      // Dropdown) + 32rem of right-column space for the list.
+      // Right-column padding lives inside `<SubcategoryGrid>` so
+      // the sticky title and the scrollable list can pad
+      // independently.
       panelClassName="w-[48rem]"
-      sidePanelClassName="p-3"
       trigger={
         activeCategory ? (
           <>

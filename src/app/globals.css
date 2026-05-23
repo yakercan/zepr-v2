@@ -391,9 +391,8 @@
  * search focus.
  */
 .site-header {
-  background-color: rgb(255 255 255 / 0.65);
+  background-color: rgb(255 255 255 / 0.96);
   backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
   transition: background-color 200ms ease;
 }
 
@@ -422,7 +421,6 @@
   color: var(--color-ink);
   border-radius: 9999px;
   background-color: transparent;
-  transition: color 0.2s ease;
 }
 
 .header-nav-link::before {
@@ -442,23 +440,17 @@
   z-index: 1;
 }
 
+/* Hover (and open-dropdown) state is the grey bubble alone — no
+ * brand-colour text swap. The pill stays ink-coloured throughout
+ * so users get a clean "selected" affordance without the trigger
+ * label visually competing with the dropdown panel beneath it. */
 @media (hover: hover) and (pointer: fine) {
-  .header-nav-link:hover {
-    color: var(--color-brand);
-  }
   .header-nav-link:hover::before {
     opacity: 1;
     transform: scale(1);
   }
 }
-
-/* Open dropdown gets the same pressed-in look as a hover, so the
- * trigger reads as "currently active". `[open]` lives on the parent
- * <details>, so we walk up via `:where`. */
-details[open] > .header-nav-link {
-  color: var(--color-brand);
-}
-details[open] > .header-nav-link::before {
+details[open] .header-nav-link::before {
   opacity: 1;
   transform: scale(1);
 }

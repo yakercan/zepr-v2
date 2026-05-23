@@ -100,7 +100,7 @@ export function MainFeedTabs() {
             aria-selected={isActive}
             tabIndex={isActive ? 0 : -1}
             onClick={() => handleSelect(tab.id)}
-            className={pillClasses(isActive)}
+            className={pillClasses(isActive, "outline")}
           >
             {tab.label}
           </button>
