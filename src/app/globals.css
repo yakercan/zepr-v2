@@ -259,14 +259,22 @@
  * Glassmorphic header background.
  *
  * Default state: translucent white over a backdrop-blur (the
- * "modern startup" look). On hover of the header itself OR when any
- * `<details>` inside the header is open (categories dropdown, account
- * dropdown, future filters), the bg fades to fully opaque white so the
- * dropdown panel reads as a continuous surface with the header strip.
+ * "modern startup" look). The bg fades to fully opaque white on any
+ * of three triggers, each of which signals "the header is the
+ * active surface right now":
  *
- * No React state — the open-state read uses CSS `:has(details[open])`,
- * which is broadly supported in modern browsers. Result: state-free
- * SiteHeader, zero re-renders on dropdown toggle.
+ *   1. `:hover`                                — pointer over header
+ *   2. `:has(details[open])`                   — a dropdown is open
+ *   3. `:has(form[role="search"]:focus-within)` — search bar focused
+ *
+ * The search-form match uses `:focus-within` (not `:focus`) so the
+ * white state holds steady while focus passes between the input and
+ * its inline clear / submit buttons — same focus-within semantic the
+ * SearchBar uses on the React side to drive the backdrop.
+ *
+ * No React state — all three reads are CSS, so SiteHeader stays a
+ * pure server component with zero re-renders on dropdown toggle or
+ * search focus.
  */
 .site-header {
   background-color: rgb(255 255 255 / 0.65);
@@ -276,7 +284,8 @@
 }
 
 .site-header:hover,
-.site-header:has(details[open]) {
+.site-header:has(details[open]),
+.site-header:has(form[role="search"]:focus-within) {
   background-color: rgb(255 255 255 / 1);
 }
 
