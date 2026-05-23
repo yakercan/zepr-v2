@@ -16,6 +16,51 @@ import type { ProductOption, ProductVariant } from "@/types/product";
 export type OptionSelection = Record<string, string>;
 
 /**
+ * PDP top picker — should this option render as a dropdown
+ * instead of a chip row?
+ *
+ * Per-option decision (independent of sibling options): a row is
+ * promoted to a dropdown only when its value list grows past 8.
+ * Below that, chips stay scannable on the PDP's roomier picker
+ * column and the eye prefers the visual catalog of values over a
+ * collapsed trigger. A 9-colour or 12-size option then folds
+ * into a compact dropdown so the buy stack doesn't push the
+ * CTAs below the fold.
+ *
+ * Mixed pickers are fine — one option can be chips, another a
+ * dropdown. The caller (`variant-picker.tsx`) lays them out
+ * accordingly: all-dropdown PDPs flow inline like pill buttons,
+ * anything with a chip row stays in a vertical stack so each
+ * chip row gets its full "Color: Blue" header.
+ */
+export function shouldUseDropdownForPdp(option: ProductOption): boolean {
+  return option.values.length > 8;
+}
+
+/**
+ * Tiered-offer unit cards — should this option render as a
+ * dropdown instead of a chip row?
+ *
+ * The unit cards are dense (a single inline row per slot:
+ * `#N · thumb · chips/dropdowns · arrow`) so the threshold is
+ * much tighter than the PDP picker:
+ *
+ *   - Multiple option groups on the same card → all options as
+ *     dropdowns. Stacking two chip rows inside a card balloons
+ *     the card's vertical height; one dropdown per option fits
+ *     on a single line.
+ *   - A single option with more than three values → dropdown.
+ *     Anything wider than three chips starts pushing the card
+ *     past the picker column on narrow viewports.
+ */
+export function shouldUseDropdownForOfferUnit(
+  options: readonly ProductOption[],
+  option: ProductOption,
+): boolean {
+  return options.length > 1 || option.values.length > 3;
+}
+
+/**
  * Find the variant whose `selectedOptions` exactly matches every
  * entry in `selection`. Returns `undefined` when the selection is
  * partial (some options unset) or refers to a combination the

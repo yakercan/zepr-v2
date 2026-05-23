@@ -6,7 +6,11 @@ import {
 import { ProductLayout } from "@/components/products/product-layout";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { RichText } from "@/components/ui/rich-text";
-import { getProductByHandle } from "@/lib/shopify/products";
+import { env } from "@/env";
+import {
+  getCompanionProducts,
+  getProductByHandle,
+} from "@/lib/shopify/products";
 import type { ProductDetail } from "@/types/product";
 
 /**
@@ -53,10 +57,29 @@ interface ProductPageProps {
 
 export default async function ProductPage({ params }: ProductPageProps) {
   const { handle } = await params;
-  const product = await getProductByHandle(handle);
-  if (!product) notFound();
+  const baseProduct = await getProductByHandle(handle);
+  if (!baseProduct) notFound();
+
+  /* Tiered-offers bundle slots — if the `custom.offers` metafield
+   * called out companion product ids, fetch them in one extra
+   * Storefront round-trip alongside the anchor. We await here
+   * (instead of streaming via Suspense) because the buy-form
+   * needs companion data on first paint to render the right tier
+   * preselect + per-unit pickers without a layout shift. */
+  const bundleCompanions = await getCompanionProducts(
+    baseProduct.offers.bundleCompanionIds,
+  );
+  const product: ProductDetail = { ...baseProduct, bundleCompanions };
 
   const breadcrumbItems = buildBreadcrumb(product);
+
+  /* Buy Now hands off to Shopify's hosted checkout via a cart
+   * permalink. Prefer the dedicated checkout subdomain when set,
+   * otherwise fall back to the storefront's `.myshopify.com`
+   * hostname — Shopify accepts the same `/cart/<variant>:<qty>`
+   * shape on both, so the CTA keeps working in either env shape. */
+  const checkoutDomain =
+    env.SHOPIFY_CHECKOUT_DOMAIN ?? env.SHOPIFY_STOREFRONT_DOMAIN;
 
   return (
     <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
@@ -67,6 +90,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
        *  <ProductAccordionItem>s alongside "Details". */}
       <ProductLayout
         product={product}
+        checkoutDomain={checkoutDomain}
         extraLeft={
           <ProductAccordion>
             {product.descriptionHtml && (

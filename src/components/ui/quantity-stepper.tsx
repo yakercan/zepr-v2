@@ -51,7 +51,7 @@ export function QuantityStepper({
     "inline-flex items-center justify-center text-[color:var(--color-ink)]",
     "transition-colors hover:bg-[color:var(--color-search)]",
     "first:rounded-l-full last:rounded-r-full",
-    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
+    "disabled:opacity-40 disabled:hover:bg-transparent",
     isSm ? "h-7 w-7" : "h-11 w-10",
   );
   const labelClasses = cn(
@@ -65,7 +65,13 @@ export function QuantityStepper({
       aria-label="Quantity"
       className={cn(
         "inline-flex shrink-0 items-center rounded-full bg-[color:var(--color-surface)]",
-        "border border-[color:var(--color-border)]",
+        /* `md` sits beside `.btn-secondary` on the PDP buy-row, so
+         * it borrows the same 2px strong-border outline for visual
+         * parity. `sm` keeps the lighter 1px border that suits the
+         * denser cart-drawer row. */
+        isSm
+          ? "border border-[color:var(--color-border)]"
+          : "border-2 border-[color:var(--color-border-strong)]",
         className,
       )}
     >

@@ -1,3 +1,5 @@
+import type { ParsedOffers } from "@/lib/offers";
+
 /**
  * Salespace search-API product types — kept intentionally minimal.
  *
@@ -220,6 +222,27 @@ export interface ProductVariant {
 }
 
 /**
+ * Trimmed product shape used for tiered-offers bundle slots.
+ *
+ * A companion is the "other product" in a Buy 2 / Buy 3 bundle —
+ * its variants drive a per-unit picker card in the tile's
+ * expansion, and its title / handle link out to its PDP. We don't
+ * need the full long-tail metadata (descriptionHtml, primary
+ * collection, deliveryTime, …) for that, so this slimmer shape
+ * keeps the companion fetch small and the type surface honest
+ * about what's actually used downstream.
+ */
+export interface CompanionProduct {
+  id: string;
+  handle: string;
+  title: string;
+  availableForSale: boolean;
+  featuredImage: ProductImage | null;
+  options: ProductOption[];
+  variants: ProductVariant[];
+}
+
+/**
  * The PDP-shaped product view, hydrated from Shopify's Storefront
  * Graph (see `lib/shopify/products.ts`).
  *
@@ -317,6 +340,26 @@ export interface ProductDetail {
    *  every product has the metafield set; the badge falls
    *  back to a safe default range when missing. */
   deliveryTime?: string;
+
+  /** Parsed `custom.offers` metafield — tile count plus any
+   *  bundle-companion product ids that fill slots 1..N. See
+   *  `lib/offers.ts#parseOffersMetafield` for the recognised
+   *  metafield shapes. `tilesCount: 0` means the picker is
+   *  hidden and the qty stepper takes its place. */
+  offers: ParsedOffers;
+
+  /** Companion products fetched for the `offers.bundleCompanionIds`
+   *  bundle slots. Same length as `offers.bundleCompanionIds`,
+   *  with `null` entries where the lookup didn't resolve
+   *  (deleted, unpublished, network failure) — the affected slot
+   *  silently falls back to anchor in the picker rather than
+   *  killing the whole tier.
+   *
+   *  Hydrated by the PDP server route (parallel Storefront
+   *  fetch alongside the main product). Lives on the product
+   *  payload itself so client islands don't have to chase a
+   *  second round-trip or context provider for it. */
+  bundleCompanions: ReadonlyArray<CompanionProduct | null>;
 
   /** Price range across all variants. When `min === max`, the
    *  product has a single price; otherwise the PDP renders a

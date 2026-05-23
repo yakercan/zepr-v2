@@ -35,12 +35,20 @@ const PDP_PANEL_PADDING = "p-5 md:p-6";
 
 export interface ProductLayoutProps {
   product: ProductDetail;
+  /** Shopify checkout hostname — threaded through to `<BuyForm>`
+   *  → `<BuyActions>` for the Buy Now cart permalink. Owned by
+   *  the server route so the client tree never reaches into env. */
+  checkoutDomain: string;
   /** Content rendered below the gallery inside the left panel —
    *  description accordion today, more long-form sections later. */
   extraLeft?: ReactNode;
 }
 
-export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
+export function ProductLayout({
+  product,
+  checkoutDomain,
+  extraLeft,
+}: ProductLayoutProps) {
   /* Pre-built `url → media index` map. Variants reference their
    * image by URL (Shopify's variant.image is a separate node from
    * the product's media gallery, but they share image URLs when
@@ -122,7 +130,11 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
        *     continues into whatever comes after the layout. */}
       <div className="md:sticky md:top-20 md:self-start">
         <div className={cn(PANEL_SURFACE_CLASSES, PDP_PANEL_PADDING)}>
-          <BuyForm product={product} onVariantChange={handleVariantChange} />
+          <BuyForm
+            product={product}
+            checkoutDomain={checkoutDomain}
+            onVariantChange={handleVariantChange}
+          />
         </div>
       </div>
     </div>

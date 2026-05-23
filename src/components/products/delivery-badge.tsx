@@ -1,6 +1,3 @@
-"use client";
-
-import { useSyncExternalStore } from "react";
 import { ZEPR_ICONS, ZeprIcon } from "@/components/ui/icons";
 import { qualifiesForFreeShipping } from "@/lib/badges";
 import { cn } from "@/lib/utils";
@@ -25,19 +22,21 @@ import { cn } from "@/lib/utils";
  *     Hides under `sm` (along with the divider) so narrow
  *     surfaces like the variant-picker modal don't wrap.
  *
- * Dates are derived client-only. The arrival range depends on
- * the user's locale + today's date, neither of which is stable
- * on the server (the PDP is ISR-cached, so the server's "today"
- * may be hours or days stale). `useSyncExternalStore` with a
- * `null` server snapshot paints a readable "Ships in 7-14 days"
- * fallback during SSR + first client render, then swaps in
- * "Arrives Jun 5 – Jun 10" after hydration — no mismatch
- * warning, no `suppressHydrationWarning` hack.
+ * Dates render synchronously — server-rendered HTML carries the
+ * final "Arrives …" string straight to the first paint, so there
+ * is no swap-in flash on refresh. The page is ISR-cached at
+ * 1 h granularity (see `revalidate` on the PDP route), so the
+ * cached date can drift by up to that window vs. the user's
+ * real "today"; `suppressHydrationWarning` on the date span
+ * silences React's hydration check for the rare boundary where
+ * SSR and hydration land on different calendar days. The display
+ * is intentionally cache-time, not real-time, since the alternative
+ * (re-computing on the client after mount) is exactly the
+ * flash the shopper sees today.
  */
 
 const DEFAULT_DELIVERY_TIME = "7-14";
 const CREDIT_AMOUNT_LABEL = "$5.00 credit for delay";
-const noopSubscribe = () => () => {};
 
 function formatDeliveryRange(deliveryTime: string): string {
   const parts = deliveryTime.split("-").map((s) => Number.parseInt(s.trim(), 10));
@@ -75,17 +74,7 @@ export function DeliveryBadge({
   className,
 }: DeliveryBadgeProps) {
   const free = qualifiesForFreeShipping(priceCents);
-
-  const dateRange = useSyncExternalStore(
-    noopSubscribe,
-    () => formatDeliveryRange(deliveryTime),
-    () => null,
-  );
-
-  /* Pre-hydration fallback — readable English over an empty
-   *  span. The client adopts the formatted range the moment
-   *  hydration runs. */
-  const arrivalLabel = dateRange ?? `Ships in ${deliveryTime} days`;
+  const arrivalLabel = formatDeliveryRange(deliveryTime);
 
   return (
     <div
@@ -101,10 +90,14 @@ export function DeliveryBadge({
       {free ? (
         <div className="flex flex-col leading-tight">
           <span className="text-sm font-semibold">Free Shipping</span>
-          <span className="text-xs">{arrivalLabel}</span>
+          <span className="text-xs" suppressHydrationWarning>
+            {arrivalLabel}
+          </span>
         </div>
       ) : (
-        <span className="text-sm font-medium">{arrivalLabel}</span>
+        <span className="text-sm font-medium" suppressHydrationWarning>
+          {arrivalLabel}
+        </span>
       )}
 
       <span

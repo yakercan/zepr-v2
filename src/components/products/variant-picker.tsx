@@ -1,18 +1,38 @@
 "use client";
 
-import { availableValuesFor, type OptionSelection } from "@/lib/variants";
+import { VariantDropdown } from "@/components/products/variant-dropdown";
+import {
+  availableValuesFor,
+  shouldUseDropdownForPdp,
+  type OptionSelection,
+} from "@/lib/variants";
 import { pillClasses } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { ProductOption, ProductVariant } from "@/types/product";
 
 /**
  * Option picker for the PDP — one row per option group (Color,
- * Size, Material…), each row a wrap-flowing strip of pills.
+ * Size, Material…). Each option independently picks its
+ * presentation via `shouldUseDropdownForPdp`:
  *
- * Visual language: reuses `pillClasses(active, "outline")`, the
- * same component the search-page filter chips and homepage feed
- * tabs render with. "Pick one of these" looks the same wherever
- * the storefront asks the question.
+ *   - ≤ 8 values → chips with a "Color: Blue" header above the
+ *     wrap row. Stays scannable at a glance and one tap commits.
+ *   - > 8 values → dropdown. The collapsed pill trades a visual
+ *     catalogue for one extra click but stops a 12-colour row
+ *     from blowing the buy column out vertically.
+ *
+ * Layout adapts to the mix:
+ *
+ *   - All dropdowns → wrap-flowing row of pill triggers, just
+ *     like a chip row. Side-by-side compresses a Color + Size +
+ *     Material PDP onto a single visual line.
+ *   - Anything else → vertical stack so each chip row keeps its
+ *     own "Color: Blue" header above its wrap row.
+ *
+ * Visual language: `pillClasses(active, "outline")` for both
+ * modes so "Pick one of these" reads the same dialect across the
+ * storefront — chip pills, dropdown triggers, filter pills, tab
+ * pills all share one shape.
  *
  * Cascade: only values that are *reachable* given the current
  * upstream selection are rendered. The first option group shows
@@ -20,14 +40,9 @@ import type { ProductOption, ProductVariant } from "@/types/product";
  * never paint a strike-through "you can't reach this" pill — the
  * caller's `onSelect` handler (`cascadeSelect`) keeps the
  * downstream selection valid, so impossible combos simply don't
- * appear. Cleaner than the cross-out treatment and matches the
- * legacy storefront's feel.
+ * appear.
  *
- * Pure presentation — selection state lives in `<BuyForm>`. The
- * picker is fed a `selection` and an `onSelect(name, value)`
- * callback; it never mutates anything itself. Lets us share the
- * same picker in the future product-modal-on-card flow without
- * its state leaking back to the card.
+ * Pure presentation — selection state lives in `<BuyForm>`.
  */
 export interface VariantPickerProps {
   options: readonly ProductOption[];
@@ -46,11 +61,20 @@ export function VariantPicker({
 }: VariantPickerProps) {
   if (options.length === 0) return null;
 
+  /* All-dropdown PDPs lay their triggers out side-by-side like a
+   * chip row — single visual line for Color + Size + Material.
+   * Mixed (some dropdowns, some chips) or all-chips stay in the
+   * vertical stack so each chip row keeps its label header. */
+  const allDropdowns = options.every(shouldUseDropdownForPdp);
+
   return (
     <div
       role="group"
       aria-label="Product options"
-      className={cn("flex flex-col gap-5", className)}
+      className={cn(
+        allDropdowns ? "flex flex-wrap gap-2" : "flex flex-col gap-5",
+        className,
+      )}
     >
       {options.map((option) => {
         const currentValue = selection[option.name];
@@ -65,10 +89,22 @@ export function VariantPicker({
          * under the current upstream selection. Empty rows are
          * dropped entirely so the picker never paints a blank
          * label header with no chips below. */
-        const visibleValues = option.values.filter((v) =>
-          reachable.has(v),
-        );
+        const visibleValues = option.values.filter((v) => reachable.has(v));
         if (visibleValues.length === 0) return null;
+
+        if (shouldUseDropdownForPdp(option)) {
+          /* The dropdown trigger already carries the "Color:
+           * Blue" composition, so we skip the chip-mode header. */
+          return (
+            <VariantDropdown
+              key={option.name}
+              optionName={option.name}
+              currentValue={currentValue}
+              values={visibleValues}
+              onSelect={(value) => onSelect(option.name, value)}
+            />
+          );
+        }
 
         return (
           <div key={option.name} className="flex flex-col gap-3">

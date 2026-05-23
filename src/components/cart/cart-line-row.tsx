@@ -18,8 +18,8 @@ import type { CartLine } from "@/types/cart";
  * Layout:
  *
  *   ┌───────────────────────────────────────────────────────────────┐
- *   │ [image] Title (clamps to 2 lines)              $price         │
- *   │  80×80  variant (optional)                     $compare       │
+ *   │ [image] Title (clamps to 2 lines)                     $price  │
+ *   │  80×80  variant (optional)                            $compare│
  *   │         [- 1 +]  [trash]                                      │
  *   └───────────────────────────────────────────────────────────────┘
  *
@@ -35,9 +35,18 @@ import type { CartLine } from "@/types/cart";
  *     with 0, which routes through `removeCartLine` in the store —
  *     one mental model: "go below 1 and the line is gone". The
  *     trash button is a one-click escape hatch for the common case.
- *   - Prices use the shared `<Price>` component, compact variant so
- *     a busy drawer stays scannable. The line total = unit × qty;
- *     compare-at is shown only on discounted lines.
+ *   - Prices use the shared `<Price>` component, compact variant
+ *     so a busy drawer stays scannable. The line total = unit × qty;
+ *     compare-at sits below the active price on discounted lines.
+ *     The price block is `absolute`-positioned in the title row's
+ *     top-right corner with `pr-20` reserving the space, so a
+ *     compare-at line growing the block can't push the variant
+ *     title downward — left and right sides flow independently
+ *     in that row.
+ *   - The qty stepper + trash row sits OUTSIDE the title row's
+ *     `pr-20` reserve so the trash anchors to the full right edge
+ *     of the line. `justify-between` on a column-wide flex puts
+ *     the stepper on the left and the trash on the right.
  */
 export function CartLineRow({ line }: { line: CartLine }) {
   const totalCents = line.priceCents * line.quantity;
@@ -65,7 +74,10 @@ export function CartLineRow({ line }: { line: CartLine }) {
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-start justify-between gap-2">
+        {/* Title row — `pr-20` reserves the right column for the
+         *  absolute-positioned price block so a compare-at line
+         *  growing the block can't push the variant title down. */}
+        <div className="relative pr-20">
           <Link
             href={`/products/${line.handle}`}
             onClick={closeCart}
@@ -74,7 +86,7 @@ export function CartLineRow({ line }: { line: CartLine }) {
             {line.title}
           </Link>
 
-          <div className="flex flex-col items-end gap-0.5">
+          <div className="absolute right-0 top-0 flex flex-col items-end gap-0.5 leading-tight">
             <Price
               cents={totalCents}
               currency={line.currency}
@@ -88,14 +100,17 @@ export function CartLineRow({ line }: { line: CartLine }) {
               />
             )}
           </div>
+
+          {line.variantTitle && (
+            <div className="mt-0.5 text-xs text-[color:var(--color-ink-muted)]">
+              {line.variantTitle}
+            </div>
+          )}
         </div>
 
-        {line.variantTitle && (
-          <div className="mt-0.5 text-xs text-[color:var(--color-ink-muted)]">
-            {line.variantTitle}
-          </div>
-        )}
-
+        {/* Qty + trash row — sibling of the title row (NOT inside
+         *  its `pr-20` reserve) so the trash anchors to the full
+         *  right edge of the line, not 5rem in from it. */}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           {/* `min={0}` keeps the cart-row UX where clicking − at qty 1
               removes the line via `setCartLineQuantity(id, 0)`, paired

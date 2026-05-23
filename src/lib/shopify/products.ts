@@ -1,7 +1,9 @@
 import "server-only";
 
+import { parseOffersMetafield, productIdToGid } from "@/lib/offers";
 import { shopifyFetch } from "@/lib/shopify/client";
 import type {
+  CompanionProduct,
   ProductDetail,
   ProductImage,
   ProductMedia,
@@ -125,6 +127,9 @@ const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
       deliveryTime: metafield(namespace: "custom", key: "delivery_time") {
         value
       }
+      offers: metafield(namespace: "custom", key: "offers") {
+        value
+      }
     }
   }
 `;
@@ -210,6 +215,10 @@ interface RawProduct {
    *  day range like `"7-14"`. Shopify returns `null` when the
    *  metafield isn't set on this product. */
   deliveryTime: { value: string } | null;
+  /** `custom.offers` metafield — drives the tiered-offers picker.
+   *  Free-text value normalised in `parseOffersMetafield`; see
+   *  `lib/offers.ts` for the recognised shapes. */
+  offers: { value: string } | null;
 }
 
 interface ProductByHandleResponse {
@@ -240,6 +249,123 @@ export async function getProductByHandle(
 
   if (!data.product) return null;
   return normaliseProduct(data.product);
+}
+
+/* ---------- Companion products (tiered-offers bundle slots) ---------- */
+
+const COMPANION_PRODUCTS_QUERY = /* GraphQL */ `
+  query CompanionProducts($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on Product {
+        id
+        handle
+        title
+        availableForSale
+        featuredImage {
+          url
+          altText
+          width
+          height
+        }
+        options {
+          name
+          values
+        }
+        variants(first: 100) {
+          nodes {
+            id
+            title
+            availableForSale
+            selectedOptions {
+              name
+              value
+            }
+            price {
+              amount
+              currencyCode
+            }
+            compareAtPrice {
+              amount
+              currencyCode
+            }
+            image {
+              url
+              altText
+              width
+              height
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+interface RawCompanionNode {
+  id?: string;
+  handle?: string;
+  title?: string;
+  availableForSale?: boolean;
+  featuredImage?: RawImage | null;
+  options?: RawOption[];
+  variants?: { nodes: RawVariantNode[] };
+}
+
+interface CompanionProductsResponse {
+  nodes: Array<RawCompanionNode | null>;
+}
+
+/**
+ * Fetch the companion products listed by a PDP's `custom.offers`
+ * metafield — the bundle pairings that fill slots 1..N of the
+ * tiered-offers tiles when the merchant configured them.
+ *
+ * Inputs are the raw numeric product ids parsed off the metafield
+ * (`ParsedOffers.bundleCompanionIds`). Output preserves the input
+ * ordering and uses `null` for ids whose lookup failed (deleted,
+ * unavailable, network glitch) — the PDP layer treats a `null`
+ * slot as "anchor for this position" so the picker still renders
+ * cleanly without the bundle pairing.
+ *
+ * Single Storefront round-trip via `nodes(ids: [...])` — Shopify's
+ * batch resolver fetches every companion in parallel server-side
+ * so the loader's critical path adds one round-trip total, not
+ * one per companion.
+ */
+export async function getCompanionProducts(
+  numericIds: ReadonlyArray<string>,
+): Promise<Array<CompanionProduct | null>> {
+  if (numericIds.length === 0) return [];
+  const gids = numericIds.map(productIdToGid);
+  const data = await shopifyFetch<CompanionProductsResponse>(
+    COMPANION_PRODUCTS_QUERY,
+    { ids: gids },
+    {
+      revalidate: 3600,
+      /* Same tag namespace as the anchor fetcher so a single
+       * `revalidateTag("product:<id>")` purges this companion
+       * wherever it's been cached, without having to know
+       * which PDPs surfaced it. */
+      tags: numericIds.map((id) => `product:${id}`),
+    },
+  );
+
+  return (data.nodes ?? []).map((node) => normaliseCompanion(node));
+}
+
+function normaliseCompanion(
+  raw: RawCompanionNode | null,
+): CompanionProduct | null {
+  if (!raw?.id || !raw.handle || !raw.title) return null;
+  return {
+    id: raw.id,
+    handle: raw.handle,
+    title: raw.title,
+    availableForSale: raw.availableForSale ?? true,
+    featuredImage: normaliseImage(raw.featuredImage ?? null),
+    options: parseOptions(raw.options ?? []),
+    variants: parseVariants(raw.variants?.nodes ?? []),
+  };
 }
 
 /* -------------------- Internals -------------------- */
@@ -339,10 +465,20 @@ function parseVariants(nodes: RawVariantNode[]): ProductVariant[] {
       id: node.id,
       title: node.title,
       availableForSale: node.availableForSale,
-      selectedOptions: node.selectedOptions.map((o) => ({
-        name: o.name,
-        value: o.value,
-      })),
+      /* Shopify's synthetic `Title: Default Title` placeholder
+       * lives on single-variant products' `selectedOptions` as
+       * well as on the product-level option list — `parseOptions`
+       * strips it from the option list, mirror that here so the
+       * variantTitle composed for cart lines (`Name: Value / …`)
+       * doesn't echo "Title: Default Title" in the drawer. */
+      selectedOptions: node.selectedOptions
+        .filter(
+          (o) => !(o.name === "Title" && o.value === "Default Title"),
+        )
+        .map((o) => ({
+          name: o.name,
+          value: o.value,
+        })),
       priceCents,
       compareAtCents:
         compareAtCents > 0 && compareAtCents > priceCents
@@ -395,6 +531,13 @@ function normaliseProduct(raw: RawProduct): ProductDetail {
     options: parseOptions(raw.options),
     variants: parseVariants(raw.variants.nodes),
     deliveryTime: raw.deliveryTime?.value?.trim() || undefined,
+    offers: parseOffersMetafield(raw.offers?.value),
+    /* Hydrated by the PDP server route (`getCompanionProducts`)
+     * after the anchor product lands; the fetcher leaves it
+     * empty so callers that don't care about bundles (modal
+     * preview, cart card, etc.) skip the companion fetch
+     * entirely. */
+    bundleCompanions: [],
     priceMinCents,
     priceMaxCents,
     compareAtMinCents: hasCompareAt ? compareMinCents : undefined,
