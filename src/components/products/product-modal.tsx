@@ -126,7 +126,7 @@ export function ProductModal({
               onClick={handleAdd}
               className="btn-primary"
             >
-              Add to cart
+              Add to Cart
             </button>
           </div>
         </div>

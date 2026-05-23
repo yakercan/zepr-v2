@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { Price } from "@/components/ui/price";
+import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
-import { MinusIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { TrashIcon } from "@/components/ui/icons";
 import {
   removeCartLine,
   setCartLineQuantity,
 } from "@/lib/cart/store";
 import { closeCart } from "@/lib/cart/drawer-store";
-import { cn } from "@/lib/utils";
 import type { CartLine } from "@/types/cart";
 
 /**
@@ -97,8 +97,13 @@ export function CartLineRow({ line }: { line: CartLine }) {
         )}
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+          {/* `min={0}` keeps the cart-row UX where clicking − at qty 1
+              removes the line via `setCartLineQuantity(id, 0)`, paired
+              with the trash button as a one-click escape hatch. PDP
+              callers leave `min` at its default `1`. */}
           <QuantityStepper
             quantity={line.quantity}
+            min={0}
             onDecrement={() =>
               setCartLineQuantity(line.id, line.quantity - 1)
             }
@@ -118,60 +123,5 @@ export function CartLineRow({ line }: { line: CartLine }) {
         </div>
       </div>
     </li>
-  );
-}
-
-/**
- * Compact `[- N +]` stepper. The current quantity sits between two
- * round-ish buttons so the touch target is obvious without dominating
- * the row. Decrement is *not* disabled at 1 — going below removes the
- * line (see `setCartLineQuantity` in the store). Increment is open
- * upward; per-product caps land when inventory lands.
- */
-function QuantityStepper({
-  quantity,
-  onIncrement,
-  onDecrement,
-}: {
-  quantity: number;
-  onIncrement: () => void;
-  onDecrement: () => void;
-}) {
-  const stepperBtn = cn(
-    "inline-flex h-7 w-7 items-center justify-center text-[color:var(--color-ink)]",
-    "transition-colors hover:bg-[color:var(--color-search)]",
-    "first:rounded-l-full last:rounded-r-full",
-    "disabled:cursor-not-allowed disabled:opacity-40",
-  );
-
-  return (
-    <div
-      className="inline-flex items-center rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
-      role="group"
-      aria-label="Quantity"
-    >
-      <button
-        type="button"
-        onClick={onDecrement}
-        aria-label="Decrease quantity"
-        className={stepperBtn}
-      >
-        <MinusIcon />
-      </button>
-      <span
-        aria-live="polite"
-        className="min-w-6 text-center text-sm font-semibold tabular-nums text-[color:var(--color-ink)]"
-      >
-        {quantity}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrement}
-        aria-label="Increase quantity"
-        className={stepperBtn}
-      >
-        <PlusIcon />
-      </button>
-    </div>
   );
 }

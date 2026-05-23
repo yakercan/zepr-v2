@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BuyActions } from "@/components/products/buy-actions";
 import { DeliveryBadge } from "@/components/products/delivery-badge";
 import { VariantPicker } from "@/components/products/variant-picker";
 import { Price } from "@/components/ui/price";
@@ -13,8 +14,9 @@ import {
 import type { ProductDetail, ProductVariant } from "@/types/product";
 
 /**
- * The "buy side" of a product — title, price band, discount
- * badge, variant pickers, and (in Round 5) the Add-to-cart CTA.
+ * The "buy side" of a product — title, delivery promise, price
+ * band, discount badge, variant pickers, and the Add-to-cart /
+ * Buy Now CTA stack.
  *
  * Lives in `components/products/` (not under `app/products/`)
  * because two surfaces will render it:
@@ -27,19 +29,21 @@ import type { ProductDetail, ProductVariant } from "@/types/product";
  * Keeping a single component means a variant-picker tweak or a
  * CTA copy change lands in both places in one edit.
  *
- * Round 4 turned this into a client island: option selection
- * state lives here, so the title row stays a render away from
- * the picker without prop-drilling. The selected variant drives:
+ * Client island: option selection state lives here, so the
+ * title row stays a render away from the picker without prop-
+ * drilling. The selected variant drives:
  *
  *   - the headline price (variant's `priceCents`)
  *   - the strike-through compare-at (`variant.compareAtCents`)
  *   - the savings badge percent
+ *   - the Add-to-cart / Buy Now CTA enablement (in `<BuyActions>`)
  *
  * Falls back to the product-level range when no variant resolves
- * — happens only when the shopper picks an unavailable combo via
- * a strike-through pill in the picker. The range is a useful
- * "no concrete price yet" cue; Round 5's CTA will surface the
- * "Unavailable" affordance for that case.
+ * — happens only on a matrix-unavailable combo (the cascading
+ * picker should prevent this, but the fallback keeps the page
+ * from ever showing "$undefined" if a future change loosens that
+ * invariant). `<BuyActions>` surfaces "Select options" for the
+ * same case.
  */
 export interface BuyFormProps {
   product: ProductDetail;
@@ -154,9 +158,7 @@ export function BuyForm({ product, className, onVariantChange }: BuyFormProps) {
         onSelect={handleSelect}
       />
 
-      {/* Round 5: Add-to-cart CTA + quantity stepper land here.
-          The CTA will read `selectedVariant?.availableForSale`
-          and compose the cart line id as `productId:variantId`. */}
+      <BuyActions product={product} selectedVariant={selectedVariant} />
     </div>
   );
 }

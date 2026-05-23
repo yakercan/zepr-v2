@@ -74,12 +74,11 @@ export function ViewMoreButton({
         aria-busy={isPending}
         className={cn(
           "btn-primary relative min-w-[160px]",
-          // The button is busy, not unavailable — drop the
-          // native disabled cursor + greyed background so the
-          // pending state reads as "loading" instead of "broken".
-          // `aria-busy` still carries the semantic meaning for
-          // assistive tech.
-          "disabled:cursor-default",
+          // The button is busy, not unavailable — keep the brand
+          // orange while pending so the state reads as "loading"
+          // instead of "broken". `aria-busy` carries the semantic
+          // meaning for assistive tech. The default-cursor part
+          // is handled globally by `.btn-primary:disabled` now.
           "disabled:bg-[color:var(--color-brand)]",
         )}
       >

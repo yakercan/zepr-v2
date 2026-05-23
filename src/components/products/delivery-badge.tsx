@@ -96,7 +96,7 @@ export function DeliveryBadge({
         className,
       )}
     >
-      <ZeprIcon src={ZEPR_ICONS.shipping} size={24} className="h-6 w-6" />
+      <ZeprIcon src={ZEPR_ICONS.shipping} size={24} />
 
       {free ? (
         <div className="flex flex-col leading-tight">
@@ -114,7 +114,7 @@ export function DeliveryBadge({
       <ZeprIcon
         src={ZEPR_ICONS.medal}
         size={20}
-        className="hidden h-5 w-5 sm:inline-block"
+        className="hidden sm:inline-block"
       />
       <span className="hidden text-sm font-medium sm:inline">
         {CREDIT_AMOUNT_LABEL}

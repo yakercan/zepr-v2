@@ -328,12 +328,65 @@
   .btn-primary[aria-disabled="true"] {
     background-color: var(--color-border-strong);
     color: #ffffff;
-    cursor: not-allowed;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .btn-primary:hover {
       background-color: var(--color-brand-hover);
+    }
+  }
+
+  /*
+   * Outline counterpart to `.btn-primary` — same pill shape, same
+   * baseline, same focus / disabled story; just the soft grey 2px
+   * outline that snaps to ink on hover, the exact look the
+   * homepage feed tabs and the search filter pills already wear.
+   *
+   * Hover changes the border colour only — no fill flip, no text
+   * recolour. Matches the storefront's broader "selectable
+   * surface" affordance (cards, feed tabs, filter chips), so the
+   * shopper sees one consistent hover language across every
+   * outline-shaped control.
+   *
+   * `padding-block` is `calc(0.75rem - 2px)` so the 2px border
+   * lands inside the same 44px-tall footprint as `.btn-primary` —
+   * the two buttons stack flush in a vertical CTA pair without
+   * one being 4px taller.
+   */
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    border: 2px solid var(--color-border-strong);
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    padding-inline: calc(1.25rem - 2px);
+    padding-block: calc(0.75rem - 2px);
+    transition: border-color 150ms ease;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .btn-secondary:focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  .btn-secondary:disabled,
+  .btn-secondary[aria-disabled="true"] {
+    color: var(--color-border-strong);
+    border-color: var(--color-border-strong);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .btn-secondary:hover {
+      border-color: var(--color-ink);
     }
   }
 
