@@ -45,10 +45,47 @@ export function ChevronDownIcon({ className }: IconProps) {
   );
 }
 
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(cn("h-4 w-4", className))}>
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  );
+}
+
 export function ChevronRightIcon({ className }: IconProps) {
   return (
     <svg {...svgProps(cn("h-4 w-4", className))}>
       <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+/** Play / Pause for the banner slider's autoplay toggle. Solid-fill
+ *  variants so they read cleanly at the small (≈14px) sizes used
+ *  inside the slider's overlay control buttons. */
+export function PlayIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={cn("h-4 w-4 shrink-0", className)}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+export function PauseIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={cn("h-4 w-4 shrink-0", className)}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path d="M6 5h4v14H6zM14 5h4v14h-4z" />
     </svg>
   );
 }

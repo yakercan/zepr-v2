@@ -43,6 +43,10 @@ export interface ShimmerImageProps
   loading?: "lazy" | "eager";
   /** Shape passed through to the underlying `<Skeleton>`. */
   skeletonRounded?: "none" | "md" | "lg" | "full";
+  /** className applied to the wrapper `<span>`. Default is
+   *  `relative inline-block` — pass `block h-full w-full` (etc.) when
+   *  the ShimmerImage should fill an aspect-ratio parent. */
+  wrapperClassName?: string;
 }
 
 export function ShimmerImage({
@@ -52,6 +56,7 @@ export function ShimmerImage({
   className,
   loading = "lazy",
   skeletonRounded = "md",
+  wrapperClassName,
   alt = "",
   ...imgProps
 }: ShimmerImageProps) {
@@ -85,7 +90,7 @@ export function ShimmerImage({
   // `loaded === false`. Both fade via opacity — unmounting would kill
   // the transition.
   return (
-    <span className="relative inline-block">
+    <span className={cn("relative inline-block", wrapperClassName)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={handleImgRef}
