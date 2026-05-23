@@ -1,4 +1,5 @@
 import { BannerSlider } from "@/components/home/banner-slider";
+import { MainFeed } from "@/components/home/main-feed";
 
 /**
  * Home route. Each top-level section is its own component — keeps
@@ -9,6 +10,7 @@ export default function HomePage() {
   return (
     <div className="page-container flex flex-col gap-8 py-6">
       <BannerSlider />
+      <MainFeed />
     </div>
   );
 }

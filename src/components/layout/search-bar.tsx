@@ -97,7 +97,11 @@ export function SearchBar() {
         autoComplete="off"
         className={cn(
           "h-10 w-full rounded-full bg-[color:var(--color-search)] pl-9 pr-15 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none transition-colors",
-          "hover:bg-[color:var(--color-search-hover)]",
+          // Hover === focus visually: white fill + 2px ink ring. Makes
+          // the input look "ready" the moment the cursor touches it,
+          // and removes the tiny visual jump that used to happen on
+          // hover → focus when only the fill flipped.
+          "hover:bg-white hover:ring-2 hover:ring-[color:var(--color-ink)]",
           "focus:bg-white focus:ring-2 focus:ring-[color:var(--color-ink)]",
         )}
       />
