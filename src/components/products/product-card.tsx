@@ -16,15 +16,21 @@ import type { SearchProduct } from "@/types/product";
  *
  * Visual layering:
  *
- *   ┌─ aspect-square image tile (rounded-2xl, soft fill bg) ─┐
- *   │   ShimmerImage cross-fades from skeleton to image       │
- *   │   ── group-hover: scale image 1.03 (subtle parallax)    │
- *   │   ── discount badge top-left when compare_at > price    │
- *   │   ── sold-out scrim when not available                  │
- *   └─────────────────────────────────────────────────────────┘
- *   title    (line-clamp-2, ink)
- *   rating   (★ 4.7 (123))
- *   price    (current — bold ink ── strikethrough compare-at — muted)
+ *   ┌─ rounded-2xl card · white surface · 2px border ──────┐
+ *   │ aspect-square image tile · full-bleed (top + sides)  │
+ *   │   ShimmerImage cross-fades from skel to image        │
+ *   │   ── group-hover: image scale 1.03 (parallax)        │
+ *   │   ── sold-out scrim when not available               │
+ *   ├──────────────────────────────────────────────────────┤
+ *   │  title    (line-clamp-2, ink)                        │
+ *   │  rating   (★ 4.7 (123))                              │
+ *   │  price    (bold ink ── strikethrough compare-at)     │
+ *   └──────────────────────────────────────────────────────┘
+ *
+ * Border behaviour mirrors the main-feed tabs: soft gray at rest,
+ * snaps to full ink on hover. The whole card hovers as one unit,
+ * which lets the title / rating / price block participate in the
+ * affordance even though the visible animation is on the image.
  */
 export interface ProductCardProps {
   product: SearchProduct;
@@ -46,11 +52,26 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
     <Link
       href={`/products/${product.handle}`}
       prefetch={false}
-      className="group flex flex-col gap-2.5"
+      className={cn(
+        // The card itself wears the outline — same `border-2` weight
+        // + `--color-border-strong` rest / `--color-ink` hover the
+        // main-feed tabs use, so the whole page speaks one visual
+        // language for "interactive surface".
+        //
+        // `overflow-hidden` on the card lets the image bleed flush
+        // to the top + side edges (its corners are clipped by the
+        // card's `rounded-2xl`); only the info block below carries
+        // padding, so the media reads as the dominant surface.
+        "group flex flex-col overflow-hidden rounded-2xl",
+        "bg-[color:var(--color-surface)]",
+        "border-2 border-[color:var(--color-border-strong)]",
+        "transition-colors duration-150",
+        "hover:border-[color:var(--color-ink)]",
+      )}
     >
       <div
         className={cn(
-          "relative aspect-square overflow-hidden rounded-2xl",
+          "relative aspect-square overflow-hidden",
           "bg-[color:var(--color-search)]",
         )}
       >
@@ -67,18 +88,6 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
           skeletonRounded="lg"
         />
 
-        {hasDiscount && (
-          <span
-            className={cn(
-              "absolute left-2 top-2 rounded-full",
-              "bg-[color:var(--color-ink)] px-2.5 py-1",
-              "text-[11px] font-bold leading-none text-white",
-            )}
-          >
-            −{discountPercent}%
-          </span>
-        )}
-
         {isSoldOut && (
           <div
             className={cn(
@@ -92,17 +101,8 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
         )}
       </div>
 
-      <div className="flex flex-col gap-1">
-        <h3
-          className={cn(
-            "line-clamp-2 text-sm font-medium leading-snug",
-            "text-[color:var(--color-ink)]",
-            // Subtle hover affordance — title shifts to the soft
-            // secondary tone instead of changing colour entirely, so
-            // the grid stays calm during scroll-skim.
-            "transition-colors group-hover:text-[color:var(--color-ink-secondary)]",
-          )}
-        >
+      <div className="flex flex-col gap-1 p-3">
+        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-[color:var(--color-ink)]">
           {product.title}
         </h3>
 
