@@ -1,20 +1,13 @@
 import { notFound } from "next/navigation";
-import { BuyForm } from "@/components/products/buy-form";
 import {
   ProductAccordion,
   ProductAccordionItem,
 } from "@/components/products/product-accordion";
-import { ProductGallery } from "@/components/products/product-gallery";
+import { ProductLayout } from "@/components/products/product-layout";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { RichText } from "@/components/ui/rich-text";
 import { getProductByHandle } from "@/lib/shopify/products";
-import { PANEL_SURFACE_CLASSES } from "@/lib/styles";
-import { cn } from "@/lib/utils";
 import type { ProductDetail } from "@/types/product";
-
-/** Shared inner padding for both PDP columns so the gallery / buy
- *  form sit at the same vertical inset inside their panels. */
-const PDP_PANEL_PADDING = "p-5 md:p-6";
 
 /**
  * Product Detail Page — Shopify-backed.
@@ -69,54 +62,21 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
       <Breadcrumb items={breadcrumbItems} className="mb-4" />
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-[1.2fr_1fr] md:gap-12 md:items-start">
-        {/* Left column — gallery + long-form copy. Wrapped in the
-            same `PANEL_SURFACE_CLASSES` panel as the right column
-            so the two sides frame the page as a pair. `min-w-0`
-            because grid tracks otherwise refuse to shrink past
-            their content's intrinsic min-width, which collapses
-            the right column when the description has long words. */}
-        <div
-          className={cn(
-            PANEL_SURFACE_CLASSES,
-            PDP_PANEL_PADDING,
-            "flex min-w-0 flex-col gap-6",
-          )}
-        >
-          <ProductGallery media={product.media} title={product.title} />
+      {/* Future PDP accordion sections (Reviews, Disclaimer, etc.)
+       *  drop into the <ProductAccordion> below as additional
+       *  <ProductAccordionItem>s alongside "Details". */}
+      <ProductLayout
+        product={product}
+        extraLeft={
           <ProductAccordion>
             {product.descriptionHtml && (
               <ProductAccordionItem title="Details" defaultOpen>
                 <RichText html={product.descriptionHtml} />
               </ProductAccordionItem>
             )}
-            {/* Future sections (Reviews, Disclaimer, etc.) drop
-             *  in here as additional <ProductAccordionItem>s. */}
           </ProductAccordion>
-        </div>
-
-        {/* Right column — buy form, sticky.
-         *
-         *   - `md:self-start`  → take only the form's natural height
-         *                        (grid items default to `stretch`,
-         *                        which would lock the form to the
-         *                        full row height and break sticky).
-         *   - `md:sticky md:top-20` → cling to `5rem` (header is
-         *                        4rem + 1px border; 5rem leaves a
-         *                        small breathing gap).
-         *   - When the left column scrolls past its end, the grid
-         *     row ends, the sticky context releases, and the page
-         *     continues into the related rail.
-         *
-         * The buy form's panel framing matches the left column; the
-         * modal variant renders <BuyForm> bare because the modal
-         * shell already owns its own surface treatment. */}
-        <div className="md:sticky md:top-20 md:self-start">
-          <div className={cn(PANEL_SURFACE_CLASSES, PDP_PANEL_PADDING)}>
-            <BuyForm product={product} />
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* TODO round 7: "You may also like" rail — single Salespace
        *  `searchProducts({ collection })` fetch inside <Suspense>

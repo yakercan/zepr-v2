@@ -1,10 +1,19 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { VariantPicker } from "@/components/products/variant-picker";
 import { Price } from "@/components/ui/price";
-import type { ProductDetail } from "@/types/product";
+import {
+  cascadeSelect,
+  defaultSelection,
+  findVariant,
+  type OptionSelection,
+} from "@/lib/variants";
+import type { ProductDetail, ProductVariant } from "@/types/product";
 
 /**
  * The "buy side" of a product — title, price band, discount
- * badge, and (in later rounds) options, variant picker, quantity
- * stepper, Add-to-cart CTA, delivery promise, etc.
+ * badge, variant pickers, and (in Round 5) the Add-to-cart CTA.
  *
  * Lives in `components/products/` (not under `app/products/`)
  * because two surfaces will render it:
@@ -15,44 +24,90 @@ import type { ProductDetail } from "@/types/product";
  *      same buy-form chrome, just inside a modal shell.
  *
  * Keeping a single component means a variant-picker tweak or a
- * CTA copy change lands in both places in one edit. The modal
- * will pass a tighter `className` (or a `compact` prop later) to
- * trim margins for the smaller surface — round 2 is just the
- * baseline.
+ * CTA copy change lands in both places in one edit.
  *
- * Stays a server component until it actually needs interactive
- * state (round 4: variant selection). Until then there's nothing
- * for the client bundle to ship.
+ * Round 4 turned this into a client island: option selection
+ * state lives here, so the title row stays a render away from
+ * the picker without prop-drilling. The selected variant drives:
+ *
+ *   - the headline price (variant's `priceCents`)
+ *   - the strike-through compare-at (`variant.compareAtCents`)
+ *   - the savings badge percent
+ *
+ * Falls back to the product-level range when no variant resolves
+ * — happens only when the shopper picks an unavailable combo via
+ * a strike-through pill in the picker. The range is a useful
+ * "no concrete price yet" cue; Round 5's CTA will surface the
+ * "Unavailable" affordance for that case.
  */
 export interface BuyFormProps {
   product: ProductDetail;
   className?: string;
+  /** Fires after the picker resolves a new variant (or fails to,
+   *  in which case the argument is `undefined`). The PDP layout
+   *  uses this to nudge the gallery to the variant's image; other
+   *  surfaces can read off variant-specific metadata for related
+   *  side effects. Skips the initial mount emission — the layout
+   *  seeds the gallery from the default variant directly. */
+  onVariantChange?: (variant: ProductVariant | undefined) => void;
 }
 
-export function BuyForm({ product, className }: BuyFormProps) {
-  const hasPriceRange = product.priceMaxCents > product.priceMinCents;
-  /* Same headline-tint rule cards use: brand-orange only when
-   * there's a real compare-at savings. Falls back to ink black. */
+export function BuyForm({ product, className, onVariantChange }: BuyFormProps) {
+  const [selection, setSelection] = useState<OptionSelection>(() =>
+    defaultSelection(product.variants),
+  );
+
+  const selectedVariant =
+    product.options.length === 0
+      ? product.variants[0]
+      : findVariant(product.variants, selection);
+
+  /* Skip-first-emit so the initial mount doesn't shout the
+   * default variant back at the layout (which already knew about
+   * it from `defaultSelection` and seeded the gallery directly).
+   * After mount, every selection-driven variant change emits so
+   * the gallery can sync to the new image. */
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    onVariantChange?.(selectedVariant);
+  }, [selectedVariant, onVariantChange]);
+
+  /* Resolved-variant pricing wins over the product-level range
+   * the moment we have one. When the picker lands on an invalid
+   * combo `selectedVariant` is `undefined` — we fall back to the
+   * range so the page never shows "$undefined". */
+  const priceMinCents = selectedVariant?.priceCents ?? product.priceMinCents;
+  const priceMaxCents = selectedVariant?.priceCents ?? product.priceMaxCents;
+  const compareAtCents =
+    selectedVariant?.compareAtCents ?? product.compareAtMinCents;
+
+  const hasPriceRange = priceMaxCents > priceMinCents;
   const discountPct =
-    product.compareAtMinCents && product.compareAtMinCents > product.priceMinCents
-      ? Math.round(
-          ((product.compareAtMinCents - product.priceMinCents) /
-            product.compareAtMinCents) *
-            100,
-        )
+    compareAtCents && compareAtCents > priceMinCents
+      ? Math.round(((compareAtCents - priceMinCents) / compareAtCents) * 100)
       : 0;
   const isDiscounted = discountPct > 0;
   const priceAccent = isDiscounted ? "var(--color-brand)" : undefined;
 
+  const handleSelect = (optionName: string, value: string) => {
+    setSelection((prev) =>
+      cascadeSelect(product.options, product.variants, prev, optionName, value),
+    );
+  };
+
   return (
-    <div className={className ?? "flex flex-col gap-4"}>
+    <div className={className ?? "flex flex-col gap-5"}>
       <h1 className="text-lg font-bold leading-snug text-[color:var(--color-ink)] md:text-xl">
         {product.title}
       </h1>
 
       <div className="flex flex-wrap items-baseline gap-3">
         <Price
-          cents={product.priceMinCents}
+          cents={priceMinCents}
           currency={product.currency}
           accent={priceAccent}
           className="text-2xl"
@@ -66,17 +121,17 @@ export function BuyForm({ product, className }: BuyFormProps) {
               –
             </span>
             <Price
-              cents={product.priceMaxCents}
+              cents={priceMaxCents}
               currency={product.currency}
               accent={priceAccent}
               className="text-2xl"
             />
           </>
         )}
-        {isDiscounted && (
+        {isDiscounted && compareAtCents && (
           <>
             <Price
-              cents={product.compareAtMinCents!}
+              cents={compareAtCents}
               currency={product.currency}
               variant="compare"
               className="text-base"
@@ -86,8 +141,16 @@ export function BuyForm({ product, className }: BuyFormProps) {
         )}
       </div>
 
-      {/* Round 4 lands the variant picker block here.
-          Round 5 lands the Add-to-cart CTA + quantity stepper. */}
+      <VariantPicker
+        options={product.options}
+        variants={product.variants}
+        selection={selection}
+        onSelect={handleSelect}
+      />
+
+      {/* Round 5: Add-to-cart CTA + quantity stepper land here.
+          The CTA will read `selectedVariant?.availableForSale`
+          and compose the cart line id as `productId:variantId`. */}
     </div>
   );
 }

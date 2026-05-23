@@ -83,20 +83,35 @@ export interface ProductGalleryProps {
   /** Falls back as alt text when an individual image lacks one. */
   title: string;
   className?: string;
+  /** Optional external nudge — when this index changes, the
+   *  gallery navigates to it through the same crossfade path
+   *  internal navigation uses. PDP wires this to the variant
+   *  picker so picking "Color: Blue" jumps the gallery to the
+   *  blue colourway's photo (when Shopify attached one). Also
+   *  seeds the initial active index, so on first paint the
+   *  gallery already shows the right variant's image — no
+   *  visible jump animation on mount. */
+  syncedIndex?: number;
 }
 
 export function ProductGallery({
   media,
   title,
   className,
+  syncedIndex,
 }: ProductGalleryProps) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(syncedIndex ?? 0);
   /* Pointer at the *previously*-active layer for the duration of the
    * crossfade. Keeping that frame painted at full opacity beneath the
    * incoming one prevents the gallery's search-tint backdrop from
    * bleeding through during the transition (the cause of the
    * mid-fade flash). `null` whenever no transition is in flight. */
   const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
+  /* Mirror of the last `syncedIndex` we've reacted to. Pairs with
+   * the render-time change detector below to drive external
+   * navigation without a useEffect — React's recommended pattern
+   * for deriving state from props. */
+  const [lastSyncedIndex, setLastSyncedIndex] = useState(syncedIndex);
 
   /* Capture the outgoing index synchronously inside the state setter
    * so the previously-active layer is still marked "outgoing" on the
@@ -110,6 +125,20 @@ export function ProductGallery({
       return next;
     });
   }, []);
+
+  /* Render-time prop sync — when an external nudge arrives, mirror
+   * it into local state and crossfade to the new index. Equivalent
+   * to a useEffect with a guard, but without the extra commit cycle
+   * (and without the React 19 setState-in-effect lint). The
+   * `activeIndex !== syncedIndex` guard skips the no-op case (mount
+   * with seeded state) so no transition fires on first paint. */
+  if (syncedIndex !== lastSyncedIndex) {
+    setLastSyncedIndex(syncedIndex);
+    if (syncedIndex != null && syncedIndex !== activeIndex) {
+      setOutgoingIndex(activeIndex);
+      setActiveIndex(syncedIndex);
+    }
+  }
 
   /* Release the outgoing reference once the incoming has reached full
    * opacity. Re-running on each change naturally cancels in-flight
@@ -390,13 +419,21 @@ function GalleryThumbs({
     thumb?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [activeIndex]);
 
+  /* Height plumbing: outer `relative` wrapper is a zero-intrinsic-
+   * height cell that grid stretches to the row's height (driven
+   * by the main viewer's `aspect-square`). The inner scroll
+   * container is `absolute inset-0` so it fills that height
+   * without ever contributing back to the row's intrinsic size.
+   * Net effect: the rail can never push the row taller than the
+   * media square — it just scrolls when the thumbs would overflow. */
   return (
+    <div className="relative">
     <div
       ref={scrollRef}
       role="tablist"
       aria-label="Product media"
       className={cn(
-        "flex min-h-0 flex-col gap-2 overflow-y-auto",
+        "absolute inset-0 flex flex-col gap-2 overflow-y-auto",
         // Hide native scrollbars — wheel / touch / trackpad
         // scrolling still works, just without the chrome bar.
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -453,6 +490,7 @@ function GalleryThumbs({
           </button>
         );
       })}
+    </div>
     </div>
   );
 }

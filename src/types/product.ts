@@ -181,6 +181,45 @@ export interface ProductMedia {
 }
 
 /**
+ * One option group on the PDP — e.g. `{ name: "Size", values: ["S","M","L"] }`.
+ *
+ * `values` order matches the order Shopify admin authored. The
+ * picker UI relies on this for stable left-to-right layout — never
+ * sort client-side or the visual order will flip between products
+ * with the same options but different sequences.
+ */
+export interface ProductOption {
+  name: string;
+  values: string[];
+}
+
+/**
+ * A single purchasable configuration of a product.
+ *
+ * Variant resolution on the PDP: walk the variant list and find
+ * the one whose `selectedOptions` exactly matches the picker's
+ * current `(option → value)` map. The matched variant supplies
+ * the concrete `priceCents`, `compareAtCents`, `availableForSale`
+ * and Shopify variant id used as the cart-line key.
+ *
+ * Image is variant-specific (e.g. the blue colourway's photo)
+ * and only present when Shopify admin attached one — most
+ * variants inherit from the product gallery and leave this empty.
+ */
+export interface ProductVariant {
+  id: string;
+  title: string;
+  availableForSale: boolean;
+  selectedOptions: { name: string; value: string }[];
+  priceCents: number;
+  /** Compare-at price for showing a strike-through next to this
+   *  variant's active price. Only present when there's a real
+   *  discount on the variant (compare > price). */
+  compareAtCents?: number;
+  image?: ProductImage;
+}
+
+/**
  * The PDP-shaped product view, hydrated from Shopify's Storefront
  * Graph (see `lib/shopify/products.ts`).
  *
@@ -232,6 +271,28 @@ export interface ProductDetail {
    *  Shopify admin arranged them. Drives `<ProductGallery>`.
    *  Empty array (not undefined) when no media is set. */
   media: ProductMedia[];
+
+  /** Option groups the shopper picks from on the PDP — e.g.
+   *  `[{ name: "Color", values: ["Pink","Blue"] },
+   *    { name: "Size",  values: ["S","M","L"] }]`.
+   *
+   *  Empty array (NOT undefined) for single-configuration
+   *  products — the Shopify "Default Title" placeholder option
+   *  is stripped at the normalisation boundary so PDP consumers
+   *  can treat `options.length === 0` as "no picker needed". */
+  options: ProductOption[];
+
+  /** Full purchasable variant set — one entry per Shopify
+   *  variant, populated even for single-configuration products
+   *  (in which case there's exactly one entry). The PDP picker
+   *  walks `selectedOptions` to find the variant matching the
+   *  current selection, then reads `priceCents` / `compareAtCents`
+   *  / `availableForSale` straight off the resolved variant.
+   *
+   *  Up to 100 variants are fetched — Shopify's per-product cap
+   *  is 100 and 99% of products are well below it; products that
+   *  exceed will surface only the first 100. */
+  variants: ProductVariant[];
 
   /** Product's primary collection — the first one Shopify returns
    *  for the product. Used to render a category crumb in the PDP

@@ -5,6 +5,8 @@ import type {
   ProductDetail,
   ProductImage,
   ProductMedia,
+  ProductOption,
+  ProductVariant,
 } from "@/types/product";
 
 /**
@@ -91,6 +93,35 @@ const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
           currencyCode
         }
       }
+      options {
+        name
+        values
+      }
+      variants(first: 100) {
+        nodes {
+          id
+          title
+          availableForSale
+          selectedOptions {
+            name
+            value
+          }
+          price {
+            amount
+            currencyCode
+          }
+          compareAtPrice {
+            amount
+            currencyCode
+          }
+          image {
+            url
+            altText
+            width
+            height
+          }
+        }
+      }
     }
   }
 `;
@@ -125,6 +156,26 @@ interface RawMediaNode {
   previewImage?: RawImage | null;
 }
 
+interface RawSelectedOption {
+  name: string;
+  value: string;
+}
+
+interface RawVariantNode {
+  id: string;
+  title: string;
+  availableForSale: boolean;
+  selectedOptions: RawSelectedOption[];
+  price: MoneyV2;
+  compareAtPrice: MoneyV2 | null;
+  image: RawImage | null;
+}
+
+interface RawOption {
+  name: string;
+  values: string[];
+}
+
 interface RawProduct {
   id: string;
   handle: string;
@@ -147,6 +198,10 @@ interface RawProduct {
   compareAtPriceRange: {
     minVariantPrice: MoneyV2;
     maxVariantPrice: MoneyV2;
+  };
+  options: RawOption[];
+  variants: {
+    nodes: RawVariantNode[];
   };
 }
 
@@ -254,6 +309,52 @@ function parseMedia(nodes: RawMediaNode[]): ProductMedia[] {
   return out;
 }
 
+/**
+ * Project Shopify's options + variants into our flat shape.
+ *
+ * Shopify always returns a synthetic "Title" option with a single
+ * "Default Title" value for products that don't actually have
+ * options. We strip it here so consumers can treat an empty
+ * `options` array as "no picker needed" without re-checking for
+ * the placeholder.
+ *
+ * Variant compare-at follows the same "drop zero/placeholder"
+ * rule as the price-range above — Shopify sometimes returns a
+ * compareAtPrice of `"0.0"` rather than `null`, and we don't want
+ * a phantom strike-through on the PDP.
+ */
+function parseVariants(nodes: RawVariantNode[]): ProductVariant[] {
+  return nodes.map((node) => {
+    const priceCents = toCents(node.price);
+    const compareAt = node.compareAtPrice;
+    const compareAtCents = compareAt ? toCents(compareAt) : 0;
+    return {
+      id: node.id,
+      title: node.title,
+      availableForSale: node.availableForSale,
+      selectedOptions: node.selectedOptions.map((o) => ({
+        name: o.name,
+        value: o.value,
+      })),
+      priceCents,
+      compareAtCents:
+        compareAtCents > 0 && compareAtCents > priceCents
+          ? compareAtCents
+          : undefined,
+      image: normaliseImage(node.image) ?? undefined,
+    };
+  });
+}
+
+function parseOptions(rawOptions: RawOption[]): ProductOption[] {
+  return rawOptions
+    .filter(
+      (o) =>
+        !(o.name === "Title" && o.values.length === 1 && o.values[0] === "Default Title"),
+    )
+    .map((o) => ({ name: o.name, values: o.values }));
+}
+
 function normaliseProduct(raw: RawProduct): ProductDetail {
   const priceMinCents = toCents(raw.priceRange.minVariantPrice);
   const priceMaxCents = toCents(raw.priceRange.maxVariantPrice);
@@ -284,6 +385,8 @@ function normaliseProduct(raw: RawProduct): ProductDetail {
     availableForSale: raw.availableForSale,
     featuredImage: normaliseImage(raw.featuredImage),
     media: parseMedia(raw.media.nodes),
+    options: parseOptions(raw.options),
+    variants: parseVariants(raw.variants.nodes),
     priceMinCents,
     priceMaxCents,
     compareAtMinCents: hasCompareAt ? compareMinCents : undefined,
