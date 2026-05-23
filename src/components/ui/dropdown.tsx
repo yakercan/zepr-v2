@@ -396,7 +396,16 @@ export function DropdownItem({
   const inner = (
     <span
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+        // Single hover treatment for every dropdown row, regardless
+        // of variant or sideMode: light grey backplate + medium
+        // font weight. Categories rows already had this via the
+        // `isActive` sideMode highlight; pulling `hover:font-medium`
+        // into the base styles makes plain rows (account menu, future
+        // settings dropdowns, etc.) read the same way. Layout shift
+        // from the weight bump is absorbed by the `flex-1 truncate`
+        // text span below — the row width never moves.
+        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm",
+        "transition-colors hover:font-medium",
         variant === "danger"
           ? "text-red-600 hover:bg-red-50"
           : isActive || active

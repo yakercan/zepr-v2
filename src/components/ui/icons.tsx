@@ -228,6 +228,35 @@ export function CloseIcon({ className }: IconProps) {
   );
 }
 
+export function PlusIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(cn("h-4 w-4", className))}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function MinusIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(cn("h-4 w-4", className))}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function TrashIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(cn("h-4 w-4", className))}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
 /** Best Sellers star — solid fill since it reads as a brand mark
  *  rather than a generic icon. Matches the path the original zepr
  *  desktop header uses. */

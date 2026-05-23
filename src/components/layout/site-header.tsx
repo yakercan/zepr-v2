@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CartTrigger } from "@/components/cart/cart-trigger";
 import { AccountDropdown } from "@/components/layout/account-dropdown";
 import { SearchBar } from "@/components/layout/search-bar";
 import { SubcategoryGrid } from "@/components/layout/subcategory-grid";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import {
   BestSellersIcon,
-  CartIcon,
   CategoriesIcon,
   FireIcon,
   HeartIcon,
@@ -73,7 +73,7 @@ export async function SiteHeader() {
 
           <AccountDropdown />
 
-          <CartLink itemCount={0} />
+          <CartTrigger />
         </div>
       </div>
     </header>
@@ -159,37 +159,3 @@ function CategoryLineIcon({ handle }: { handle: string }) {
     />
   );
 }
-
-/**
- * Cart trigger. Pure server component for now — it accepts a count
- * prop so when the real cart source (cookie + Storefront API or a
- * lightweight client store) lands, only the call site changes. The
- * `<CartIcon>` itself handles all visual variants (empty / 1-4
- * fruits) and a small numeric badge appears once the count exceeds
- * the four-fruit max so the user still sees the real number.
- */
-function CartLink({ itemCount }: { itemCount: number }) {
-  const showBadge = itemCount > 0;
-  return (
-    <Link
-      href="/cart"
-      className="header-icon-button relative"
-      aria-label={
-        itemCount === 0
-          ? "Cart, empty"
-          : `Cart, ${itemCount} item${itemCount === 1 ? "" : "s"}`
-      }
-    >
-      <CartIcon itemCount={itemCount} />
-      {showBadge && itemCount > 4 && (
-        <span
-          aria-hidden
-          className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--color-brand)] px-1 text-[10px] font-bold leading-none text-white"
-        >
-          {itemCount > 99 ? "99+" : itemCount}
-        </span>
-      )}
-    </Link>
-  );
-}
-

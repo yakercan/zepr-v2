@@ -67,14 +67,7 @@ export function AccountDropdown({
 function AccountPanelGuest() {
   return (
     <div className="flex flex-col gap-2">
-      <Link
-        href="/account/sign-in"
-        className={cn(
-          "inline-flex h-11 w-full items-center justify-center rounded-full",
-          "bg-[color:var(--color-brand)] text-sm font-semibold text-white",
-          "transition-transform duration-150 hover:scale-[1.01] hover:bg-[color:var(--color-brand-hover)]",
-        )}
-      >
+      <Link href="/account/sign-in" className="btn-primary w-full">
         Sign in / Register
       </Link>
 
