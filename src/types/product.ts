@@ -22,8 +22,27 @@ export interface SearchProduct {
   handle: string;
   title: string;
 
-  /** Square hero image — already CDN-served, no transforms needed. */
+  /** Primary square hero image — already CDN-served, no transforms
+   *  needed. Resolved at the API boundary: prefers
+   *  `custom.product_image_1`, falls back to
+   *  `custom.product_image_2`, finally to the upstream `image_url`,
+   *  so the card never has to think about which source it came
+   *  from. */
   image_url: string;
+
+  /** Secondary still image shown when the card is hovered. Only
+   *  populated when *both* `custom.product_image_1` AND
+   *  `custom.product_image_2` are set — i.e. there's a meaningful
+   *  "second look" distinct from the primary. Card overlays this
+   *  with a CSS opacity transition; no JS needed. */
+  hover_image_url?: string;
+
+  /** Looping video shown when the card is hovered. Takes priority
+   *  over `hover_image_url` when both exist. Cards load video
+   *  metadata lazily (`preload="none"`) and only play on actual
+   *  hover, so off-screen / never-hovered cards consume zero
+   *  bandwidth. */
+  hover_video_url?: string;
 
   /** All money values are integer cents in the product currency. */
   price_min_cents: number;

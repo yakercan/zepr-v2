@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { AddToCartButton } from "@/components/products/add-to-cart-button";
 import { ProductBadge, RatingBadge } from "@/components/products/badge";
+import { ProductCardMedia } from "@/components/products/product-card-media";
 import { Price } from "@/components/ui/price";
-import { ShimmerImage } from "@/components/ui/shimmer-image";
 import {
   FREE_SHIPPING_BADGE,
   pickProductBadge,
@@ -25,9 +25,10 @@ import type { SearchProduct } from "@/types/product";
  * Visual layering:
  *
  *   ┌─ rounded-2xl card · white surface · 2px border ──────┐
- *   │ aspect-square image tile · full-bleed (top + sides)  │
- *   │   ShimmerImage cross-fades from skel to image        │
- *   │   ── group-hover: image scale 1.03 (parallax)        │
+ *   │ aspect-square media tile · full-bleed (top + sides)  │
+ *   │   ProductCardMedia owns the hover-scoped interactions│
+ *   │   ── group-hover/media: image scale 1.03 (parallax)  │
+ *   │   ── group-hover/media: swap to image_2 OR play video│
  *   │                                  [FREE SHIPPING]     │
  *   │   ── sold-out scrim when not available               │
  *   ├──────────────────────────────────────────────────────┤
@@ -35,6 +36,13 @@ import type { SearchProduct } from "@/types/product";
  *   │  second line if it's long (line-clamp-2)             │
  *   │  price    (tinted with badge accent · strikethrough) │
  *   └──────────────────────────────────────────────────────┘
+ *
+ * Why the media tile is its own client component: every hover-
+ * driven media effect (image swap, video play/pause, scale) is
+ * scoped to the media area via Tailwind's `group/media` named
+ * group. Hovering the info row (title / price / Add-to-Cart) no
+ * longer fires media effects — they only trigger when the cursor
+ * is actually over the tile.
  *
  * Badge rules:
  *   • At most ONE product badge (priority-picked from API `badges`)
@@ -94,25 +102,7 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
         SURFACE_OUTLINE_CLASSES,
       )}
     >
-      <div
-        className={cn(
-          "relative aspect-square overflow-hidden",
-          "bg-[color:var(--color-search)]",
-        )}
-      >
-        <ShimmerImage
-          src={product.image_url}
-          alt={product.title}
-          loading={eager ? "eager" : "lazy"}
-          wrapperClassName="block h-full w-full"
-          className={cn(
-            "h-full w-full object-cover",
-            "transition-transform duration-300 ease-out",
-            "group-hover:scale-[1.03]",
-          )}
-          skeletonRounded="lg"
-        />
-
+      <ProductCardMedia product={product} eager={eager}>
         {/* Free Shipping — full-width solid green banner pinned to
             the bottom edge of the media. Lives on the image (not
             the meta row) because it answers a delivery question,
@@ -140,7 +130,7 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
             Sold out
           </div>
         )}
-      </div>
+      </ProductCardMedia>
 
       {/* `flex-1` lets the info section grow to fill whatever
           height the grid stretches the card to, so `mt-auto` on

@@ -156,6 +156,27 @@ function normalizeSearchResponse(
  * Discards rows that don't have the minimum we need to render a card
  * (id, handle, title, price, image). Saves the card itself from
  * defensive null-checks.
+ *
+ * Image / video resolution. Three metafields can override the
+ * upstream `image_url` and add hover media:
+ *
+ *   - `custom.product_image_1` — preferred primary
+ *   - `custom.product_image_2` — fallback primary OR hover image
+ *   - `custom.product_video`   — looping hover video (wins over
+ *                                hover image when both exist)
+ *
+ * The resolution table:
+ *
+ *   | img1 | img2 | video | primary    | hover         |
+ *   |------|------|-------|------------|---------------|
+ *   |   ✓  |   ✓  |   ✓   | img1       | video         |
+ *   |   ✓  |   ✓  |       | img1       | img2          |
+ *   |   ✓  |      |   ✓   | img1       | video         |
+ *   |   ✓  |      |       | img1       | —             |
+ *   |      |   ✓  |   ✓   | img2       | video         |
+ *   |      |   ✓  |       | img2       | —             |
+ *   |      |      |   ✓   | upstream   | video         |
+ *   |      |      |       | upstream   | —             |
  */
 function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
   if (
@@ -169,11 +190,23 @@ function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
     return null;
   }
 
+  const img1 = parseMetafieldUrl(raw.metafields?.["custom.product_image_1"]);
+  const img2 = parseMetafieldUrl(raw.metafields?.["custom.product_image_2"]);
+  const video = parseMetafieldUrl(raw.metafields?.["custom.product_video"]);
+
+  const image_url = img1 ?? img2 ?? raw.image_url;
+  // Hover image is only meaningful when both metafield images are
+  // present — otherwise the "second" image is already on display
+  // as the primary, so there's nothing to swap to.
+  const hover_image_url = img1 && img2 ? img2 : undefined;
+
   return {
     id: raw.id,
     handle: raw.handle,
     title: raw.title,
-    image_url: raw.image_url,
+    image_url,
+    hover_image_url,
+    hover_video_url: video,
     price_min_cents: raw.price_min_cents,
     price_max_cents:
       typeof raw.price_max_cents === "number"
@@ -188,6 +221,19 @@ function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
     rating_count: parseRatingCount(raw.metafields?.["custom.rating_count"]),
     options: parseOptions(raw.options),
   };
+}
+
+/**
+ * Reads a metafield expected to carry a usable URL string. Returns
+ * `undefined` for missing, non-string, or empty values so the
+ * resolution table above collapses to plain `??` / truthy checks.
+ */
+function parseMetafieldUrl(
+  raw: string | number | undefined,
+): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
