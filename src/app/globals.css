@@ -88,6 +88,20 @@
   --color-brand-light: #fff4ed;
   --color-brand-border: #ffd4b8;
 
+  /* Secondary accent — hot-pink, currently only used for the
+   * `Hot Deal` badge + its price tint. Exposed as a token because
+   * we expect to reuse it for other "headliner" promo surfaces
+   * (countdown banners, flash-sale rails, etc.) and want one
+   * source of truth when we tune the hue. */
+  --color-secondary: #f41441;
+
+  /* Success / trust accent — green used today by the Free Shipping
+   * badge. Stored as a token so the next places that need a
+   * "positive trust signal" (verified seller, money-back guarantee,
+   * in-stock pill, etc.) can share the exact same hue without
+   * re-picking a green each time. */
+  --color-success: #16a34a;
+
   --color-search: #f3f4f6;
   --color-search-hover: #e8eaed;
 

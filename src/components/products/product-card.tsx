@@ -1,5 +1,11 @@
 import Link from "next/link";
+import { ProductBadge } from "@/components/products/badge";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
+import {
+  FREE_SHIPPING_BADGE,
+  pickProductBadge,
+  qualifiesForFreeShipping,
+} from "@/lib/badges";
 import { calcDiscountPercent, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { SearchProduct } from "@/types/product";
@@ -22,10 +28,20 @@ import type { SearchProduct } from "@/types/product";
  *   │   ── group-hover: image scale 1.03 (parallax)        │
  *   │   ── sold-out scrim when not available               │
  *   ├──────────────────────────────────────────────────────┤
+ *   │  [BADGE] [FREE SHIPPING]                             │
  *   │  title    (line-clamp-2, ink)                        │
  *   │  rating   (★ 4.7 (123))                              │
- *   │  price    (bold ink ── strikethrough compare-at)     │
+ *   │  price    (tinted with badge accent · strikethrough) │
  *   └──────────────────────────────────────────────────────┘
+ *
+ * Badge rules:
+ *   • At most ONE product badge (priority-picked from API `badges`).
+ *   • PLUS a Free Shipping pill when price clears the threshold —
+ *     it doesn't compete for the one-product-badge slot.
+ *   • The product badge's accent colour also tints the current
+ *     price `<span>`, so the headline tag visually owns the price.
+ *     Free Shipping doesn't drive the price tint — it's about
+ *     delivery, not about what's special about the product.
  *
  * Border behaviour mirrors the main-feed tabs: soft gray at rest,
  * snaps to full ink on hover. The whole card hovers as one unit,
@@ -47,6 +63,14 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
   );
   const hasDiscount = discountPercent > 0;
   const isSoldOut = !product.available;
+
+  // Up to one product badge (priority-picked from the API tags),
+  // plus a separate free-shipping badge — the latter doesn't count
+  // toward the one-badge product limit because it answers a
+  // different question ("will this ship for free?" vs "what's
+  // special about this product?").
+  const productBadge = pickProductBadge(product.badges);
+  const showFreeShipping = qualifiesForFreeShipping(product.price_min_cents);
 
   return (
     <Link
@@ -101,7 +125,20 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
         )}
       </div>
 
-      <div className="flex flex-col gap-1 p-3">
+      <div className="flex flex-col gap-1.5 p-3">
+        {/* Badge row above the title — one product badge (optional)
+            plus the free-shipping pill (optional). When neither
+            applies we skip the row entirely so the title sits flush
+            with the top of the info section. `flex-wrap` lets the
+            second pill drop to a new line on the narrowest tiles
+            instead of being clipped. */}
+        {(productBadge || showFreeShipping) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {productBadge && <ProductBadge badge={productBadge} />}
+            {showFreeShipping && <ProductBadge badge={FREE_SHIPPING_BADGE} />}
+          </div>
+        )}
+
         <h3 className="line-clamp-2 text-sm font-medium leading-snug text-[color:var(--color-ink)]">
           {product.title}
         </h3>
@@ -119,7 +156,17 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
         )}
 
         <div className="mt-0.5 flex items-baseline gap-2">
-          <span className="text-sm font-bold text-[color:var(--color-ink)]">
+          {/* Current price tinted with the product badge's accent —
+              same `getTopBadgeColor` semantic zepr uses, just
+              inlined: when there's a top badge, the price shares
+              its colour; otherwise plain ink. Strikethrough
+              compare-at stays muted regardless. */}
+          <span
+            className="text-sm font-bold text-[color:var(--color-ink)]"
+            style={
+              productBadge ? { color: productBadge.theme.accent } : undefined
+            }
+          >
             {formatPrice(product.price_min_cents, product.currency)}
           </span>
           {hasDiscount && product.compare_at_min_cents !== undefined && (
