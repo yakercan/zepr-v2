@@ -12,18 +12,20 @@ import {
   type SyntheticEvent,
 } from "react";
 import { cn } from "@/lib/utils";
+import { Backdrop } from "@/components/ui/backdrop";
 import { ChevronDownIcon, ChevronRightIcon } from "@/components/ui/icons";
 
 /**
  * Hover intent timings, ms.
  *
- * Open delay is intentionally tiny — anything over ~80ms feels
- * sluggish on a cursor sweep into the trigger. Close delay is
- * longer so the cursor has time to cross the gap between the
- * summary and the panel without losing the dropdown.
+ * Symmetric 80ms — short enough that the dropdown feels glued to the
+ * cursor on both open and close. The gap between summary and panel is
+ * eliminated by `padding-top` on the panel container (it sits flush
+ * under the summary inside the `<details>` element), so we don't need
+ * a long close grace period to cover travel.
  */
 const HOVER_OPEN_DELAY_MS = 80;
-const HOVER_CLOSE_DELAY_MS = 180;
+const HOVER_CLOSE_DELAY_MS = 80;
 
 /**
  * Generic header dropdown.
@@ -252,11 +254,14 @@ export function Dropdown({
         >
           {children}
         </div>
+        {/* React `key` keyed on the active item — forces the previous
+            side panel to unmount when the user hovers a new row, so
+            old icons can't bleed through while the new ones decode.
+            Pairs with the shimmer skeletons inside the panel: every
+            category swap shows a clean shimmer-first state. */}
         <div
-          className={cn(
-            "flex-1 p-5",
-            sidePanelClassName,
-          )}
+          key={activeSide?.key ?? "empty"}
+          className={cn("flex-1 p-5", sidePanelClassName)}
         >
           {activeSide?.content}
         </div>
@@ -274,13 +279,19 @@ export function Dropdown({
   return (
     <DropdownCloseContext.Provider value={closeCtx}>
       <DropdownSideContext.Provider value={sideCtx}>
+        {/* Backdrop sits behind the header by default — page content
+            dims while the bar stays crisp. */}
+        <Backdrop open={open} />
         <details
           ref={ref}
           open={open}
           onToggle={onToggle}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
-          className="group relative"
+          /* Named group so nested `group-hover/*` scopes (e.g. the
+             subcategory tiles in the side panel) only react to their
+             own hover, not to "anywhere in the dropdown". */
+          className="group/dropdown relative"
         >
           <summary
             aria-label={ariaLabel}
@@ -292,7 +303,7 @@ export function Dropdown({
             )}
           >
             {trigger}
-            <ChevronDownIcon className="h-3.5 w-3.5 text-[color:var(--color-ink-secondary)] transition-transform duration-200 group-open:-rotate-180" />
+            <ChevronDownIcon className="h-3.5 w-3.5 text-[color:var(--color-ink-secondary)] transition-transform duration-200 group-open/dropdown:-rotate-180" />
           </summary>
           <div
             className={cn(
@@ -387,7 +398,7 @@ export function DropdownItem({
       className={cn(
         "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
         variant === "danger"
-          ? "text-[#c2410c] hover:bg-[#fff1ea]"
+          ? "text-red-600 hover:bg-red-50"
           : isActive || active
             ? "bg-[color:var(--color-search)] font-medium text-[color:var(--color-ink)]"
             : "text-[color:var(--color-ink)] hover:bg-[color:var(--color-search)]",

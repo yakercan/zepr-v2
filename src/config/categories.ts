@@ -1,6 +1,35 @@
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
+ * Local line-style category icons.
+ *
+ * The Salespace taxonomy returns colorful CDN PNGs for `iconUrl` —
+ * great for the subcategory grid on the right of the dropdown, but
+ * visually busy in the dense vertical category list on the left. So
+ * the left column uses curated monochrome line SVGs shipped from
+ * `/public/category-icons/line/<handle>.svg`, keyed by handle.
+ *
+ * Returning `null` for unknown handles lets the renderer fall back to
+ * a neutral placeholder square, so a new category appearing in the
+ * taxonomy never breaks the header — it just renders without an icon
+ * until we add one.
+ */
+const LINE_CATEGORY_ICONS: Readonly<Record<string, string>> = {
+  electronics: "/category-icons/line/electronics.svg",
+  clothing: "/category-icons/line/clothing.svg",
+  "home-and-living": "/category-icons/line/home-and-living.svg",
+  "beauty-and-health": "/category-icons/line/beauty-and-health.svg",
+  "sports-and-outdoors": "/category-icons/line/sports-and-outdoors.svg",
+  "kids-and-baby": "/category-icons/line/kids-and-baby.svg",
+  "pet-essentials": "/category-icons/line/pet-essentials.svg",
+  accessories: "/category-icons/line/accessories.svg",
+};
+
+export function getLineCategoryIcon(handle: string): string | null {
+  return LINE_CATEGORY_ICONS[handle] ?? null;
+}
+
+/**
  * Static category fallback for the header dropdown and the categories
  * bar. Used when the Salespace taxonomy API is unavailable (missing
  * key, network error, cold revalidation race) so the header still

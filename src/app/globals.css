@@ -96,6 +96,22 @@
   --radius-lg: 0.75rem;
 
   --page-max-px: 1440px;
+
+  /* Shimmer keyframes registered as a theme token so the
+     `animate-shimmer` utility is available everywhere. The animation
+     is GPU-only — a single transform on the highlight band — and the
+     band itself is a flat 3-stop gradient, so it costs effectively
+     nothing while running. */
+  --animate-shimmer: shimmer 1.5s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @layer base {

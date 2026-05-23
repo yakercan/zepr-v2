@@ -11,7 +11,7 @@ import {
   HeartIcon,
   SearchIcon,
 } from "@/components/ui/icons";
-import { DEFAULT_CATEGORIES } from "@/config/categories";
+import { DEFAULT_CATEGORIES, getLineCategoryIcon } from "@/config/categories";
 import { site } from "@/config/site";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
 import { cn } from "@/lib/utils";
@@ -133,7 +133,7 @@ function CategoriesDropdown({
           key={cat.handle}
           itemKey={cat.handle}
           href={`/collections/${cat.handle}`}
-          icon={<CategoryIcon iconUrl={cat.iconUrl} />}
+          icon={<CategoryLineIcon handle={cat.handle} />}
           sidePanel={<SubcategoryGrid category={cat} />}
         >
           {cat.name}
@@ -143,20 +143,26 @@ function CategoriesDropdown({
   );
 }
 
-function CategoryIcon({ iconUrl }: { iconUrl: string | null }) {
-  if (!iconUrl) {
+/**
+ * Left-column category icon — always the local monochrome line SVG,
+ * not the taxonomy's colorful CDN icon. See `getLineCategoryIcon`
+ * for the rationale. Renders a neutral placeholder square when no
+ * line icon is registered for the handle yet.
+ */
+function CategoryLineIcon({ handle }: { handle: string }) {
+  const src = getLineCategoryIcon(handle);
+  if (!src) {
     return (
       <span className="inline-block h-5 w-5 rounded bg-[color:var(--color-search)]" />
     );
   }
   return (
     <Image
-      src={iconUrl}
+      src={src}
       alt=""
       width={20}
       height={20}
       className="h-5 w-5 object-contain"
-      unoptimized
     />
   );
 }

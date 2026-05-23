@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { ShimmerImage } from "@/components/ui/shimmer-image";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
@@ -7,13 +7,15 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  * column.
  *
  * Pure UI — receives the active category and produces a 4-column grid
- * of circular icons + names, plus an "All" tile that links to the
- * category's collection page. Mirrors the original zepr mega menu
- * layout so the visual language stays consistent.
+ * of icons + names plus an "All" tile that links to the category's
+ * collection page. Icons use `<ShimmerImage>` so the panel paints a
+ * skeleton while CDN PNGs decode (especially on the first hover of a
+ * given category — subsequent hovers hit the browser cache and the
+ * shimmer never appears).
  *
- * When a category has no subcategories (e.g. the static fallback used
- * before the Salespace taxonomy API responds), we still render the
- * "All" tile so the user has a useful destination.
+ * The grid only mounts when the parent `<Dropdown>` swaps the active
+ * panel (via a React `key` keyed on category handle), so previous
+ * category's icons can't bleed through into the next one.
  */
 export function SubcategoryGrid({ category }: { category: TaxonomyCategory }) {
   const subcategories = category.subcategories ?? [];
@@ -57,6 +59,11 @@ export function SubcategoryGrid({ category }: { category: TaxonomyCategory }) {
   );
 }
 
+/* Tile icon size — bumped from 44px → 56px for legibility now that
+ * the gray circle backplate is gone. Width === height so the shimmer
+ * skeleton inherits a perfect square footprint while loading. */
+const TILE_ICON_PX = 56;
+
 function SubcategoryTile({
   href,
   label,
@@ -68,28 +75,36 @@ function SubcategoryTile({
   iconUrl: string | null;
   fallback: string;
 }) {
+  /* Named `group/tile` so hover state is scoped to this tile only —
+   * the dropdown's outer `group/dropdown` won't also fire. */
   return (
     <Link
       href={href}
-      className="group flex flex-col items-center gap-2 text-center"
+      className="group/tile flex flex-col items-center gap-1.5 text-center"
     >
-      <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[color:var(--color-search)] transition-transform duration-200 group-hover:scale-[1.04]">
+      <span
+        className="flex items-center justify-center transition-transform duration-200 group-hover/tile:scale-[1.06]"
+        style={{ width: TILE_ICON_PX, height: TILE_ICON_PX }}
+      >
         {iconUrl ? (
-          <Image
+          <ShimmerImage
             src={iconUrl}
-            alt=""
-            width={48}
-            height={48}
-            className="h-12 w-12 object-contain"
-            unoptimized
+            width={TILE_ICON_PX}
+            height={TILE_ICON_PX}
+            className="object-contain"
+            style={{ width: TILE_ICON_PX, height: TILE_ICON_PX }}
+            skeletonRounded="full"
           />
         ) : (
-          <span className="text-sm font-medium text-[color:var(--color-ink-muted)]">
+          <span
+            className="flex h-full w-full items-center justify-center rounded-full bg-[color:var(--color-search)] text-sm font-medium text-[color:var(--color-ink-muted)]"
+            aria-hidden
+          >
             {fallback}
           </span>
         )}
       </span>
-      <span className="text-xs font-medium leading-tight text-[color:var(--color-ink)] transition-colors duration-200 group-hover:text-[color:var(--color-brand)]">
+      <span className="text-xs font-medium leading-tight text-[color:var(--color-ink)] transition-colors duration-200 group-hover/tile:text-[color:var(--color-brand)]">
         {label}
       </span>
     </Link>
@@ -102,13 +117,13 @@ function SubcategoryEmpty({ category }: { category: TaxonomyCategory }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 py-8 text-center">
       {category.iconUrl && (
-        <Image
+        <ShimmerImage
           src={category.iconUrl}
-          alt=""
           width={64}
           height={64}
-          className="h-16 w-16 opacity-80"
-          unoptimized
+          className="object-contain opacity-80"
+          style={{ width: 64, height: 64 }}
+          skeletonRounded="full"
         />
       )}
       <p className="max-w-[16rem] text-sm text-[color:var(--color-ink-secondary)]">
