@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   DEFAULT_MAIN_FEED_TAB,
   MAIN_FEED_TABS,
@@ -69,6 +69,13 @@ export function MainFeedTabs() {
     setActive(urlTab);
   }
 
+  // `useTransition` keeps the click → pill-highlight flip synchronous
+  // (so the active state paints in the same frame as the tap) while
+  // the RSC refetch for the grid runs as a low-priority transition.
+  // `isPending` is exposed so the strip can show a subtle "loading"
+  // tint while the new tab's payload streams in.
+  const [isPending, startTransition] = useTransition();
+
   const handleSelect = (id: MainFeedTabId) => {
     if (id === active) return;
     setActive(id);
@@ -81,15 +88,23 @@ export function MainFeedTabs() {
     }
     const qs = params.toString();
     // `replace` (not push) + `scroll: false`: stays on the same page,
-    // doesn't add to history, doesn't jump to top.
-    router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+    // doesn't add to history, doesn't jump to top. Wrapped in a
+    // transition so React keeps the previous grid interactive until
+    // the new RSC payload is ready.
+    startTransition(() => {
+      router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+    });
   };
 
   return (
     <div
       role="tablist"
       aria-label="Product feed sort"
-      className="flex flex-wrap items-center gap-2"
+      aria-busy={isPending}
+      className={cn(
+        "flex flex-wrap items-center gap-2 transition-opacity duration-150",
+        isPending && "opacity-70",
+      )}
     >
       {MAIN_FEED_TABS.map((tab) => {
         const isActive = active === tab.id;
