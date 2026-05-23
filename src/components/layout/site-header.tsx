@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { AccountDropdown } from "@/components/layout/account-dropdown";
+import { SearchBar } from "@/components/layout/search-bar";
 import { SubcategoryGrid } from "@/components/layout/subcategory-grid";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import {
@@ -9,12 +10,10 @@ import {
   CategoriesIcon,
   FireIcon,
   HeartIcon,
-  SearchIcon,
 } from "@/components/ui/icons";
 import { DEFAULT_CATEGORIES, getLineCategoryIcon } from "@/config/categories";
 import { site } from "@/config/site";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
-import { cn } from "@/lib/utils";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
@@ -64,7 +63,7 @@ export async function SiteHeader() {
           <CategoriesDropdown categories={categories} />
         </nav>
 
-        <SearchBarStub />
+        <SearchBar />
 
         <div className="flex shrink-0 items-center gap-1">
           <Link href="/favorites" className="header-nav-link">
@@ -194,28 +193,3 @@ function CartLink({ itemCount }: { itemCount: number }) {
   );
 }
 
-/**
- * Placeholder search bar — visual only. Wires up to the real search
- * route + suggestions when we build the search step.
- */
-function SearchBarStub() {
-  return (
-    <form
-      action="/search"
-      method="get"
-      className={cn(
-        "relative mx-auto flex h-10 min-w-0 max-w-2xl flex-1 items-center rounded-full",
-        "bg-[color:var(--color-search)] transition-colors hover:bg-[color:var(--color-search-hover)] focus-within:bg-white focus-within:ring-2 focus-within:ring-[color:var(--color-brand-border)]",
-      )}
-    >
-      <SearchIcon className="ml-3.5 text-[color:var(--color-ink-secondary)]" />
-      <input
-        name="q"
-        type="search"
-        placeholder="Search products, brands, and more"
-        className="h-full flex-1 bg-transparent px-3 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none"
-        autoComplete="off"
-      />
-    </form>
-  );
-}

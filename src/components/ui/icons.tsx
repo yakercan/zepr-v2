@@ -53,6 +53,17 @@ export function ChevronRightIcon({ className }: IconProps) {
   );
 }
 
+/** Long-shaft right arrow — used inside the search bar's submit
+ *  button. Stroke-only so it tints with `currentColor` against the
+ *  brand-colored background. */
+export function ArrowRightIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(cn("h-4 w-4", className))}>
+      <path d="M5 12h14M13 5l7 7-7 7" />
+    </svg>
+  );
+}
+
 export function CategoriesIcon({ className }: IconProps) {
   return (
     <svg {...svgProps(className)}>

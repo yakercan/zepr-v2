@@ -111,7 +111,7 @@
    * className and inherits both at once. Don't hand-roll
    * `mx-auto max-w-[…] px-…` combinations elsewhere — change a token
    * here and every page tracks. */
-  --page-max-px: 1360px;
+  --page-max-px: 1400px;
   --page-gutter-px: 1.5rem;
 
   /* Shimmer keyframes registered as a theme token so the
@@ -148,11 +148,6 @@
     font-family: var(--font-sans);
     font-weight: 400;
     letter-spacing: 0.01em;
-  }
-
-  ::selection {
-    background-color: rgb(246 95 20 / 0.2);
-    color: var(--color-ink);
   }
 
   /*
