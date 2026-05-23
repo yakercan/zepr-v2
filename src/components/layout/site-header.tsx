@@ -1,22 +1,26 @@
 import Image from "next/image";
 import Link from "next/link";
+import { AccountDropdown } from "@/components/layout/account-dropdown";
+import { SubcategoryGrid } from "@/components/layout/subcategory-grid";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import {
   BestSellersIcon,
   CartIcon,
   CategoriesIcon,
+  FireIcon,
   HeartIcon,
   SearchIcon,
-  UserIcon,
-  ZeprIcon,
-  ZEPR_ICONS,
 } from "@/components/ui/icons";
-import { DEFAULT_CATEGORIES, type NavCategory } from "@/config/categories";
+import { DEFAULT_CATEGORIES } from "@/config/categories";
 import { site } from "@/config/site";
+import { getTaxonomy } from "@/lib/salespace/taxonomy";
 import { cn } from "@/lib/utils";
+import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
- * Site-wide header. Pure server component — no React state lives here.
+ * Site-wide header. Async server component — fetches the category
+ * taxonomy at request time (cached for an hour at the edge via
+ * Next's fetch cache) and renders the whole bar in one round.
  *
  * Background fades from translucent-blur to opaque-white on either
  * `:hover` of the header itself OR `:has(details[open])` when any
@@ -24,15 +28,17 @@ import { cn } from "@/lib/utils";
  * `globals.css` so the React tree stays state-free.
  *
  * Categories and Account both render via the same `<Dropdown>` —
- * single source of caret + click-outside + Escape behavior. Easy to
- * add a third (Language, Currency, …) by dropping in another
- * `<Dropdown>` with new content.
+ * single source of caret + click-outside + Escape behavior. Categories
+ * uses `sideMode` to mount a subcategory grid in the right column when
+ * a category row is hovered; Account uses the simple stacked layout.
  */
-export function SiteHeader({
-  categories = DEFAULT_CATEGORIES,
-}: {
-  categories?: readonly NavCategory[];
-}) {
+export async function SiteHeader() {
+  const taxonomy = await getTaxonomy();
+  const categories: readonly TaxonomyCategory[] =
+    taxonomy?.categories?.length
+      ? taxonomy.categories
+      : DEFAULT_CATEGORIES;
+
   return (
     <header className="site-header sticky top-0 z-50 border-b border-[color:var(--color-border)]">
       <div className="mx-auto flex h-16 max-w-[var(--page-max-px)] items-center gap-4 px-6">
@@ -51,7 +57,7 @@ export function SiteHeader({
             href="/search?sort=hot_deals%3Adesc"
             className="header-nav-link"
           >
-            <ZeprIcon src={ZEPR_ICONS.fireBlack} size={20} alt="" />
+            <FireIcon className="text-[color:var(--color-ink)]" />
             <span className="text-[15px] font-semibold">Hot Deals</span>
           </Link>
 
@@ -107,55 +113,51 @@ function Logo() {
 function CategoriesDropdown({
   categories,
 }: {
-  categories: readonly NavCategory[];
+  categories: readonly TaxonomyCategory[];
 }) {
   return (
     <Dropdown
+      sideMode
+      panelClassName="w-[48rem]"
+      mainColumnClassName="w-[16rem] shrink-0 py-2 pl-1.5 pr-1.5"
+      sidePanelClassName="min-h-[22rem] p-5"
       trigger={
         <>
           <CategoriesIcon className="text-[color:var(--color-ink)]" />
           <span className="text-[15px] font-semibold">Categories</span>
         </>
       }
-      panelClassName="grid w-[34rem] grid-cols-2 gap-1 p-2"
     >
       {categories.map((cat) => (
         <DropdownItem
           key={cat.handle}
+          itemKey={cat.handle}
           href={`/collections/${cat.handle}`}
-          icon={
-            <Image
-              src={cat.icon}
-              alt=""
-              width={20}
-              height={20}
-              className="h-5 w-5"
-            />
-          }
+          icon={<CategoryIcon iconUrl={cat.iconUrl} />}
+          sidePanel={<SubcategoryGrid category={cat} />}
         >
-          {cat.title}
+          {cat.name}
         </DropdownItem>
       ))}
     </Dropdown>
   );
 }
 
-function AccountDropdown() {
+function CategoryIcon({ iconUrl }: { iconUrl: string | null }) {
+  if (!iconUrl) {
+    return (
+      <span className="inline-block h-5 w-5 rounded bg-[color:var(--color-search)]" />
+    );
+  }
   return (
-    <Dropdown
-      align="right"
-      panelClassName="w-[14rem] p-1.5"
-      triggerClassName="header-icon-trigger"
-      ariaLabel="Account"
-      trigger={<UserIcon />}
-    >
-      <DropdownItem href="/account/sign-in">Sign in</DropdownItem>
-      <DropdownItem href="/account">My account</DropdownItem>
-      <DropdownItem href="/account/orders">Orders</DropdownItem>
-      <DropdownItem href="/account/wishlist">Wishlist</DropdownItem>
-      <div className="my-1.5 h-px bg-[color:var(--color-border)]" />
-      <DropdownItem href="/help">Help</DropdownItem>
-    </Dropdown>
+    <Image
+      src={iconUrl}
+      alt=""
+      width={20}
+      height={20}
+      className="h-5 w-5 object-contain"
+      unoptimized
+    />
   );
 }
 

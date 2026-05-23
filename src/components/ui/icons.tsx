@@ -45,6 +45,14 @@ export function ChevronDownIcon({ className }: IconProps) {
   );
 }
 
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(cn("h-4 w-4", className))}>
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
 export function CategoriesIcon({ className }: IconProps) {
   return (
     <svg {...svgProps(className)}>
@@ -113,6 +121,26 @@ export function BestSellersIcon({ className }: IconProps) {
       aria-hidden
     >
       <path d="M12 1L15.09 7.26L22 8.27L17 13.14L18.18 20.02L12 16.77L5.82 20.02L7 13.14L2 8.27L8.91 7.26L12 1Z" />
+    </svg>
+  );
+}
+
+/** Hot Deals flame — inline so it paints with the rest of the header
+ *  instead of late-loading off the CDN. Solid fill, `currentColor` so
+ *  the standard nav-link hover (text-brand) tints it orange for free. */
+export function FireIcon({ className }: IconProps) {
+  return (
+    <svg
+      className={cn(DEFAULT_SIZE, "shrink-0", className)}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12.963 2.286a.75.75 0 0 0-1.071-.136 9.742 9.742 0 0 0-3.539 6.176 7.547 7.547 0 0 1-1.705-1.715.75.75 0 0 0-1.152-.082A9 9 0 1 0 15.68 4.534a7.46 7.46 0 0 1-2.717-2.248ZM15.75 14.25a3.75 3.75 0 1 1-7.313-1.172c.628.465 1.35.81 2.133 1a5.99 5.99 0 0 1 1.925-3.546 3.75 3.75 0 0 1 3.255 3.718Z"
+      />
     </svg>
   );
 }

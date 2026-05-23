@@ -1,56 +1,94 @@
-/**
- * Static category fallback used by the header dropdown and the
- * categories bar until the live Salespace taxonomy is wired up.
- *
- * Icons live in `/public/category-icons/line/*.svg`; the same handles
- * map cleanly to the `/collections/<handle>` URLs we'll use once
- * the collection routes ship.
- */
-export interface NavCategory {
-  handle: string;
-  title: string;
-  icon: string;
-}
+import type { TaxonomyCategory } from "@/types/taxonomy";
 
-export const DEFAULT_CATEGORIES: readonly NavCategory[] = [
+/**
+ * Static category fallback for the header dropdown and the categories
+ * bar. Used when the Salespace taxonomy API is unavailable (missing
+ * key, network error, cold revalidation race) so the header still
+ * renders something meaningful instead of an empty panel.
+ *
+ * Shape matches `TaxonomyCategory` exactly so the rendering code
+ * doesn't need to branch on data source. Subcategories are an empty
+ * array here — when the API responds, those populate from the wire.
+ */
+export const DEFAULT_CATEGORIES: readonly TaxonomyCategory[] = [
   {
+    id: 1,
     handle: "electronics",
-    title: "Electronics",
-    icon: "/category-icons/line/electronics.svg",
+    name: "Electronics",
+    iconUrl: "/category-icons/line/electronics.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
   {
+    id: 2,
     handle: "clothing",
-    title: "Clothing",
-    icon: "/category-icons/line/clothing.svg",
+    name: "Clothing",
+    iconUrl: "/category-icons/line/clothing.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
   {
+    id: 3,
     handle: "home-and-living",
-    title: "Home & Living",
-    icon: "/category-icons/line/home-and-living.svg",
+    name: "Home & Living",
+    iconUrl: "/category-icons/line/home-and-living.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
   {
+    id: 4,
     handle: "beauty-and-health",
-    title: "Beauty & Health",
-    icon: "/category-icons/line/beauty-and-health.svg",
+    name: "Beauty & Health",
+    iconUrl: "/category-icons/line/beauty-and-health.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
   {
+    id: 5,
     handle: "sports-and-outdoors",
-    title: "Sports & Outdoors",
-    icon: "/category-icons/line/sports-and-outdoors.svg",
+    name: "Sports & Outdoors",
+    iconUrl: "/category-icons/line/sports-and-outdoors.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
   {
+    id: 6,
     handle: "kids-and-baby",
-    title: "Kids & Baby",
-    icon: "/category-icons/line/kids-and-baby.svg",
+    name: "Kids & Baby",
+    iconUrl: "/category-icons/line/kids-and-baby.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
   {
+    id: 7,
     handle: "pet-essentials",
-    title: "Pet Essentials",
-    icon: "/category-icons/line/pet-essentials.svg",
+    name: "Pet Essentials",
+    iconUrl: "/category-icons/line/pet-essentials.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
   {
+    id: 8,
     handle: "accessories",
-    title: "Accessories",
-    icon: "/category-icons/line/accessories.svg",
+    name: "Accessories",
+    iconUrl: "/category-icons/line/accessories.svg",
+    imageUrl: null,
+    shopifyCollectionId: null,
+    productCount: 0,
+    subcategories: [],
   },
 ] as const;
