@@ -13,7 +13,7 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  *
  * Trigger chrome depends on the *route*, not on hover state:
  *
- *   - `/category/<handle>` → `[LineIcon] {Name}` (truncated) so
+ *   - `/categories/<handle>` → `[LineIcon] {Name}` (truncated) so
  *     the header reflects where the user actually is.
  *   - Anything else → generic `[CategoriesIcon] Categories`.
  *
@@ -29,12 +29,12 @@ export function CategoriesDropdown({
 }) {
   const pathname = usePathname();
 
-  // Match `/category/<handle>` (with optional trailing segments /
+  // Match `/categories/<handle>` (with optional trailing segments /
   // query — keeps the trigger active on hypothetical future child
   // routes too). Stops at the next `/` so `?` and trailing slashes
   // resolve to the bare handle.
   const activeHandle = useMemo(() => {
-    const m = pathname.match(/^\/category\/([^/?#]+)/);
+    const m = pathname.match(/^\/categories\/([^/?#]+)/);
     return m ? decodeURIComponent(m[1]) : null;
   }, [pathname]);
 
@@ -75,7 +75,7 @@ export function CategoriesDropdown({
         <DropdownItem
           key={cat.handle}
           itemKey={cat.handle}
-          href={`/category/${cat.handle}`}
+          href={`/categories/${cat.handle}`}
           sidePanel={<SubcategoryGrid category={cat} />}
         >
           {cat.name}

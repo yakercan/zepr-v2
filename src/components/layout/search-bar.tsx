@@ -20,11 +20,13 @@ import { cn } from "@/lib/utils";
 
 /** Shared layout for the Clear (×) and Submit (→) buttons inside the
  *  search bar — fixed circular footprint, soft grey halo on hover.
- *  Per-button text color (neutral vs brand) is layered on top at the
- *  call site so both still share one source of truth for sizing. */
+ *  The halo colour is `--color-bubble`, the same token the header's
+ *  `.icon-bubble` pills use, so every "icon button" in the chrome
+ *  reads as one family. Per-button text color (neutral vs brand) is
+ *  layered on top at the call site. */
 const SEARCH_BAR_BUTTON_BASE = cn(
   "flex h-6 w-6 items-center justify-center rounded-full",
-  "transition-colors hover:bg-[color:var(--color-border)]",
+  "transition-colors hover:bg-[color:var(--color-bubble)]",
 );
 
 /**

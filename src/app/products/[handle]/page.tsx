@@ -134,7 +134,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
  * Category and subcategory crumbs only render when their data is
  * present on the product (`primaryCollection` and the
  * `subcategory:` tag respectively). The links route into our
- * `/category/[handle]` shell — for the subcategory step we also
+ * `/categories/[handle]` shell — for the subcategory step we also
  * pass `?subcategory=…` so the destination opens with that
  * subcategory pre-filtered, matching the legacy storefront's URL
  * shape.
@@ -149,13 +149,13 @@ function buildBreadcrumb(product: ProductDetail): BreadcrumbItem[] {
   if (product.primaryCollection) {
     items.push({
       label: product.primaryCollection.title,
-      href: `/category/${product.primaryCollection.handle}`,
+      href: `/categories/${product.primaryCollection.handle}`,
     });
 
     if (product.subcategory) {
       items.push({
         label: product.subcategory,
-        href: `/category/${product.primaryCollection.handle}?subcategory=${encodeURIComponent(
+        href: `/categories/${product.primaryCollection.handle}?subcategory=${encodeURIComponent(
           product.subcategory,
         )}`,
       });

@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
- * `/category` — index of every top-level category as a card
+ * `/categories` — index of every top-level category as a card
  * grid. Card image is the category's CDN image, label is the
  * category name; tapping the card lands the user on
- * `/category/[handle]` where the subcategory slider + filter
+ * `/categories/[handle]` where the subcategory slider + filter
  * bar take over.
  *
  * No products are fetched here — the upstream taxonomy is the
@@ -76,7 +76,7 @@ function CategoryCard({
 
   return (
     <Link
-      href={`/category/${category.handle}`}
+      href={`/categories/${category.handle}`}
       // Same hover + border treatment as `<ProductCard>` so the
       // index cards and the product grid speak the same visual
       // language.

@@ -245,13 +245,18 @@ export function Dropdown({
     );
   };
 
-  // Tap toggle for touch/keyboard. preventDefault stops the native
+  // Tap / keyboard activation. preventDefault stops the native
   // `<summary>` toggle so our controlled state stays authoritative.
+  // Open-only: clicking the trigger never *closes* the dropdown —
+  // hover-out timeout, click-outside, Escape, and item selection
+  // all already handle that, and accidentally re-clicking a hovered
+  // trigger used to dismiss the panel right after hover-intent
+  // opened it. Touch users still get an explicit "open" gesture.
   const onSummaryClick = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     clearOpenTimer();
     clearCloseTimer();
-    setOpen((prev) => !prev);
+    setOpen(true);
   };
 
   const panel =

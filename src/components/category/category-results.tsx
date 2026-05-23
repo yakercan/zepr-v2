@@ -16,7 +16,7 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
 const DEFAULT_SORT = "best_sellers:desc";
 
 /**
- * `/category/[handle]` body — filter bar + grid + view-more
+ * `/categories/[handle]` body — filter bar + grid + view-more
  * for one collection. Mirrors `<SearchResults>` but anchors
  * to a category handle instead of a query, and hides the
  * Category filter pill (the subcategory slider already lives

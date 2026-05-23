@@ -11,8 +11,8 @@ import { getTaxonomy } from "@/lib/salespace/taxonomy";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
- * `/category/[handle]?page=N&sort=…&subcategory=…&price_min=…
- *                    &price_max=…&size=…`
+ * `/categories/[handle]?page=N&sort=…&subcategory=…&price_min=…
+ *                      &price_max=…&size=…`
  *
  * Thin shell:
  *

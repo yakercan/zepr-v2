@@ -15,11 +15,11 @@ import { cn } from "@/lib/utils";
  *
  * Visual model:
  *
- *   - No top rule on the group (the gallery above already
- *     provides its own visual break).
- *   - Bottom rule on the group + hairline `divide-y` between
- *     siblings, so each section reads as one row in a quiet
- *     ledger.
+ *   - No top rule on the group, no bottom rule on the group.
+ *   - Hairline `divide-y` between siblings — i.e. a top rule on
+ *     every item except the first — so each section reads as
+ *     one row in a quiet ledger without bracketing the group
+ *     on either edge.
  *   - Inside each open section: a hairline separator between the
  *     title row and the body content — frames the open content
  *     as a distinct surface rather than letting it bleed into
@@ -50,12 +50,7 @@ import { cn } from "@/lib/utils";
  */
 export function ProductAccordion({ children }: { children: ReactNode }) {
   return (
-    <div
-      className={cn(
-        "border-b border-[color:var(--color-border)]",
-        "divide-y divide-[color:var(--color-border)]",
-      )}
-    >
+    <div className="divide-y divide-[color:var(--color-border)]">
       {children}
     </div>
   );
@@ -87,14 +82,13 @@ export function ProductAccordionItem({
         className={cn(
           "flex w-full items-center justify-between py-4 text-left",
           "text-base font-semibold text-[color:var(--color-ink)]",
-          "transition-colors hover:text-[color:var(--color-ink)]",
         )}
       >
         <span>{title}</span>
         <SmoothCaretIcon
           className={cn(
             "h-3 w-3 text-[color:var(--color-ink-secondary)]",
-            "transition-transform duration-300",
+            "transition-transform duration-200",
             open && "rotate-180",
           )}
         />
@@ -113,7 +107,7 @@ export function ProductAccordionItem({
         id={panelId}
         aria-hidden={!open}
         className={cn(
-          "grid transition-[grid-template-rows] duration-300 ease-out",
+          "grid transition-[grid-template-rows] duration-200 ease-out",
           open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
       >

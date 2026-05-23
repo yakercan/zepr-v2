@@ -12,7 +12,7 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  *
  *   - **Clickable title** (shrink-0) — the category name itself
  *     is the "All" affordance: clicking it navigates to
- *     `/category/<handle>` (the unfiltered category) and closes
+ *     `/categories/<handle>` (the unfiltered category) and closes
  *     the dropdown. Hovers brand-orange to telegraph the link.
  *     A soft drop-shadow under the bottom border lifts it above
  *     the scrolling list.
@@ -34,7 +34,7 @@ export function SubcategoryGrid({ category }: { category: TaxonomyCategory }) {
   return (
     <div className="flex h-full flex-col">
       <Link
-        href={`/category/${category.handle}`}
+        href={`/categories/${category.handle}`}
         onClick={close}
         className={
           // Sticky header treatment: bottom border + soft drop
@@ -64,7 +64,7 @@ export function SubcategoryGrid({ category }: { category: TaxonomyCategory }) {
               />
             )}
             <DropdownItem
-              href={`/category/${category.handle}?subcategory=${encodeURIComponent(sub.name)}`}
+              href={`/categories/${category.handle}?subcategory=${encodeURIComponent(sub.name)}`}
               icon={<SubcategoryIcon src={sub.iconUrl} fallback={sub.name} />}
             >
               {sub.name}
