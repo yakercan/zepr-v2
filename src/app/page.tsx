@@ -8,22 +8,23 @@ import { MainFeed } from "@/components/home/main-feed";
  *
  * `searchParams` is awaited (Next 16 makes it a Promise so the
  * framework can defer dynamic reads until they're actually
- * consumed). We forward only `tab` to `MainFeed`; it parses /
- * validates against the known tab ids itself.
+ * consumed). We forward `tab` + `page` to `MainFeed`; it
+ * validates both itself (against the known tab ids / a positive
+ * integer respectively).
  */
-type HomeSearchParams = { tab?: string };
+type HomeSearchParams = { tab?: string; page?: string };
 
 export default async function HomePage({
   searchParams,
 }: {
   searchParams: Promise<HomeSearchParams>;
 }) {
-  const { tab } = await searchParams;
+  const { tab, page } = await searchParams;
 
   return (
     <div className="page-container flex flex-col gap-8 py-6">
       <BannerSlider />
-      <MainFeed tabParam={tab} />
+      <MainFeed tabParam={tab} pageParam={page} />
     </div>
   );
 }

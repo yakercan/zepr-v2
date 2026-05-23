@@ -91,6 +91,10 @@ export function MainFeedTabs() {
     } else {
       params.set("tab", id);
     }
+    // Each tab gets its own "view more" counter — leaking a
+    // deep page from the previous tab would dump a wall of
+    // unrelated products on the user. Always reset on switch.
+    params.delete("page");
     const qs = params.toString();
     // `replace` (not push) + `scroll: false`: stays on the same page,
     // doesn't add to history, doesn't jump to top. Wrapped in a

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/env";
+import { PRODUCTS_PAGE_SIZE } from "@/lib/pagination";
 import type {
   SearchProduct,
   SearchProductReview,
@@ -23,7 +24,10 @@ import type {
 
 const SALESPACE_API_BASE = "https://api.salespace.com";
 const DEFAULT_REVALIDATE_SEC = 60;
-const DEFAULT_LIMIT = 24;
+// One source of truth for batch size lives in `lib/pagination` so
+// the homepage, search, and collection surfaces all use the same
+// number. Callers can still override per-request.
+const DEFAULT_LIMIT = PRODUCTS_PAGE_SIZE;
 
 const EMPTY_RESULT: SearchResult = {
   hits: [],
