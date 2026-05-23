@@ -8,7 +8,7 @@ import {
   parseMainFeedTab,
   type MainFeedTabId,
 } from "@/config/main-feed-tabs";
-import { SURFACE_OUTLINE_CLASSES } from "@/lib/styles";
+import { pillClasses } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,36 +28,11 @@ import { cn } from "@/lib/utils";
  * Visual: reversed-colour pills — active is ink-on-white, idle is
  * white-on-ink. Sticks to the left edge of the page-container so the
  * row reads like a section header, not a centered hero element.
+ *
+ * The pill itself is shared with the search-page filter bar — both
+ * pull from `pillClasses()` in `lib/styles.ts`. Change pill look
+ * there once and every surface tracks.
  */
-// Every pill carries `border-2 border-transparent` at the base so
-// the 2px outline on the idle variant doesn't shift the active pill
-// by a pixel when its border collapses into the ink background.
-const TAB_BASE_CLASS = cn(
-  "shrink-0 rounded-full border-2 border-transparent px-5 py-2.5",
-  "text-sm font-semibold leading-none",
-  "transition-colors duration-150",
-  "focus-visible:outline-none focus-visible:ring-2",
-  "focus-visible:ring-[color:var(--color-ink)] focus-visible:ring-offset-2",
-  "focus-visible:ring-offset-[color:var(--color-page)]",
-);
-
-const TAB_ACTIVE_CLASS = cn(
-  "bg-[color:var(--color-ink)] text-white",
-  "border-[color:var(--color-ink)]",
-);
-
-// Idle: white fill, shared `SURFACE_OUTLINE_CLASSES` preset for
-// the soft grey → ink hover transition. The preset includes its
-// own `border-2`, so no separate border-width is needed here.
-// `SURFACE_OUTLINE_CLASSES` is the single source of truth for
-// "selectable surface outline" across tabs, cards, and any future
-// chip / picker — change it once in `lib/styles.ts`, every surface
-// tracks.
-const TAB_IDLE_CLASS = cn(
-  "bg-[color:var(--color-surface)] text-[color:var(--color-ink)]",
-  SURFACE_OUTLINE_CLASSES,
-);
-
 export function MainFeedTabs() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -125,10 +100,7 @@ export function MainFeedTabs() {
             aria-selected={isActive}
             tabIndex={isActive ? 0 : -1}
             onClick={() => handleSelect(tab.id)}
-            className={cn(
-              TAB_BASE_CLASS,
-              isActive ? TAB_ACTIVE_CLASS : TAB_IDLE_CLASS,
-            )}
+            className={pillClasses(isActive)}
           >
             {tab.label}
           </button>

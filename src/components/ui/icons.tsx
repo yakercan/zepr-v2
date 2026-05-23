@@ -61,6 +61,16 @@ export function ChevronRightIcon({ className }: IconProps) {
   );
 }
 
+/** Tick — used as the "selected" indicator in single-select filter
+ *  dropdowns (sort options today, future sort/sort-direction lists). */
+export function CheckIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(cn("h-4 w-4", className))}>
+      <path d="m5 12 5 5 9-11" />
+    </svg>
+  );
+}
+
 /** Play / Pause — used by the banner slider's autoplay toggle AND
  *  by the product card's "this product has a video preview"
  *  indicator (in a dark overlay bubble). Solid-fill variant so the

@@ -3,6 +3,7 @@ import "server-only";
 import { env } from "@/env";
 import { PRODUCTS_PAGE_SIZE } from "@/lib/pagination";
 import type {
+  SearchFacets,
   SearchProduct,
   SearchProductReview,
   SearchResult,
@@ -45,6 +46,15 @@ export interface SearchProductsParams {
   /** Subcategory filter — repeat in URLSearchParams for multi-select. */
   subcategory?: string | string[];
   campaign?: string | string[];
+  /** Inclusive minimum price in whole dollars (not cents). */
+  price_min?: number;
+  /** Inclusive maximum price in whole dollars (not cents). */
+  price_max?: number;
+  /** Size variant filter — multi-select. Mapped through the
+   *  upstream `filter=options.Size:"VALUE"` syntax. */
+  size?: string | string[];
+  /** Restrict to in-stock products when `true`. */
+  available?: boolean;
   limit?: number;
   page?: number;
 }
@@ -78,6 +88,23 @@ export async function searchProducts(
   };
   multi("subcategory", params.subcategory);
   multi("campaign", params.campaign);
+
+  if (params.price_min !== undefined) {
+    search.set("price_min", String(params.price_min));
+  }
+  if (params.price_max !== undefined) {
+    search.set("price_max", String(params.price_max));
+  }
+  if (params.available !== undefined) {
+    search.set("available", String(params.available));
+  }
+  // Size lives in the variant-options space, so it uses the
+  // upstream's generic `filter=options.Size:"VALUE"` syntax instead
+  // of a top-level param. Repeated for multi-select.
+  if (params.size) {
+    const sizes = Array.isArray(params.size) ? params.size : [params.size];
+    for (const s of sizes) search.append("filter", `options.Size:"${s}"`);
+  }
 
   const url = `${SALESPACE_API_BASE}/search?${search.toString()}`;
 
@@ -119,6 +146,10 @@ interface RawSearchResponse {
   total?: number;
   page?: number;
   limit?: number;
+  /** Pre-validated upstream — we type the wire shape here and
+   *  pick only the maps the UI actually consumes. Extra keys are
+   *  passed through untouched on the dynamic facet maps. */
+  facets?: Record<string, unknown>;
 }
 
 interface RawSearchProduct {
@@ -153,7 +184,53 @@ function normalizeSearchResponse(
     total: typeof raw.total === "number" ? raw.total : hits.length,
     page: typeof raw.page === "number" ? raw.page : (params.page ?? 1),
     limit: typeof raw.limit === "number" ? raw.limit : (params.limit ?? DEFAULT_LIMIT),
+    facets: normalizeFacets(raw.facets),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Facet normalisation                                                 */
+/* ------------------------------------------------------------------ */
+/**
+ * Type-guard each facet map shape so a malformed upstream key
+ * can't poison the UI. We only surface the maps the filter bar
+ * actually consumes; everything else flows through opaquely on
+ * the `SearchFacets` index signature for future filters.
+ */
+function normalizeFacets(raw: unknown): SearchFacets | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+
+  const out: SearchFacets = {};
+
+  const asCountMap = (v: unknown): Record<string, number> | undefined => {
+    if (!v || typeof v !== "object") return undefined;
+    const entries = Object.entries(v as Record<string, unknown>).filter(
+      (e): e is [string, number] => typeof e[1] === "number",
+    );
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  };
+
+  out.vendor = asCountMap(r.vendor);
+  out.product_type = asCountMap(r.product_type);
+  out.tags = asCountMap(r.tags);
+  out.collections = asCountMap(r.collections);
+  out.available = asCountMap(r.available);
+  out.subcategory = asCountMap(r.subcategory);
+  out["options.Size"] = asCountMap(r["options.Size"]);
+  out.campaigns = asCountMap(r.campaigns);
+
+  if (r.price && typeof r.price === "object") {
+    const p = r.price as Record<string, unknown>;
+    const min = typeof p.min === "number" ? p.min : undefined;
+    const max = typeof p.max === "number" ? p.max : undefined;
+    const buckets = asCountMap(p.buckets);
+    if (min !== undefined && max !== undefined) {
+      out.price = { min, max, buckets: buckets ?? {} };
+    }
+  }
+
+  return out;
 }
 
 /**

@@ -18,6 +18,8 @@
  * or DOM behaviour belongs elsewhere.
  */
 
+import { cn } from "@/lib/utils";
+
 /**
  * "Selectable surface" outline — soft grey 2px border at rest,
  * snaps to ink on hover. Shared by:
@@ -59,3 +61,89 @@ export const SURFACE_OUTLINE_CLASSES =
  */
 export const MEDIA_OVERLAY_BUBBLE_CLASSES =
   "flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55";
+
+/**
+ * Pill button styling — reversed colours, rounded-full.
+ *
+ *   - **active** → ink fill, white text.
+ *   - **idle**   → white fill, ink text, soft grey outline that
+ *                  snaps to ink on hover (shares
+ *                  `SURFACE_OUTLINE_CLASSES`).
+ *
+ * Shared by the homepage main-feed tabs and the search-page
+ * filter pills. The two surfaces should look identical: pills
+ * are the storefront's primary "pick one (or some)" affordance,
+ * and a wandering shopper should recognise the same shape on
+ * every page. Change the look here once, every pill tracks.
+ *
+ * `border-2 border-transparent` lives on the base — keeps the
+ * footprint stable across active ↔ idle. The active variant
+ * paints an ink border that disappears into its own background;
+ * the idle variant gets `SURFACE_OUTLINE_CLASSES`, which also
+ * carries `border-2`. Tailwind-merge dedupes either way.
+ */
+const PILL_BASE_CLASSES = cn(
+  "shrink-0 rounded-full border-2 border-transparent px-5 py-2.5",
+  "text-sm font-semibold leading-none",
+  "transition-colors duration-150",
+  "focus-visible:outline-none focus-visible:ring-2",
+  "focus-visible:ring-[color:var(--color-ink)] focus-visible:ring-offset-2",
+  "focus-visible:ring-offset-[color:var(--color-page)]",
+);
+
+const PILL_ACTIVE_CLASSES = cn(
+  "bg-[color:var(--color-ink)] text-white",
+  "border-[color:var(--color-ink)]",
+);
+
+const PILL_IDLE_CLASSES = cn(
+  "bg-[color:var(--color-surface)] text-[color:var(--color-ink)]",
+  SURFACE_OUTLINE_CLASSES,
+);
+
+/**
+ * "Outline" active variant — same white fill + ink text as idle,
+ * but the soft grey border snaps to ink and stops responding to
+ * hover (no more grey ↔ ink flip). Reads as a confirmed
+ * selection without the visual weight of the fully-inverted
+ * "fill" variant.
+ *
+ * Used by:
+ *
+ *   - filter-bar pills (Sort by, Category, Price, Size) — the
+ *     selected / open state shouldn't outshout the surrounding
+ *     content the way a fully-inked pill would
+ *   - selection chips inside large filter panels (a grid of
+ *     subcategory / size / price-bucket buttons that the user
+ *     toggles into the staged state before hitting "Show
+ *     results")
+ *
+ * The fill variant stays for the homepage main-feed tabs, where
+ * the "this is the only feed you're seeing right now" message
+ * benefits from the heavier visual weight.
+ */
+const PILL_OUTLINE_ACTIVE_CLASSES = cn(
+  "bg-[color:var(--color-surface)] text-[color:var(--color-ink)]",
+  "border-2 border-[color:var(--color-ink)]",
+);
+
+export type PillVariant = "fill" | "outline";
+
+/**
+ * Build the className string for a pill in the given state.
+ * Default variant is `fill` — the high-contrast main-feed-tab
+ * look. Pass `outline` for the softer "selected but not
+ * shouting" look used by every search-page filter surface.
+ *
+ * Call sites still layer extra utilities through
+ * `cn(pillClasses(active, …), <extra>)` when they need to
+ * override spacing or size for a specific surface.
+ */
+export function pillClasses(
+  active: boolean,
+  variant: PillVariant = "fill",
+): string {
+  const activeClasses =
+    variant === "outline" ? PILL_OUTLINE_ACTIVE_CLASSES : PILL_ACTIVE_CLASSES;
+  return cn(PILL_BASE_CLASSES, active ? activeClasses : PILL_IDLE_CLASSES);
+}

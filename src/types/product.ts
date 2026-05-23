@@ -75,9 +75,60 @@ export interface SearchProduct {
   options?: Record<string, string[]>;
 }
 
+/**
+ * Facet maps from the Salespace `/search` response.
+ *
+ * Each map is `value → product-count` so the filter UI can both
+ * (a) list ONLY values that actually exist in the current result
+ * set and (b) display the count next to each option.
+ *
+ * Everything is optional because not every search returns every
+ * facet, and we don't want a missing facet to crash the bar.
+ * The few we actually surface in the UI today:
+ *
+ *   - `subcategory`     → Category pill
+ *   - `options.Size`    → Size pill
+ *   - `price.buckets`   → Price pill (preset range chips)
+ *
+ * The rest are kept in the type for forward-compat — we read
+ * them straight off the wire, so adding a Vendor or Available
+ * filter later is a UI-only change.
+ */
+export interface SearchFacets {
+  vendor?: Record<string, number>;
+  product_type?: Record<string, number>;
+  tags?: Record<string, number>;
+  collections?: Record<string, number>;
+  available?: Record<string, number>;
+  subcategory?: Record<string, number>;
+  "options.Size"?: Record<string, number>;
+  /**
+   * Price facet. The Salespace upstream returns:
+   *
+   *   - `min` / `max` in **cents** (the absolute bounds across
+   *     the current result set).
+   *   - `buckets` keyed by dollar ranges like `"0-50"` (each
+   *     entry's value is the product count in that bucket).
+   *
+   * Mixed-unit on purpose — the bounds are precise (`12399` ¢)
+   * and the buckets are user-facing ranges (`$0–$50`). Callers
+   * convert the bounds when they need them in dollars.
+   */
+  price?: {
+    min: number;
+    max: number;
+    buckets: Record<string, number>;
+  };
+  campaigns?: Record<string, number>;
+}
+
 export interface SearchResult {
   hits: SearchProduct[];
   total: number;
   page: number;
   limit: number;
+  /** Populated when the upstream returns a facets block. Undefined
+   *  in the empty/error fallback so callers can branch on
+   *  presence (`if (result.facets) …`). */
+  facets?: SearchFacets;
 }
