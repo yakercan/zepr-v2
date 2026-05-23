@@ -132,12 +132,22 @@ export function SearchBar() {
   /* JS-on path: client-side nav via the App Router so the page
    * doesn't full-reload. The `action="/search"` attribute on the
    * form still routes correctly if JS fails — preserving graceful
-   * degradation for free. */
+   * degradation for free.
+   *
+   * Blur whatever's currently focused *inside the form* — not
+   * just the input. Pressing Enter blurs the input, but clicking
+   * the submit (→) button moves DOM focus to the button itself,
+   * so blurring the input does nothing and the suggestion modal
+   * lingers. Querying `:focus` from the form covers both paths
+   * in one branch — the form's `onBlur` then fires with
+   * `relatedTarget=null`, collapsing backdrop + modal cleanly. */
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed) return;
     router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    const focused = e.currentTarget.querySelector(":focus");
+    if (focused instanceof HTMLElement) focused.blur();
   };
 
   return (
