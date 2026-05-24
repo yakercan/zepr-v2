@@ -137,7 +137,7 @@ export function VariantDropdown({
                   isCompact ? "text-xs" : "text-sm",
                   selected
                     ? "bg-[color:var(--color-bubble)] font-semibold text-[color:var(--color-ink)]"
-                    : "text-[color:var(--color-ink)] hover:bg-[color:var(--color-search)]",
+                    : "text-[color:var(--color-ink)] hover:bg-[color:var(--color-hover-strong)]",
                 )}
               >
                 {value}

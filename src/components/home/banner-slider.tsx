@@ -199,7 +199,7 @@ function BannerSlide({
   hidden?: boolean;
 }) {
   const inner = (
-    <div className="relative aspect-[1920/300] w-full overflow-hidden bg-[color:var(--color-search)]">
+    <div className="relative aspect-[1920/300] w-full overflow-hidden bg-[color:var(--color-surface-muted)]">
       <ShimmerImage
         src={banner.image}
         alt={banner.alt}

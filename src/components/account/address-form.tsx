@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import type { AddressActionState } from "@/app/account/addresses/actions";
 import type { CustomerAddressInput } from "@/lib/shopify/customer-account-types";
+import { PANEL_SURFACE_THIN_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 /**
@@ -79,7 +80,7 @@ export function AddressForm({
   const [state, formAction] = useActionState(action, INITIAL_STATE);
 
   return (
-    <section className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 md:p-8">
+    <section className={cn(PANEL_SURFACE_THIN_CLASSES, "p-6 md:p-8")}>
       <header className="mb-6">
         <h2 className="text-xl font-semibold leading-tight md:text-2xl">
           {heading}

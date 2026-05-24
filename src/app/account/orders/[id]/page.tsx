@@ -18,6 +18,7 @@ import {
   type TimelineEvent,
   type TimelineEventStatus,
 } from "@/lib/shopify/order-status";
+import { PANEL_SURFACE_THIN_CLASSES } from "@/lib/styles";
 import { getTrackingDelivery } from "@/lib/tracking/seventeen-track";
 import { cn } from "@/lib/utils";
 
@@ -198,10 +199,7 @@ function SectionCard({
 }) {
   return (
     <section
-      className={cn(
-        "rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 md:p-8",
-        className,
-      )}
+      className={cn(PANEL_SURFACE_THIN_CLASSES, "p-6 md:p-8", className)}
     >
       <header className="mb-6">
         <h2 className="text-xl font-semibold leading-tight md:text-2xl">
@@ -404,7 +402,7 @@ function ItemThumbnail({
         ) : (
           <div
             aria-hidden
-            className="h-full w-full bg-[color:var(--color-search)]"
+            className="h-full w-full bg-[color:var(--color-surface-muted)]"
           />
         )}
       </div>

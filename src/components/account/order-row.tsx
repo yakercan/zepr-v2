@@ -49,7 +49,7 @@ export function OrderRow({ order }: OrderRowProps) {
     <li>
       <Link
         href={`/account/orders/${numericId}`}
-        className="-mx-3 flex items-center gap-4 rounded-md px-3 py-4 transition-colors hover:bg-[#fafafa]"
+        className="-mx-3 flex items-center gap-4 rounded-md px-3 py-4 transition-colors hover:bg-[color:var(--color-hover)]"
       >
         <OrderRowThumbnail
           src={order.previewImageUrl}
@@ -99,7 +99,7 @@ function OrderRowThumbnail({
         ) : (
           <div
             aria-hidden
-            className="h-full w-full bg-[color:var(--color-search)]"
+            className="h-full w-full bg-[color:var(--color-surface-muted)]"
           />
         )}
       </div>

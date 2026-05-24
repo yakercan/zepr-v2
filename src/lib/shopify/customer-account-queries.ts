@@ -1,6 +1,9 @@
 import "server-only";
 
-import { customerAccountFetch } from "@/lib/shopify/customer-account";
+import {
+  customerAccountFetch,
+  customerAccountFetchWithToken,
+} from "@/lib/shopify/customer-account";
 import type {
   CustomerAddress,
   CustomerAddressInput,
@@ -549,13 +552,77 @@ export async function fetchAddresses(): Promise<AddressesPayload> {
 }
 
 /* ------------------------------------------------------------------ */
+/* Customer profile (read)                                             */
+/* ------------------------------------------------------------------ */
+
+interface CustomerProfileResponse {
+  customer: {
+    firstName: string | null;
+    lastName: string | null;
+    emailAddress: { emailAddress: string | null } | null;
+  };
+}
+
+const CUSTOMER_PROFILE_QUERY = /* GraphQL */ `
+  query CustomerProfile {
+    customer {
+      firstName
+      lastName
+      emailAddress {
+        emailAddress
+      }
+    }
+  }
+`;
+
+export interface CustomerProfile {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+}
+
+/**
+ * Fetch the canonical first / last / email straight off the
+ * customer record.
+ *
+ * Exists because Shopify's id_token frequently omits
+ * `given_name` / `family_name` even when the admin has them set
+ * — so the OAuth callback enriches the about-to-be-sealed
+ * session with these values before writing the cookie. After
+ * that the dashboard renders fast off `session.customer` and
+ * never needs to hit this query at render time.
+ *
+ * Takes the access token explicitly because the only caller
+ * (the `/account/authorize` route) hasn't sealed the session
+ * cookie yet — so `customerAccountFetch`'s session lookup would
+ * see nothing.
+ */
+export async function fetchCustomerProfileWithToken(
+  accessToken: string,
+): Promise<CustomerProfile> {
+  const data = await customerAccountFetchWithToken<CustomerProfileResponse>(
+    CUSTOMER_PROFILE_QUERY,
+    accessToken,
+  );
+  return {
+    firstName: data.customer.firstName,
+    lastName: data.customer.lastName,
+    email: data.customer.emailAddress?.emailAddress ?? null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Address mutations                                                   */
 /* ------------------------------------------------------------------ */
 
 /** Shape of the per-mutation `userErrors` array from Shopify.
  *  Surfaced as-is so server actions can build a human-readable
- *  message ("Phone number is invalid") without re-mapping. */
-export interface AddressUserError {
+ *  message ("Phone number is invalid") without re-mapping.
+ *  Shopify uses an identical `{ code, field, message }` triple
+ *  for every userError list across the Customer Account API,
+ *  so this one alias covers address mutations + profile updates
+ *  + anything else we plumb through later. */
+export interface MutationUserError {
   code: string | null;
   field: string[] | null;
   message: string;
@@ -564,29 +631,29 @@ export interface AddressUserError {
 interface CustomerAddressCreatePayload {
   customerAddressCreate: {
     customerAddress: { id: string } | null;
-    userErrors: AddressUserError[];
+    userErrors: MutationUserError[];
   };
 }
 
 interface CustomerAddressUpdatePayload {
   customerAddressUpdate: {
     customerAddress: { id: string } | null;
-    userErrors: AddressUserError[];
+    userErrors: MutationUserError[];
   };
 }
 
 interface CustomerAddressDeletePayload {
   customerAddressDelete: {
     deletedAddressId: string | null;
-    userErrors: AddressUserError[];
+    userErrors: MutationUserError[];
   };
 }
 
 /* Tiny helper so each mutation can early-return a typed
- * "first error message" without four near-identical blocks
- * inline. Shopify always returns at least one entry in
- * `userErrors` when the mutation didn't apply cleanly. */
-function firstErrorMessage(errors: AddressUserError[]): string | null {
+ * "first error message" without near-identical blocks inline.
+ * Shopify always returns at least one entry in `userErrors`
+ * when the mutation didn't apply cleanly. */
+function firstErrorMessage(errors: MutationUserError[]): string | null {
   return errors[0]?.message ?? null;
 }
 
@@ -644,12 +711,14 @@ const CUSTOMER_ADDRESS_DELETE = /* GraphQL */ `
   }
 `;
 
-/** Result envelope every address mutation returns to its server-
- *  action caller. The action funnels both "Shopify returned
- *  userErrors" and "network / GraphQL transport blew up" through
- *  the same `{ ok: false, error }` shape so the form UI has one
- *  branch to render. */
-export type AddressMutationResult =
+/** Result envelope every Customer Account API mutation returns
+ *  to its server-action caller. The action funnels both "Shopify
+ *  returned userErrors" and "network / GraphQL transport blew
+ *  up" through the same `{ ok: false, error }` shape so the
+ *  form UI has one branch to render. Generic over the whole
+ *  mutation surface (addresses, profile, …) since each caller
+ *  only cares whether the call succeeded. */
+export type MutationResult =
   | { ok: true }
   | { ok: false; error: string };
 
@@ -675,7 +744,7 @@ function sanitiseAddressInput(input: CustomerAddressInput) {
 export async function createCustomerAddress(
   input: CustomerAddressInput,
   defaultAddress: boolean,
-): Promise<AddressMutationResult> {
+): Promise<MutationResult> {
   const data = await customerAccountFetch<CustomerAddressCreatePayload>(
     CUSTOMER_ADDRESS_CREATE,
     {
@@ -691,7 +760,7 @@ export async function updateCustomerAddress(
   addressId: string,
   input: CustomerAddressInput | null,
   defaultAddress: boolean | null,
-): Promise<AddressMutationResult> {
+): Promise<MutationResult> {
   const data = await customerAccountFetch<CustomerAddressUpdatePayload>(
     CUSTOMER_ADDRESS_UPDATE,
     {
@@ -706,11 +775,82 @@ export async function updateCustomerAddress(
 
 export async function deleteCustomerAddress(
   addressId: string,
-): Promise<AddressMutationResult> {
+): Promise<MutationResult> {
   const data = await customerAccountFetch<CustomerAddressDeletePayload>(
     CUSTOMER_ADDRESS_DELETE,
     { addressId },
   );
   const error = firstErrorMessage(data.customerAddressDelete.userErrors);
   return error ? { ok: false, error } : { ok: true };
+}
+
+/* ------------------------------------------------------------------ */
+/* Profile mutation                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Form input shape for the `customerUpdate` mutation. Mirrors
+ *  Shopify's `CustomerUpdateInput`, which today carries only
+ *  `firstName` + `lastName`. Email is OIDC-managed and cannot
+ *  be edited from the customer-facing API at all, so the form
+ *  doesn't collect it. */
+export interface CustomerProfileInput {
+  firstName: string;
+  lastName: string;
+}
+
+interface CustomerUpdatePayload {
+  customerUpdate: {
+    customer: {
+      firstName: string | null;
+      lastName: string | null;
+    } | null;
+    userErrors: MutationUserError[];
+  };
+}
+
+const CUSTOMER_UPDATE = /* GraphQL */ `
+  mutation CustomerUpdate($input: CustomerUpdateInput!) {
+    customerUpdate(input: $input) {
+      customer {
+        firstName
+        lastName
+      }
+      userErrors {
+        code
+        field
+        message
+      }
+    }
+  }
+`;
+
+/** Mutation-result variant that *also* returns the freshly-
+ *  saved profile fields when the call succeeded. Lets the
+ *  caller re-seal the session cookie off the values Shopify
+ *  actually persisted (which may have been trimmed or
+ *  case-normalised) rather than the raw form input. */
+export type CustomerProfileMutationResult =
+  | { ok: true; firstName: string | null; lastName: string | null }
+  | { ok: false; error: string };
+
+export async function updateCustomerProfile(
+  input: CustomerProfileInput,
+): Promise<CustomerProfileMutationResult> {
+  const blank = (s: string) => (s.trim() === "" ? null : s.trim());
+  const data = await customerAccountFetch<CustomerUpdatePayload>(
+    CUSTOMER_UPDATE,
+    {
+      input: {
+        firstName: blank(input.firstName),
+        lastName: blank(input.lastName),
+      },
+    },
+  );
+  const error = firstErrorMessage(data.customerUpdate.userErrors);
+  if (error) return { ok: false, error };
+  return {
+    ok: true,
+    firstName: data.customerUpdate.customer?.firstName ?? null,
+    lastName: data.customerUpdate.customer?.lastName ?? null,
+  };
 }

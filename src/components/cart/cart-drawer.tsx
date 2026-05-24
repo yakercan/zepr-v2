@@ -173,7 +173,7 @@ function CartHeader({ count }: { count: number }) {
         type="button"
         onClick={closeCart}
         aria-label="Close cart"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--color-ink-muted)] transition-colors hover:bg-[color:var(--color-search)] hover:text-[color:var(--color-ink)]"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--color-ink-muted)] transition-colors hover:bg-[color:var(--color-surface-muted)] hover:text-[color:var(--color-ink)]"
       >
         <CloseIcon className="h-5 w-5" />
       </button>

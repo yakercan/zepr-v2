@@ -41,7 +41,7 @@ export function Skeleton({
   return (
     <div
       className={cn(
-        "relative overflow-hidden bg-[color:var(--color-search)]",
+        "relative overflow-hidden bg-[color:var(--color-surface-muted)]",
         ROUNDED_CLASS[rounded],
         className,
       )}

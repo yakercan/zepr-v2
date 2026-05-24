@@ -98,7 +98,7 @@ export function ProductModal({
               the real swatches ship they slot into this same
               container, so the modal's vertical rhythm carries
               over. Reserved height keeps the layout stable. */}
-          <div className="rounded-lg bg-[color:var(--color-search)] px-4 py-6 text-sm text-[color:var(--color-ink-muted)]">
+          <div className="rounded-lg bg-[color:var(--color-surface-muted)] px-4 py-6 text-sm text-[color:var(--color-ink-muted)]">
             <p className="text-center">
               Option pickers coming soon — adding the base
               configuration for now.

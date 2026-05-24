@@ -9,6 +9,8 @@ import {
   fetchOrdersPage,
   type OrderSummary,
 } from "@/lib/shopify/customer-account-queries";
+import { PANEL_SURFACE_THIN_CLASSES } from "@/lib/styles";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Orders",
@@ -56,7 +58,9 @@ export default async function OrdersListPage() {
         </h1>
       </header>
 
-      <section className="mt-8 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 md:mt-10 md:p-8">
+      <section
+        className={cn(PANEL_SURFACE_THIN_CLASSES, "mt-8 p-6 md:mt-10 md:p-8")}
+      >
         {orders === null ? (
           <p className="text-sm text-[color:var(--color-ink-muted)]">
             We couldn&apos;t load your orders right now. Please try again

@@ -150,7 +150,7 @@ export function ProductGallery({
       <div
         aria-hidden
         className={cn(
-          "aspect-square rounded-2xl bg-[color:var(--color-search)]",
+          "aspect-square rounded-2xl bg-[color:var(--color-surface-muted)]",
           className,
         )}
       />
@@ -249,7 +249,7 @@ function toLightboxItem(m: ProductMedia, title: string): LightboxMediaItem {
  *
  * Why an outgoing layer: a naive opacity crossfade leaks the
  * parent backdrop at midpoint (both layers semi-transparent over
- * `--color-search`), which reads as a brief flash. Pinning the
+ * `--color-surface-muted`), which reads as a brief flash. Pinning the
  * previously-active layer at full opacity directly under the
  * incoming one keeps the viewport opaque end-to-end, so the
  * transition fades cleanly from frame A to frame B.

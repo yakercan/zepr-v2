@@ -32,7 +32,7 @@ export function CategoryLineIcon({
       <span
         aria-hidden
         className={cn(
-          "inline-block shrink-0 rounded bg-[color:var(--color-search)]",
+          "inline-block shrink-0 rounded bg-[color:var(--color-surface-muted)]",
           className,
         )}
         style={{ width: size, height: size }}

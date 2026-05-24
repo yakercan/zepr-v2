@@ -331,7 +331,7 @@ export function SearchFilters({
                     className={cn(
                       "flex w-full items-center justify-between gap-2",
                       "rounded-md px-3 py-2 text-left text-sm",
-                      "transition-colors hover:bg-[color:var(--color-search)]",
+                      "transition-colors hover:bg-[color:var(--color-surface-muted)]",
                       isActive &&
                         "font-semibold text-[color:var(--color-ink)]",
                     )}

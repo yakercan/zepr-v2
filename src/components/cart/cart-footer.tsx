@@ -93,7 +93,7 @@ function FreeShippingProgress({
         aria-valuenow={Math.round(pct)}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--color-search)]"
+        className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--color-surface-muted)]"
       >
         <div
           className="h-full rounded-full bg-[color:var(--color-success)] transition-[width] duration-300 ease-out"

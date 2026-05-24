@@ -14,6 +14,7 @@ import {
   fetchOrdersPage,
   type OrderSummary,
 } from "@/lib/shopify/customer-account-queries";
+import { PANEL_SURFACE_THIN_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 const ADDRESSES_HREF = "/account/addresses";
@@ -121,10 +122,11 @@ function SectionCard({
     <section
       id={id}
       className={cn(
+        PANEL_SURFACE_THIN_CLASSES,
         /* `scroll-mt-24` puts the anchor target ~96px below the
          *  viewport top so deep-links from the header dropdown
          *  land below the sticky header, not behind it. */
-        "scroll-mt-24 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 md:p-8",
+        "scroll-mt-24 p-6 md:p-8",
         className,
       )}
     >
@@ -156,7 +158,22 @@ function ProfileCard({ customer }: { customer: Customer }) {
     .join(" ");
 
   return (
-    <SectionCard id="details" title="Profile">
+    <SectionCard
+      id="details"
+      title="Profile"
+      /* "Edit" is the entry point into the profile edit sub-
+       *  page. Same dialect as the addresses card's "Manage"
+       *  link, so the dashboard's affordance language stays
+       *  consistent across cards. */
+      action={
+        <Link
+          href="/account/profile/edit"
+          className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)]"
+        >
+          Edit
+        </Link>
+      }
+    >
       <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm">
         <dt className="font-medium text-[color:var(--color-ink-muted)]">
           Name

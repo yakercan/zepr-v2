@@ -179,7 +179,7 @@ export function SearchBar() {
           placeholder="Search products, brands, and more"
           autoComplete="off"
           className={cn(
-            "h-10 w-full rounded-full bg-[color:var(--color-search)] pl-9 pr-15 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none transition-colors",
+            "h-10 w-full rounded-full bg-[color:var(--color-surface-muted)] pl-9 pr-15 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none transition-colors",
             // Hover === focus visually: white fill + 2px ink ring. Makes
             // the input look "ready" the moment the cursor touches it,
             // and removes the tiny visual jump that used to happen on

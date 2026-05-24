@@ -463,8 +463,8 @@ export function DropdownItem({
         variant === "danger"
           ? "text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger-soft)]"
           : isActive || active
-            ? "bg-[#fafafa] text-[color:var(--color-brand)]"
-            : "text-[color:var(--color-ink)] hover:bg-[#fafafa] hover:text-[color:var(--color-brand)]",
+            ? "bg-[color:var(--color-hover)] text-[color:var(--color-brand)]"
+            : "text-[color:var(--color-ink)] hover:bg-[color:var(--color-hover)] hover:text-[color:var(--color-brand)]",
         className,
       )}
     >

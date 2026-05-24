@@ -93,7 +93,7 @@ function SubcategoryIcon({
   if (!src) {
     return (
       <span
-        className="flex items-center justify-center rounded-full bg-[color:var(--color-search)] text-[10px] font-semibold text-[color:var(--color-ink-muted)]"
+        className="flex items-center justify-center rounded-full bg-[color:var(--color-surface-muted)] text-[10px] font-semibold text-[color:var(--color-ink-muted)]"
         style={{ width: SUBCATEGORY_ICON_PX, height: SUBCATEGORY_ICON_PX }}
         aria-hidden
       >

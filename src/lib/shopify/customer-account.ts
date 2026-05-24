@@ -97,6 +97,38 @@ export async function customerAccountFetch<
     );
   }
 
+  return customerAccountFetchWithToken<TData, TVariables>(
+    query,
+    session.tokens.accessToken,
+    variables,
+    options,
+  );
+}
+
+/**
+ * Same wire shape as `customerAccountFetch`, but takes the
+ * access token explicitly instead of resolving it from the
+ * session cookie.
+ *
+ * The only legitimate caller is the OAuth callback route, which
+ * needs to query the API *before* the session cookie has been
+ * sealed — to enrich the id_token claims with the canonical
+ * profile (Shopify's id_token frequently omits `given_name` /
+ * `family_name` even when they're set on the customer record).
+ *
+ * Anything else should use `customerAccountFetch` so the session
+ * stays the single source of truth for "who is this request
+ * authenticated as?".
+ */
+export async function customerAccountFetchWithToken<
+  TData,
+  TVariables extends Record<string, unknown> = Record<string, unknown>,
+>(
+  query: string,
+  accessToken: string,
+  variables?: TVariables,
+  options: CustomerAccountFetchOptions = {},
+): Promise<TData> {
   const res = await fetch(endpoint(), {
     method: "POST",
     headers: {
@@ -104,7 +136,7 @@ export async function customerAccountFetch<
       /* Bare access_token — NOT `Bearer …`. This is what the
        * Customer Account API docs prescribe; other Shopify APIs
        * use different header conventions. */
-      Authorization: session.tokens.accessToken,
+      Authorization: accessToken,
     },
     body: JSON.stringify({ query, variables }),
     cache: options.revalidate === undefined ? "no-store" : undefined,

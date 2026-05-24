@@ -15,6 +15,7 @@ import {
   extractGidId,
   fetchAddresses,
 } from "@/lib/shopify/customer-account-queries";
+import { PANEL_SURFACE_THIN_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 /* Auto-fill grid with a 280px minimum tile width — cards reflow
@@ -132,19 +133,15 @@ function AddressCard({
   return (
     <article
       className={cn(
-        /* Card chrome matches the storefront's "panel surface"
-         *  dialect — 2px border on the strong-grey token, same
-         *  family as PDP `PANEL_SURFACE_CLASSES` and the
-         *  storefront's other interactive tiles — so the address
-         *  list reads as the same surface language as the rest
-         *  of the app, not the quieter 1px outer-section style.
-         *  `relative` carries the floating "Default" badge's
-         *  absolute anchor; only the border colour swaps for
-         *  the default-card glow. */
-        "relative flex h-full flex-col gap-4 rounded-2xl border-2 bg-[color:var(--color-surface)] p-5 md:p-6",
-        isDefault
-          ? "border-[color:var(--color-brand)]"
-          : "border-[color:var(--color-border-strong)]",
+        PANEL_SURFACE_THIN_CLASSES,
+        /* `relative` carries the floating "Default" badge's
+         *  absolute anchor. The shared thin panel paints a 1px
+         *  regular-grey border; the default variant just swaps
+         *  the colour to the brand orange glow — `cn`
+         *  (tailwind-merge) keeps the width, only overrides
+         *  the colour. */
+        "relative flex h-full flex-col gap-4 p-5 md:p-6",
+        isDefault && "border-[color:var(--color-brand)]",
       )}
     >
       {isDefault && <DefaultBadge />}
@@ -253,7 +250,7 @@ function FormattedAddress({ address }: { address: CustomerAddress }) {
 
 function EmptyShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 md:p-8">
+    <div className={cn(PANEL_SURFACE_THIN_CLASSES, "p-6 md:p-8")}>
       <p className="text-sm text-[color:var(--color-ink-muted)]">{children}</p>
     </div>
   );

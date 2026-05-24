@@ -131,8 +131,44 @@
   --color-danger-hover: #b91c1c;
   --color-danger-soft: #fef2f2;
 
-  --color-search: #f3f4f6;
-  --color-search-hover: #e8eaed;
+  /* Muted neutral grey fill — the workhorse "this isn't white,
+   * but it isn't ink either" token. Reused across the app for:
+   *
+   *   - skeleton + shimmer base bg
+   *   - image placeholder fills (ShimmerImage, gallery, banners)
+   *   - the search bar pill bg
+   *   - cart progress bars, empty-state info panels
+   *   - icon-button hover halos on close / quantity steppers
+   *     (cart drawer close, modal close, +/− steppers, filter
+   *     checkboxes) — distinct from the brighter "row hover"
+   *     idiom on flat white surfaces
+   *
+   * Renamed from `--color-search` because the only "search"-
+   * specific usage was one of many — the token is really a
+   * generic muted-surface fill. */
+  --color-surface-muted: #f3f4f6;
+
+  /* Row-hover bubble (light) — the canonical "highlight the row
+   * under the cursor" press for selectable rows on plain white
+   * surfaces. Used in header dropdowns (account / mobile menu)
+   * and order rows in the account dashboard. Almost-white: loud
+   * enough to track the cursor, quiet enough not to fight the
+   * content. */
+  --color-hover: #fafafa;
+
+  /* Row-hover bubble (strong) — same idiom as `--color-hover`,
+   * but a step darker for surfaces where the lighter shade would
+   * vanish:
+   *
+   *   - rows on an already-tinted surface (search modal's
+   *     suggestion + product rows live inside a light-grey panel)
+   *   - popover pickers that need a tactile, visible hover even
+   *     against the chrome around them (variant picker)
+   *
+   * Sits one step lighter than `--color-surface-muted` so a
+   * tinted resting surface still reads quiet and the hover
+   * clearly lifts off it. */
+  --color-hover-strong: #f6f7f9;
 
   /* Soft halo shared by every "icon button" surface — header pills
    * (.icon-bubble) and the search bar's clear / submit chevrons.

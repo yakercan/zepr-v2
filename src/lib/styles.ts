@@ -38,23 +38,47 @@ export const SURFACE_OUTLINE_CLASSES =
   "border-2 border-[color:var(--color-border-strong)] transition-colors duration-150 hover:border-[color:var(--color-ink)]";
 
 /**
- * Static "card" surface — rounded, soft grey 2px border, white
- * fill. Same visual shape as a product card, but without the
- * hover-to-ink behaviour, so it reads as a quiet info panel rather
- * than an interactive control.
+ * Static "card" surface (bold) — rounded, soft grey 2px border,
+ * white fill. Same visual shape as a product card, but without
+ * the hover-to-ink behaviour, so it reads as a quiet info panel
+ * rather than an interactive control.
  *
- * Used by both PDP columns (gallery + accordion on the left, buy
- * form on the right) so the two surfaces frame the page as a pair.
+ * Use this on surfaces that need to *announce themselves* — the
+ * PDP gallery + buy form columns, where the two panels frame
+ * the page as a pair.
+ *
  * Padding is left to the caller — surfaces with tight inner
- * components (gallery, accordion) want `p-5 md:p-6`, denser
- * surfaces may want something tighter.
+ * components want `p-5 md:p-6`, denser surfaces may want
+ * something tighter; this constant only owns the radius + border
+ * + fill.
  *
- * Distinct constant from `SURFACE_OUTLINE_CLASSES` on purpose: this
- * one has no hover transition, so it won't fight an outer
+ * Distinct constant from `SURFACE_OUTLINE_CLASSES` on purpose:
+ * this one has no hover transition, so it won't fight an outer
  * `group-hover` if a future caller wraps it in one.
  */
 export const PANEL_SURFACE_CLASSES =
-  "rounded-2xl border-2 border-[color:var(--color-border-strong)] bg-white";
+  "rounded-2xl border-2 border-[color:var(--color-border-strong)] bg-[color:var(--color-surface)]";
+
+/**
+ * Static "card" surface (thin) — same rounded white fill as
+ * `PANEL_SURFACE_CLASSES`, but with a 1px regular-grey border
+ * instead of a 2px strong one. Reads as a *quiet* panel that
+ * lets the content lead rather than the frame.
+ *
+ * Use this everywhere on the customer account surface — the
+ * dashboard cards, orders list / order detail, addresses list,
+ * the address + profile edit forms. The 2px strong border read
+ * too heavy when stacked four+ panels deep on a single page;
+ * this thin variant gives the same shape language without the
+ * visual weight piling up.
+ *
+ * Border colour overrides (e.g. the "default address" card
+ * painting an orange border) still compose cleanly — `cn`'s
+ * tailwind-merge keeps the latter `border-[color:…]` and the
+ * `border` width side-by-side.
+ */
+export const PANEL_SURFACE_THIN_CLASSES =
+  "rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]";
 
 /**
  * Square media stage — the container that owns the `group/media`
@@ -75,7 +99,7 @@ export const PANEL_SURFACE_CLASSES =
  * the surrounding page chrome.
  */
 export const MEDIA_STAGE_CLASSES =
-  "group/media relative aspect-square overflow-hidden bg-[color:var(--color-search)]";
+  "group/media relative aspect-square overflow-hidden bg-[color:var(--color-surface-muted)]";
 
 /**
  * Hover-zoom for a media element inside a `<MEDIA_STAGE_CLASSES />`
@@ -123,7 +147,7 @@ export const MEDIA_LAYER_FADE_CLASSES =
  *     100 *on top* of the still-opaque outgoing one, so the parent
  *     surface can't bleed through at midpoint. Right choice for
  *     surfaces backed by a *light* / non-contrasting background
- *     (the PDP gallery sits on `--color-search` light gray; a
+ *     (the PDP gallery sits on `--color-surface-muted` light gray; a
  *     naive crossfade would flash gray mid-fade).
  *
  *     The trade-off: if the two layers have *different bounding

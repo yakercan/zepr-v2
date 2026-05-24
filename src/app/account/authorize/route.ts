@@ -10,6 +10,7 @@ import {
   ShopifyOAuthError,
   exchangeCodeForTokens,
 } from "@/lib/auth/shopify-oauth";
+import { fetchCustomerProfileWithToken } from "@/lib/shopify/customer-account-queries";
 
 /**
  * `/account/authorize` — Shopify redirects here after the
@@ -84,13 +85,36 @@ export async function GET(req: NextRequest) {
 
     const claims = decodeAndValidateIdToken(tokens.idToken, oauthState.nonce);
 
+    /* Shopify's id_token frequently omits `given_name` /
+     * `family_name` — even when the admin has them set on the
+     * customer record. The canonical name lives on the Customer
+     * Account API `customer` object, so we fetch it here once
+     * at sign-in and seed the session with it. Every page after
+     * this point reads `session.customer.firstName` and sees the
+     * real value without a per-render API round trip.
+     *
+     * Best-effort: a Shopify hiccup at this exact moment falls
+     * back to id_token claims (which may leave the dashboard
+     * showing "Not set" but never blocks login). */
+    let profileFirstName = claims.given_name;
+    let profileLastName = claims.family_name;
+    let profileEmail = claims.email;
+    try {
+      const profile = await fetchCustomerProfileWithToken(tokens.accessToken);
+      profileFirstName = profile.firstName ?? profileFirstName;
+      profileLastName = profile.lastName ?? profileLastName;
+      profileEmail = profile.email ?? profileEmail;
+    } catch (err) {
+      console.warn("[auth] profile enrichment failed, using id_token claims:", err);
+    }
+
     const session: Session = {
       tokens,
       customer: {
-        email: claims.email ?? "",
+        email: profileEmail ?? "",
         emailVerified: claims.email_verified ?? false,
-        firstName: claims.given_name,
-        lastName: claims.family_name,
+        firstName: profileFirstName,
+        lastName: profileLastName,
       },
     };
 

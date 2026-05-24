@@ -49,7 +49,7 @@ export function QuantityStepper({
   const isSm = size === "sm";
   const btnClasses = cn(
     "inline-flex items-center justify-center text-[color:var(--color-ink)]",
-    "transition-colors hover:bg-[color:var(--color-search)]",
+    "transition-colors hover:bg-[color:var(--color-surface-muted)]",
     "first:rounded-l-full last:rounded-r-full",
     "disabled:opacity-40 disabled:hover:bg-transparent",
     isSm ? "h-7 w-7" : "h-11 w-10",

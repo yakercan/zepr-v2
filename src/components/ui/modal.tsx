@@ -261,7 +261,7 @@ function ModalCloseButton({
       aria-label="Close"
       className={cn(
         "inline-flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--color-ink-muted)]",
-        "transition-colors hover:bg-[color:var(--color-search)] hover:text-[color:var(--color-ink)]",
+        "transition-colors hover:bg-[color:var(--color-surface-muted)] hover:text-[color:var(--color-ink)]",
         className,
       )}
     >

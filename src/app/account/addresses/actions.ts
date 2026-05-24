@@ -38,8 +38,8 @@ import type { CustomerAddressInput } from "@/lib/shopify/customer-account-types"
  * `getSession()` is just a redirect convenience).
  */
 
-/** Shared result envelope. Mirrors `AddressMutationResult` from
- *  the queries module but adds an idle / pending phase so
+/** Shared result envelope. Mirrors `MutationResult` from the
+ *  queries module but adds an idle / pending phase so
  *  `useActionState` can render three states off one variable:
  *  initial, error, and (briefly) success — though success paths
  *  here mostly redirect away. */

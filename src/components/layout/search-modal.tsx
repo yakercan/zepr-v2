@@ -167,7 +167,7 @@ function KeywordsSection({
               className={cn(
                 "flex items-center gap-3 px-3 py-2",
                 "text-sm text-[color:var(--color-ink)]",
-                "transition-colors hover:bg-[color:var(--color-search)]",
+                "transition-colors hover:bg-[color:var(--color-hover-strong)]",
               )}
             >
               <SearchIcon className="h-4 w-4 shrink-0 text-[color:var(--color-ink-muted)]" />
@@ -199,13 +199,13 @@ function ProductsSection({
               onClick={onClose}
               className={cn(
                 "flex items-center gap-3 px-3 py-2",
-                "transition-colors hover:bg-[color:var(--color-search)]",
+                "transition-colors hover:bg-[color:var(--color-hover-strong)]",
               )}
             >
               <ShimmerImage
                 src={p.image_url}
                 alt={p.title}
-                wrapperClassName="h-12 w-12 shrink-0 rounded-md overflow-hidden bg-[color:var(--color-search)]"
+                wrapperClassName="h-12 w-12 shrink-0 rounded-md overflow-hidden bg-[color:var(--color-surface-muted)]"
                 className="h-full w-full object-cover"
                 skeletonRounded="md"
               />

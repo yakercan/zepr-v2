@@ -131,7 +131,7 @@ export function CartLineRow({ line }: { line: CartLine }) {
             type="button"
             onClick={() => removeCartLine(line.id)}
             aria-label={`Remove ${line.title} from cart`}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--color-ink-muted)] transition-colors hover:bg-[color:var(--color-search)] hover:text-[color:var(--color-ink)]"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--color-ink-muted)] transition-colors hover:bg-[color:var(--color-surface-muted)] hover:text-[color:var(--color-ink)]"
           >
             <TrashIcon />
           </button>
