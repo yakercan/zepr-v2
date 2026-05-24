@@ -4,9 +4,13 @@ import {
   ProductAccordionItem,
 } from "@/components/products/product-accordion";
 import { ProductLayout } from "@/components/products/product-layout";
+import { ProductReviews } from "@/components/products/product-reviews";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
+import { RatingChip } from "@/components/ui/rating-chip";
 import { RichText } from "@/components/ui/rich-text";
 import { env } from "@/env";
+import { getAuthState } from "@/lib/auth/session";
+import { getProductReviews } from "@/lib/reviews";
 import {
   getCompanionProducts,
   getProductByHandle,
@@ -65,11 +69,28 @@ export default async function ProductPage({ params }: ProductPageProps) {
    * Storefront round-trip alongside the anchor. We await here
    * (instead of streaming via Suspense) because the buy-form
    * needs companion data on first paint to render the right tier
-   * preselect + per-unit pickers without a layout shift. */
-  const bundleCompanions = await getCompanionProducts(
-    baseProduct.offers.bundleCompanionIds,
-  );
+   * preselect + per-unit pickers without a layout shift.
+   *
+   * Reviews + auth state run in parallel with the companions
+   * because they're independent — bundle data, review summary,
+   * and session view all gate parts of the first paint, so we
+   * `Promise.all` them and pay the slowest of the three rather
+   * than the sum. */
+  const [bundleCompanions, reviewsSummary, authState] = await Promise.all([
+    getCompanionProducts(baseProduct.offers.bundleCompanionIds),
+    getProductReviews(baseProduct.id),
+    getAuthState(),
+  ]);
   const product: ProductDetail = { ...baseProduct, bundleCompanions };
+
+  /* Section gate — only render the Reviews accordion when
+   * there's something for the shopper to see or do. Guests
+   * with no reviews to read get a quieter PDP; signed-in
+   * shoppers always see the section (so they can write one).
+   * Empty `null` summary and `totalCount: 0` are treated
+   * identically — see `getProductReviews`'s contract. */
+  const reviewsCount = reviewsSummary?.totalCount ?? 0;
+  const showReviews = authState.isLoggedIn || reviewsCount > 0;
 
   const breadcrumbItems = buildBreadcrumb(product);
 
@@ -85,9 +106,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
       <Breadcrumb items={breadcrumbItems} className="mb-4" />
 
-      {/* Future PDP accordion sections (Reviews, Disclaimer, etc.)
-       *  drop into the <ProductAccordion> below as additional
-       *  <ProductAccordionItem>s alongside "Details". */}
+      {/* Additional PDP accordion sections drop in here as more
+       *  <ProductAccordionItem>s alongside "Details" + "Reviews".
+       *  Each one is fetched server-side at the top of the route
+       *  and gated by simple booleans so the markup stays a flat
+       *  list of conditional `&&` items. */}
       <ProductLayout
         product={product}
         checkoutDomain={checkoutDomain}
@@ -96,6 +119,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
             {product.descriptionHtml && (
               <ProductAccordionItem title="Details" defaultOpen>
                 <RichText html={product.descriptionHtml} />
+              </ProductAccordionItem>
+            )}
+            {showReviews && (
+              <ProductAccordionItem
+                title="Reviews"
+                titleAside={
+                  reviewsCount > 0 && reviewsSummary ? (
+                    <RatingChip
+                      value={reviewsSummary.averageRating}
+                      count={reviewsCount}
+                    />
+                  ) : null
+                }
+              >
+                <ProductReviews
+                  productTitle={product.title}
+                  summary={reviewsSummary}
+                  authState={authState}
+                />
               </ProductAccordionItem>
             )}
           </ProductAccordion>

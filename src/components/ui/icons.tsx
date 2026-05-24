@@ -403,6 +403,19 @@ export function ExternalLinkIcon({ className }: IconProps) {
   );
 }
 
+/** Info "i" inside a circle — paired with a tooltip on the trust
+ *  badges. Outline-only so the hover state can swap the colour
+ *  via `currentColor`. */
+export function InfoIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(className)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8h.01" />
+      <path d="M11 12h1v4h1" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ className }: IconProps) {
   return (
     <svg {...svgProps(cn("h-4 w-4", className))}>

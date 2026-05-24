@@ -58,6 +58,12 @@ export function ProductAccordion({ children }: { children: ReactNode }) {
 
 export interface ProductAccordionItemProps {
   title: string;
+  /** Optional content rendered inline to the right of the title
+   *  (before the caret). Lets a section attach quick stats
+   *  without re-typing the title prop — Reviews uses it for a
+   *  `★ 4.5 (24)` strip so the rating's visible even when the
+   *  section is collapsed. */
+  titleAside?: ReactNode;
   /** Open by default — only one section should typically use
    *  this. The rest stay collapsed so the page starts compact. */
   defaultOpen?: boolean;
@@ -66,6 +72,7 @@ export interface ProductAccordionItemProps {
 
 export function ProductAccordionItem({
   title,
+  titleAside,
   defaultOpen,
   children,
 }: ProductAccordionItemProps) {
@@ -80,11 +87,14 @@ export function ProductAccordionItem({
         aria-expanded={open}
         aria-controls={panelId}
         className={cn(
-          "flex w-full items-center justify-between py-4 text-left",
+          "flex w-full items-center justify-between gap-3 py-4 text-left",
           "text-base font-semibold text-[color:var(--color-ink)]",
         )}
       >
-        <span>{title}</span>
+        <span className="flex min-w-0 items-center gap-3">
+          <span>{title}</span>
+          {titleAside}
+        </span>
         <SmoothCaretIcon
           className={cn(
             "h-3 w-3 text-[color:var(--color-ink-secondary)]",

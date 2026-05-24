@@ -12,6 +12,7 @@ import {
   type UnitSlotConfig,
 } from "@/components/products/offer-unit-pickers";
 import { TieredOffers } from "@/components/products/tiered-offers";
+import { TrustBadges } from "@/components/products/trust-badges";
 import { VariantPicker } from "@/components/products/variant-picker";
 import { Price } from "@/components/ui/price";
 import { tiersForCount } from "@/lib/offers";
@@ -360,6 +361,8 @@ export function BuyForm({
         units={buyUnits}
         checkoutDomain={checkoutDomain}
       />
+
+      <TrustBadges />
     </div>
   );
 }
