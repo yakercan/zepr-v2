@@ -107,6 +107,18 @@
   --color-success-soft: #f0fdf4;
   --color-success-soft-border: #bbf7d0;
 
+  /* Danger / destructive accent — the red shared by every
+   * "this action removes / signs out / deletes" affordance.
+   * Mirrors the success block: a main ink colour for text +
+   * outlines, a darker step for hover, and a soft tint for
+   * the hover background under flat surfaces (dropdown rows,
+   * destructive-button pills, etc.). Match `#dc2626` / `#fef2f2`
+   * — the same red-600 / red-50 the rest of the app already
+   * eyeballed against before this token existed. */
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-danger-soft: #fef2f2;
+
   --color-search: #f3f4f6;
   --color-search-hover: #e8eaed;
 

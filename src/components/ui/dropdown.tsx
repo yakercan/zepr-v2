@@ -461,7 +461,7 @@ export function DropdownItem({
         "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium",
         "transition-colors",
         variant === "danger"
-          ? "text-red-600 hover:bg-red-50"
+          ? "text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger-soft)]"
           : isActive || active
             ? "bg-[#fafafa] text-[color:var(--color-brand)]"
             : "text-[color:var(--color-ink)] hover:bg-[#fafafa] hover:text-[color:var(--color-brand)]",

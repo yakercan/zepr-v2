@@ -52,6 +52,11 @@ export const env = createEnv({
     /** Public client ID from the Headless channel. We use PKCE so
      *  there's no client secret to provision. */
     SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID: z.string().min(1),
+    /** Customer Account API release. Bumped quarterly — see the
+     *  Shopify API version status page before changing. The default
+     *  here mirrors the Storefront / Admin versions in `.env` so
+     *  every Shopify surface speaks the same schema generation. */
+    SHOPIFY_CUSTOMER_ACCOUNT_API_VERSION: z.string().default("2026-04"),
 
     /* ----- Shopify Admin API (private, server-only) ----- */
     SHOPIFY_ADMIN_TOKEN: z.string().optional(),
@@ -97,6 +102,8 @@ export const env = createEnv({
 
     SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID:
       process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID,
+    SHOPIFY_CUSTOMER_ACCOUNT_API_VERSION:
+      process.env.SHOPIFY_CUSTOMER_ACCOUNT_API_VERSION,
 
     SHOPIFY_ADMIN_TOKEN: process.env.SHOPIFY_ADMIN_TOKEN,
     SHOPIFY_ADMIN_API_VERSION: process.env.SHOPIFY_ADMIN_API_VERSION,
