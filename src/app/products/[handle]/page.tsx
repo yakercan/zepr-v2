@@ -44,20 +44,29 @@ import type { ProductDetail } from "@/types/product";
  *
  * Stack on phones (single column, no sticking — too tall).
  *
- * Performance plan:
+ * Rendering model — dynamic shell, streaming Suspense holes:
  *
- *   - `revalidate = 3600` → ISR; first cold visitor pays one
- *     Storefront round-trip (~200 ms), every subsequent visitor in
- *     the next hour gets the prerendered HTML in <50 ms.
- *   - `generateStaticParams` will pre-bake the top-N handles at
- *     build time once we know which products to seed.
- *   - "You may also like" lives inside `<Suspense>` so the hero
- *     paints immediately and the related rail streams in below —
- *     subcategory + category Salespace fetch happen in parallel
- *     inside `<RelatedProductsSection>`.
+ *   - The page renders per request. There's intentionally no
+ *     `export const revalidate` here because Next.js 16 resolves
+ *     `<Suspense>` boundaries *at render time* for static / ISR
+ *     pages — meaning the "You may also like" fetch would land
+ *     in the critical path before the shell could flush. Dynamic
+ *     rendering lets each Suspense boundary stream as its own
+ *     chunk, so the buy form paints first and the related rail
+ *     fills in below as its Salespace round-trip resolves.
+ *   - Per-request render cost stays cheap because every upstream
+ *     read (`shopifyFetch`, `searchProducts`) caches at the
+ *     `fetch()` layer via `next: { revalidate, tags }` — the page
+ *     CPU work is mostly transforming already-cached JSON into
+ *     HTML, not waiting on the network.
+ *   - `generateStaticParams` is the next step for the top-N
+ *     handles by traffic — those get build-time prerender + cache
+ *     headers so popular PDPs are served from the edge.
+ *   - True PPR (`cacheComponents: true` + `"use cache"`) is the
+ *     end state once the root-layout device gate can read the
+ *     User-Agent without blocking the shell — see the matching
+ *     note in `next.config.ts`.
  */
-
-export const revalidate = 3600;
 
 interface ProductPageProps {
   params: Promise<{ handle: string }>;

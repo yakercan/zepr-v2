@@ -18,17 +18,25 @@ const nextConfig: NextConfig = {
 
   /**
    * Cache Components (`'use cache'` directive + cacheLife / cacheTag) is
-   * intentionally NOT enabled here. With cacheComponents on, every
-   * dynamic data read (cookies, headers) must be wrapped in Suspense
-   * so the static shell can stream first — which conflicts with our
-   * SSR device gate that needs `<html data-device>` set before paint.
+   * intentionally NOT enabled here yet. Turning `cacheComponents: true`
+   * on forces every dynamic read (cookies, headers) into a Suspense
+   * boundary so the static shell can stream first — and the root
+   * layout's SSR device gate reads `headers()`/`cookies()` to set
+   * `<html data-device>` *before* any Suspense fence can be drawn,
+   * which means the layout itself would have to be reshaped before
+   * we can flip the flag.
    *
-   * Instead we get the same first-paint speed via the simpler
-   * Next.js data cache: each `fetch(..., { next: { revalidate } })`
-   * inside `shopifyFetch` caches at the edge, and PDP / collection
-   * routes opt into build-time prerender via `generateStaticParams`.
-   * The cookie-reading layout stays normal; the heavy page content
-   * is cached HTML.
+   * Until then, our caching story is the simpler `fetch()`-level
+   * one: every Shopify Storefront, Salespace, and Supabase read
+   * goes through `next: { revalidate, tags }`, so the upstream
+   * round-trips are cached at the edge and per-request rendering
+   * cost is mostly JSON-to-HTML transform. Routes render
+   * dynamically so `<Suspense>` actually streams (static / ISR
+   * pages resolve Suspense at render time and emit complete
+   * HTML — useless for "shell first, dynamic hole streams in"
+   * UX). `generateStaticParams` on the top-traffic PDP / category
+   * handles is the next optimisation pass once we have analytics
+   * to seed the list.
    */
 
   images: {

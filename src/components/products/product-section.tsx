@@ -108,8 +108,18 @@ export function ProductSectionSkeleton({
 }) {
   return (
     <div className={cn("flex flex-col gap-6", className)} aria-busy>
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-6 w-48" rounded="md" />
+      {/* Header row mirrors `<ProductSection>` exactly — same
+       *  `items-end justify-between` shape, same heading text
+       *  classes wrapping the placeholder so `h-[1lh]` resolves
+       *  to the same pixel height the real `<h2>` will print at.
+       *  No View-all skeleton on the right: when the link does
+       *  appear it's shorter than the heading and aligns to its
+       *  baseline, so the row's overall height is unchanged. The
+       *  result is a zero-CLS swap when the section streams in. */}
+      <div className="flex items-end justify-between gap-3">
+        <div className="text-xl font-semibold leading-tight md:text-2xl">
+          <Skeleton className="block h-[1lh] w-48" rounded="md" />
+        </div>
       </div>
       <ProductGridSkeleton count={count} />
     </div>
