@@ -17,6 +17,16 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 
   /**
+   * Hosts allowed to load dev-server resources (HMR sockets,
+   * `/_next/*` chunks). Production builds ignore this — it only
+   * affects `next dev`. `localhost` is allowed by default, so we
+   * only need to add the Cloudflare-tunnel hostname we develop
+   * through. Safe to leave forever: a dev-only allowlist can't
+   * widen anything at runtime.
+   */
+  allowedDevOrigins: ["dev.zepr.com"],
+
+  /**
    * Cache Components (`'use cache'` directive + cacheLife / cacheTag) is
    * intentionally NOT enabled here yet. Turning `cacheComponents: true`
    * on forces every dynamic read (cookies, headers) into a Suspense

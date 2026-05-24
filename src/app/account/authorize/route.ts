@@ -2,6 +2,7 @@ import "server-only";
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { env } from "@/env";
 import { IdTokenError, decodeAndValidateIdToken } from "@/lib/auth/id-token";
 import { clearOAuthState, getOAuthState } from "@/lib/auth/oauth-state";
 import { setSession, type Session } from "@/lib/auth/session";
@@ -27,7 +28,13 @@ import {
  */
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
-  const homeUrl = new URL("/", req.nextUrl);
+  /* Anchor every redirect target on `env.APP_URL` rather than
+   * `req.nextUrl`. Behind a Cloudflare tunnel / reverse proxy
+   * the local socket Next.js sees is `http://localhost:3000` —
+   * `new URL("/", req.nextUrl)` would happily send the shopper
+   * there instead of back to the public host. `APP_URL` is the
+   * one explicit, always-correct base. */
+  const homeUrl = new URL("/", env.APP_URL);
 
   /* Read + immediately invalidate the one-shot oauth-state
    * cookie. Every exit path below — success, error, CSRF — must
@@ -80,7 +87,6 @@ export async function GET(req: NextRequest) {
     const session: Session = {
       tokens,
       customer: {
-        id: claims.sub,
         email: claims.email ?? "",
         emailVerified: claims.email_verified ?? false,
         firstName: claims.given_name,
@@ -90,7 +96,7 @@ export async function GET(req: NextRequest) {
 
     await setSession(session);
 
-    return NextResponse.redirect(new URL(oauthState.returnTo, req.nextUrl));
+    return NextResponse.redirect(new URL(oauthState.returnTo, env.APP_URL));
   } catch (err) {
     if (err instanceof ShopifyOAuthError) {
       console.error("[auth] token exchange failed:", err.code, err.message);

@@ -37,12 +37,14 @@ import type {
  */
 
 export interface ProductReviewsProps {
+  productHandle: string;
   productTitle: string;
   summary: ProductReviewSummary | null;
   authState: AuthState;
 }
 
 export function ProductReviews({
+  productHandle,
   productTitle,
   summary,
   authState,
@@ -59,7 +61,10 @@ export function ProductReviews({
         </p>
       )}
 
-      <WriteReviewSection authState={authState} />
+      <WriteReviewSection
+        authState={authState}
+        productHandle={productHandle}
+      />
     </div>
   );
 }
@@ -151,7 +156,13 @@ function ReviewRow({ review }: { review: ProductReview }) {
 
 /* ---------- Write-review CTA ---------- */
 
-function WriteReviewSection({ authState }: { authState: AuthState }) {
+function WriteReviewSection({
+  authState,
+  productHandle,
+}: {
+  authState: AuthState;
+  productHandle: string;
+}) {
   /* Signed-in: a primary CTA stubbed for now — the actual write
    * form lands in a later round; wiring it up here just means
    * swapping the `disabled` button below for an `onClick` that
@@ -173,10 +184,19 @@ function WriteReviewSection({ authState }: { authState: AuthState }) {
     );
   }
 
+  /* Guest: send them through Shopify login and bounce them back
+   * to *this* PDP afterwards. `encodeURIComponent` covers any
+   * handle that happens to contain query-reserved characters —
+   * the login route re-validates that the decoded value starts
+   * with `/` before honouring it (open-redirect defence). */
+  const loginHref = `/account/login?return_to=${encodeURIComponent(
+    `/products/${productHandle}`,
+  )}`;
+
   return (
     <div className="border-t border-[color:var(--color-border)] pt-4 text-sm text-[color:var(--color-ink-muted)]">
       <Link
-        href="/account/sign-in"
+        href={loginHref}
         className="font-semibold text-[color:var(--color-ink)] transition-colors hover:text-[color:var(--color-brand)]"
       >
         Sign in

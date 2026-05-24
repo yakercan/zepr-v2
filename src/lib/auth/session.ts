@@ -33,10 +33,10 @@ import type { TokenSet } from "@/lib/auth/shopify-oauth";
  *      to the session payload don't ripple across components.
  *
  * Token refresh on near-expiry is deliberately NOT in this file.
- * It lives in Next.js middleware (step 5) so that the response
- * carrying the refreshed cookie can be returned BEFORE the page
- * renders — Server Components can't write cookies, so doing it
- * here would either silently no-op or throw mid-render.
+ * It lives in `src/proxy.ts` so the response carrying the
+ * refreshed cookie can attach BEFORE the page renders — Server
+ * Components can't write cookies, so doing it here would either
+ * silently no-op or throw mid-render.
  */
 
 /**
@@ -44,12 +44,15 @@ import type { TokenSet } from "@/lib/auth/shopify-oauth";
  * validates the token. Decoupled from `TokenSet` so a future
  * "swap to a different identity provider" refactor only touches
  * one file.
+ *
+ * No customer GID here: Shopify's id_token `sub` is an opaque
+ * internal value (their own docs say it's not API-accessible),
+ * and we don't have a Customer Account GraphQL client wired up
+ * yet. When we do, the real `gid://shopify/Customer/...` will
+ * come from `query { customer { id } }` on demand and live
+ * here. For now, email is the stable shopper identifier.
  */
 export interface Customer {
-  /** Shopify customer GID — `gid://shopify/Customer/{id}`. The
-   *  identifier we hand to the Customer Account GraphQL API and
-   *  use to attribute reviews / wishlist rows on Supabase. */
-  id: string;
   email: string;
   emailVerified: boolean;
   firstName?: string;

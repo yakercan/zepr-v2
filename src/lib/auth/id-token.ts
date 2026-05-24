@@ -23,11 +23,24 @@ import { env } from "@/env";
  *
  * Together these defeat token-substitution and replay attacks
  * even though we're trusting TLS for authenticity.
+ *
+ * `sub` is intentionally NOT validated here. Shopify's own docs
+ * state the `sub` is an opaque internal identifier the platform
+ * uses to dedupe customers — it's "not accessible through API
+ * or the Shopify admin." Our session keys on `email` instead
+ * (which is the field every other Shopify surface uses to
+ * identify a customer), so requiring `sub` was an OIDC reflex
+ * that doesn't match Shopify's actual contract.
  */
 
 export interface IdTokenClaims {
   iss: string;
-  sub: string;
+  /** Opaque Shopify-internal subject. Optional — Shopify's
+   *  docs explicitly classify `sub` as an internal-only field
+   *  ("not accessible through API or the Shopify admin"), so
+   *  we type it as `string | undefined` and let email play the
+   *  stable-identity role instead. */
+  sub?: string;
   aud: string | string[];
   exp: number;
   iat: number;
@@ -85,10 +98,6 @@ export function decodeAndValidateIdToken(
       "invalid_nonce",
       "id_token nonce does not match the value sent at authorize time",
     );
-  }
-
-  if (typeof claims.sub !== "string" || claims.sub.length === 0) {
-    throw new IdTokenError("missing_sub", "id_token has no subject claim");
   }
 
   return claims;

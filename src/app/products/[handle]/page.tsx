@@ -147,6 +147,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 }
               >
                 <ProductReviews
+                  productHandle={product.handle}
                   productTitle={product.title}
                   summary={reviewsSummary}
                   authState={authState}

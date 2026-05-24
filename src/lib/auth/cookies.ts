@@ -73,14 +73,3 @@ export const OAUTH_STATE_COOKIE_OPTIONS = {
   path: "/",
   maxAge: 60 * 10, // 10 minutes
 } as const;
-
-/* ----- Clear-cookie option presets ---------------------------- */
-
-/* `cookies().delete(name, options)` needs the same path/secure
- * flags the cookie was set with — otherwise the browser keeps a
- * stray copy at a different path. Reusing one shape across both
- * cookies because both are pinned to `path: "/"` + `Secure`. */
-export const CLEAR_COOKIE_OPTIONS = {
-  path: "/",
-  secure: true,
-} as const;

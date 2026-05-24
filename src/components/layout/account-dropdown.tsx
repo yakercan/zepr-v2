@@ -1,50 +1,52 @@
 import Link from "next/link";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { UserIcon } from "@/components/ui/icons";
+import { getAuthState } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
 /**
  * Account dropdown — desktop header trigger.
  *
- * Trigger shows `icon + "Sign in / Register"` for guests (or `icon +
- * "Account"` when signed in) plus the standard rotating caret. The
- * panel content branches:
+ * Async server component. Resolves the shopper's session once
+ * (cheap — `getAuthState` is wrapped in React's `cache()` so the
+ * decrypt is shared with anything else in the tree that asks)
+ * and renders the right panel directly into the initial HTML —
+ * no client flicker between guest and signed-in shells.
  *
- *   - **guest** — primary "Sign in / Register" CTA at the top, then a
- *     "DISCOVER" section: Wishlist, Order Tracking, Returns, Contact,
- *     FAQ. Same item layout zepr ships today.
- *   - **signed-in** — two columns: "MY ACCOUNT" (Dashboard, Profile,
- *     Orders, My Addresses, Logout) and "HELP & INFO" (Wishlist,
- *     Tracking, Returns, Contact, FAQ).
+ * The host `<Dropdown>` is a Client Component for the
+ * open/close + click-outside / Escape choreography, but it
+ * happily accepts server-rendered children, so all the auth-
+ * dependent content stays on the server.
  *
- * Auth isn't wired yet, so the dropdown is invoked with
- * `isLoggedIn={false}` from `SiteHeader` for now. When the customer
- * account API lands, the host will pass the real state and the
- * trigger label updates to match.
+ * Branching:
+ *
+ *   - **guest**     — primary "Sign in / Register" CTA wired to
+ *                     `/account/login`, then a "DISCOVER" section
+ *                     (Wishlist, Order Tracking, Returns, Contact,
+ *                     FAQ).
+ *   - **signed-in** — two columns: "MY ACCOUNT" (Dashboard,
+ *                     Profile, Orders, My Addresses, Logout) and
+ *                     "HELP & INFO" (Wishlist, Tracking, Returns,
+ *                     Contact, FAQ).
+ *
+ * The `/account/{dashboard,details,orders,addresses}` links are
+ * placeholders — the actual customer pages land in a later step
+ * once the Customer Account GraphQL client is wired up. The
+ * sign-in CTA and sign-out link are live today.
  */
-export function AccountDropdown({
-  isLoggedIn = false,
-  customerName,
-}: {
-  isLoggedIn?: boolean;
-  customerName?: string;
-}) {
+export async function AccountDropdown() {
+  const { isLoggedIn } = await getAuthState();
+
   return (
     <Dropdown
       align="right"
-      panelClassName={
-        isLoggedIn ? "w-[28rem] p-2" : "w-[20rem] p-3"
-      }
+      panelClassName={isLoggedIn ? "w-[28rem] p-2" : "w-[20rem] p-3"}
       ariaLabel="Account"
       trigger={
         <>
           <UserIcon className="text-[color:var(--color-ink)]" />
           <span className="text-[15px] font-semibold">
-            {isLoggedIn
-              ? customerName
-                ? customerName.split(" ")[0]
-                : "Account"
-              : "Sign in / Register"}
+            {isLoggedIn ? "My Account" : "Sign in / Register"}
           </span>
           {isLoggedIn && (
             <span
@@ -67,7 +69,7 @@ export function AccountDropdown({
 function AccountPanelGuest() {
   return (
     <div className="flex flex-col gap-2">
-      <Link href="/account/sign-in" className="btn-primary w-full">
+      <Link href="/account/login" className="btn-primary w-full">
         Sign in / Register
       </Link>
 
@@ -99,7 +101,7 @@ function AccountPanelLoggedIn() {
           My Addresses
         </DropdownItem>
         <DropdownItem
-          href="/account/sign-out"
+          href="/account/logout"
           icon={<LogoutIcon />}
           variant="danger"
         >

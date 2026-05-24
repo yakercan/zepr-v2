@@ -23,7 +23,7 @@ import { env } from "@/env";
  *
  * Everything's expressed as pure functions (no cookies, no
  * framework code) so route handlers and server actions in the
- * `app/` tree stay thin and unit-test would only have to mock
+ * `app/` tree stay thin and unit tests only need to mock
  * `fetch`. Failures throw `ShopifyOAuthError` carrying the
  * structured `error` / `error_description` Shopify returned —
  * callers can branch on `code` to render the right UI.
@@ -60,13 +60,18 @@ const POST_LOGOUT_REDIRECT_URL = `${env.APP_URL}/`;
 /**
  * OAuth scopes requested at authorize time.
  *
- *   - `openid`  → required for the id_token (OIDC core).
- *   - `email`   → email claim in the id_token, used for
- *                 "is this review by the current shopper?" checks.
- *   - the URL-form scope → full Customer Account GraphQL access;
- *                 the same string Shopify Hydrogen ships with.
+ *   - `openid`                    → required for the id_token (OIDC core).
+ *   - `email`                     → email claim in the id_token, used for
+ *                                   "is this review by the current shopper?" checks.
+ *   - `customer-account-api:full` → full Customer Account GraphQL access.
+ *
+ * The shorter colon-form is the one Shopify's current
+ * (2026-07) docs document and the only one the authorize
+ * endpoint accepts — the older URL-form (`https://api.customers
+ * .com/auth/customer.graphql`) that shipped with Hydrogen
+ * reference examples is rejected with `invalid_scope`.
  */
-const SCOPES = "openid email https://api.customers.com/auth/customer.graphql";
+const SCOPES = "openid email customer-account-api:full";
 
 /**
  * Normalised token bundle stored in our session cookie.

@@ -1,7 +1,8 @@
 import "server-only";
 
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
+import { env } from "@/env";
 import { clearSession, getSession } from "@/lib/auth/session";
 import { buildLogoutUrl } from "@/lib/auth/shopify-oauth";
 
@@ -20,12 +21,16 @@ import { buildLogoutUrl } from "@/lib/auth/shopify-oauth";
  * tampered), we just send the shopper home — no point round-
  * tripping through Shopify with nothing to clear.
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await getSession();
   await clearSession();
 
   if (!session) {
-    return NextResponse.redirect(new URL("/", req.nextUrl));
+    /* Use `env.APP_URL` rather than the request URL — behind a
+     * Cloudflare tunnel `req.nextUrl` resolves to the local
+     * socket (`http://localhost:3000`), and we'd bounce the
+     * shopper there instead of the public host. */
+    return NextResponse.redirect(new URL("/", env.APP_URL));
   }
 
   const logoutUrl = buildLogoutUrl({ idTokenHint: session.tokens.idToken });
