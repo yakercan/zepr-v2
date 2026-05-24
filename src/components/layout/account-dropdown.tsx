@@ -94,7 +94,7 @@ function AccountPanelLoggedIn() {
         <DropdownItem href="/account#details" icon={<ProfileIcon />}>
           Profile
         </DropdownItem>
-        <DropdownItem href="/account#orders" icon={<OrdersIcon />}>
+        <DropdownItem href="/account/orders" icon={<OrdersIcon />}>
           Orders
         </DropdownItem>
         <DropdownItem href="/account#addresses" icon={<AddressIcon />}>

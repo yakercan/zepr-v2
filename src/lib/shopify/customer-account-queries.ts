@@ -4,6 +4,7 @@ import { customerAccountFetch } from "@/lib/shopify/customer-account";
 import type {
   CustomerAddress,
   OrderDetail,
+  OrderReturnStatus,
   OrdersPage,
 } from "@/lib/shopify/customer-account-types";
 
@@ -16,10 +17,11 @@ import type {
  * field here when (and only when) a component starts to need it.
  *
  * Types live in `customer-account-types.ts` (a sibling module
- * without `server-only`) so client components — the orders list
- * loader, future profile-edit forms — can import them too. This
- * file is the server-only network layer; everything below talks
- * to Shopify and must not be reached by a client bundle.
+ * without `server-only`) so client components — the order-row
+ * link, future profile-edit forms — can import them without
+ * dragging the server-only fetch layer along. This file is the
+ * server-only network layer; everything below talks to Shopify
+ * and must not be reached by a client bundle.
  *
  * All helpers are best-effort: they let `CustomerAccountError`
  * bubble up to the caller, which is expected to wrap the call in
@@ -35,6 +37,8 @@ export type {
   CustomerAddress,
   OrderDetail,
   OrderLineItem,
+  OrderReturnEvent,
+  OrderReturnStatus,
   OrderSummary,
   OrdersPage,
   OrdersPageInfo,
@@ -118,6 +122,48 @@ export async function fetchOrdersPage(
 }
 
 /* ------------------------------------------------------------------ */
+/* Tracking number extraction                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Pull a usable tracking number out of Shopify's
+ * `Fulfillment.trackingInformation` array, accepting either of
+ * the two ways Shopify populates it in practice:
+ *
+ *   1. The `.number` field is set — the normal path.
+ *   2. The `.number` field is null but `.url` points to a
+ *      17track / carrier link that carries the number in a
+ *      `nums=` (or `?n=`) query-string parameter.
+ *
+ * Returns the first hit across all entries, or `null` if neither
+ * shape applies. The matching regex is broad on purpose — Shopify
+ * URL hosts and parameter casing aren't consistent across the
+ * carriers / fulfilment apps merchants use.
+ */
+function extractTrackingNumber(
+  entries: Array<{ number: string | null; url: string | null }> | null,
+): string | null {
+  if (!entries) return null;
+  for (const entry of entries) {
+    if (entry.number) return entry.number;
+    if (entry.url) {
+      const fromUrl = trackingNumberFromUrl(entry.url);
+      if (fromUrl) return fromUrl;
+    }
+  }
+  return null;
+}
+
+function trackingNumberFromUrl(url: string): string | null {
+  /* Match `nums=…` (17track's canonical shape, `?nums=ABC123` or
+   * `#nums=ABC123`) and `n=…` (a few carrier links use this). The
+   * captured group stops at typical URL delimiters so we don't
+   * eat a trailing `&foo=bar`. */
+  const match = url.match(/[#?&](?:nums|n)=([A-Za-z0-9-]+)/);
+  return match ? match[1] : null;
+}
+
+/* ------------------------------------------------------------------ */
 /* Order detail                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -129,7 +175,14 @@ interface OrderDetailResponse {
         name: string;
         processedAt: string;
         statusPageUrl: string | null;
+        financialStatus: string | null;
+        cancelledAt: string | null;
         totalPrice: { amount: string; currencyCode: string };
+        subtotal: { amount: string; currencyCode: string } | null;
+        totalShipping: { amount: string; currencyCode: string } | null;
+        totalTax: { amount: string; currencyCode: string } | null;
+        totalRefunded: { amount: string; currencyCode: string };
+        refunds: Array<{ createdAt: string | null }>;
         shippingAddress: CustomerAddress | null;
         lineItems: {
           nodes: Array<{
@@ -138,6 +191,25 @@ interface OrderDetailResponse {
             quantity: number;
             image: { url: string; altText: string | null } | null;
             totalPrice: { amount: string; currencyCode: string } | null;
+          }>;
+        };
+        fulfillments: {
+          nodes: Array<{
+            createdAt: string;
+            status: string;
+            trackingInformation: Array<{
+              number: string | null;
+              url: string | null;
+            }>;
+          }>;
+        };
+        returns: {
+          nodes: Array<{
+            id: string;
+            name: string;
+            status: OrderReturnStatus;
+            createdAt: string | null;
+            updatedAt: string | null;
           }>;
         };
       }>;
@@ -161,9 +233,30 @@ const ORDER_DETAIL_QUERY = /* GraphQL */ `
           name
           processedAt
           statusPageUrl
+          financialStatus
+          cancelledAt
           totalPrice {
             amount
             currencyCode
+          }
+          subtotal {
+            amount
+            currencyCode
+          }
+          totalShipping {
+            amount
+            currencyCode
+          }
+          totalTax {
+            amount
+            currencyCode
+          }
+          totalRefunded {
+            amount
+            currencyCode
+          }
+          refunds {
+            createdAt
           }
           shippingAddress {
             firstName
@@ -191,6 +284,25 @@ const ORDER_DETAIL_QUERY = /* GraphQL */ `
               }
             }
           }
+          fulfillments(first: 10) {
+            nodes {
+              createdAt
+              status
+              trackingInformation {
+                number
+                url
+              }
+            }
+          }
+          returns(first: 10) {
+            nodes {
+              id
+              name
+              status
+              createdAt
+              updatedAt
+            }
+          }
         }
       }
     }
@@ -213,13 +325,34 @@ export async function fetchOrderDetail(
   const raw = data.customer.orders.nodes[0];
   if (!raw) return null;
 
+  /* Latest refund timestamp drives the "Refund issued" row in
+   * the timeline. Shopify doesn't promise ordering on `refunds[]`,
+   * so we sort lexicographically (safe for ISO 8601) and take the
+   * tail. Null timestamps — schema-allowed but rare in practice —
+   * are filtered out before the sort. */
+  const lastRefundAt =
+    raw.refunds
+      .map((r) => r.createdAt)
+      .filter((d): d is string => Boolean(d))
+      .sort()
+      .at(-1) ?? null;
+
   return {
     id: raw.id,
     name: raw.name,
     processedAt: raw.processedAt,
     statusPageUrl: raw.statusPageUrl,
+    financialStatus: raw.financialStatus,
     totalAmount: Number(raw.totalPrice.amount),
     currencyCode: raw.totalPrice.currencyCode,
+    subtotalAmount: raw.subtotal ? Number(raw.subtotal.amount) : null,
+    totalShippingAmount: raw.totalShipping
+      ? Number(raw.totalShipping.amount)
+      : null,
+    totalTaxAmount: raw.totalTax ? Number(raw.totalTax.amount) : null,
+    cancelledAt: raw.cancelledAt,
+    totalRefundedAmount: Number(raw.totalRefunded.amount),
+    lastRefundAt,
     shippingAddress: raw.shippingAddress,
     lineItems: raw.lineItems.nodes.map((node) => ({
       title: node.title,
@@ -229,6 +362,19 @@ export async function fetchOrderDetail(
       imageAlt: node.image?.altText ?? null,
       totalAmount: node.totalPrice ? Number(node.totalPrice.amount) : null,
       currencyCode: node.totalPrice?.currencyCode ?? null,
+    })),
+    fulfillments: raw.fulfillments.nodes.map((f) => ({
+      createdAt: f.createdAt,
+      status: f.status,
+      trackingNumber: extractTrackingNumber(f.trackingInformation),
+      deliveredAt: null,
+    })),
+    returns: raw.returns.nodes.map((r) => ({
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
     })),
   };
 }

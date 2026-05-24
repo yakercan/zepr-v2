@@ -80,16 +80,9 @@ function DashboardHeader({ customer }: { customer: Customer }) {
 
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-semibold leading-tight md:text-3xl">
-          {greeting}
-        </h1>
-        {customer.email && (
-          <p className="mt-1 truncate text-sm text-[color:var(--color-ink-muted)]">
-            {customer.email}
-          </p>
-        )}
-      </div>
+      <h1 className="text-2xl font-semibold leading-tight md:text-3xl">
+        {greeting}
+      </h1>
       <Link
         href="/account/logout"
         className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-danger)]"
@@ -207,10 +200,10 @@ async function OrdersCard() {
     orders = null;
   }
 
-  /* The "View all" link is only meaningful when there's more history
-   *  beyond the 5-row preview. Showing it for shoppers with ≤ 5
-   *  orders would lead to a near-empty list page — better to hide
-   *  it until there's a real second page worth visiting. */
+  /* "View all →" only renders when there's more history beyond
+   *  the 5-row preview. Shoppers with ≤ 5 orders see the same
+   *  thing here as they would on the list page, so the link
+   *  would point nowhere useful. */
   const showViewAll = orders !== null && hasMore;
 
   return (

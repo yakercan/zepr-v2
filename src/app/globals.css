@@ -107,6 +107,18 @@
   --color-success-soft: #f0fdf4;
   --color-success-soft-border: #bbf7d0;
 
+  /* Warning / neutral-termination accent — the amber shared by
+   * every "this ended without harm but didn't reach the happy
+   * path" affordance: order canceled, return canceled, future
+   * "pending review" pills. Same shape as the success / danger
+   * blocks: a main ink colour, a darker hover step, a soft tint
+   * for hover backgrounds under flat surfaces. Matches Tailwind's
+   * amber-500 / amber-600 / amber-50 — the same hues the rest of
+   * the app's icon pickers and badge styling already lean on. */
+  --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
+  --color-warning-soft: #fffbeb;
+
   /* Danger / destructive accent — the red shared by every
    * "this action removes / signs out / deletes" affordance.
    * Mirrors the success block: a main ink colour for text +
