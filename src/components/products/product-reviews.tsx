@@ -132,9 +132,9 @@ function ReviewRow({ review }: { review: ProductReview }) {
         {review.body}
       </p>
 
-      {review.images && review.images.length > 0 && (
+      {review.media && review.media.length > 0 && (
         <ReviewMediaGrid
-          images={review.images}
+          media={review.media}
           altPrefix={review.title ?? `Review by ${review.authorName}`}
         />
       )}

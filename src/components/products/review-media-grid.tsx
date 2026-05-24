@@ -1,181 +1,168 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
-import { Modal } from "@/components/ui/modal";
+import { useMemo, useState } from "react";
+import {
+  MediaLightbox,
+  type LightboxMediaItem,
+} from "@/components/products/media-lightbox";
+import { PlayBadgeIcon } from "@/components/ui/icons";
+import type { ReviewMedia } from "@/lib/reviews/media";
 import { cn } from "@/lib/utils";
 
 /**
- * Photo strip for a single review row.
+ * Photo / video strip for a single review row.
  *
- * Square thumbnails sized to the storefront's image rhythm
- * (`h-20 w-20`, `object-cover`) — every review with attached
- * media reads as a consistent row, regardless of original
- * aspect ratio. Clicking a thumb opens the shared `<Modal>`
- * primitive at the `preview` layer with the full-size image
- * fitted to the viewport (`max-h-[80vh]`, `object-contain` so
- * portrait + landscape photos both render without crop). Arrow
- * keys + the prev/next buttons walk through the rest of the
- * review's photos without closing the lightbox between clicks.
+ * Visual language matches `<ProductGallery>`'s thumbnail rail —
+ * same 64×64 footprint, same 2px hairline border + hover-to-ink,
+ * same focus ring. Video attachments get the gallery's exact
+ * play-badge overlay (`bg-black/30` scrim + `<PlayBadgeIcon>`).
+ * Two surfaces, one visual vocabulary.
  *
- * Client island scoped to ONE review row. `<ProductReviews>`
- * stays a server component — only the rows that actually have
+ * Click any thumb → opens the shared `<MediaLightbox>` (an
+ * external primitive at `media-lightbox.tsx`) at that index.
+ * The lightbox handles arrow navigation, Escape close, body-
+ * scroll lock, and the click-outside-to-close model for both
+ * images and videos.
+ *
+ * Client island scoped to ONE review row — `<ProductReviews>`
+ * stays a server component and only the rows that actually have
  * attached media pay the JS cost.
  *
- * Returns `null` for empty / undefined `images` so callers can
- * drop the component in without guarding.
+ * Returns `null` for empty / undefined `media` so the call site
+ * stays a one-line render.
  */
 
 export interface ReviewMediaGridProps {
-  images?: ReadonlyArray<string>;
-  /** Used for `alt` text on the thumbnails + the lightbox image
-   *  (e.g. the review title, or the product name as a fallback). */
+  media?: ReadonlyArray<ReviewMedia>;
+  /** Used as the `alt` prefix on each thumb + lightbox item
+   *  (typically the review title, or `"Review by …"`). */
   altPrefix: string;
 }
 
-export function ReviewMediaGrid({ images, altPrefix }: ReviewMediaGridProps) {
+export function ReviewMediaGrid({ media, altPrefix }: ReviewMediaGridProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  /* Keyboard navigation while the lightbox is open. Wired
-   * directly on `window` (NOT inside the modal) because the
-   * modal portal lives outside this component's subtree and
-   * onKeyDown on a `<div>` only fires when that div has
-   * focus — flaky for image carousels. */
-  useEffect(() => {
-    if (activeIndex === null || !images || images.length < 2) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        setActiveIndex((i) => (i === null ? 0 : (i + 1) % images.length));
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        setActiveIndex((i) =>
-          i === null ? 0 : (i - 1 + images.length) % images.length,
-        );
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [activeIndex, images]);
+  /* Pre-build the lightbox payload once per render. Stable
+   * across re-renders unless the media list itself changes,
+   * which means the lightbox's `initialIndex` prop sync sees
+   * a single steady-state array rather than a new identity
+   * every tick. */
+  const lightboxItems = useMemo<LightboxMediaItem[]>(
+    () => (media ?? []).map((m, i) => toLightboxItem(m, altPrefix, i, media!.length)),
+    [media, altPrefix],
+  );
 
-  const close = useCallback(() => setActiveIndex(null), []);
-
-  if (!images || images.length === 0) return null;
-
-  const open = activeIndex !== null;
-  const activeUrl = open ? images[activeIndex] : null;
-  const canStep = images.length > 1;
+  if (!media || media.length === 0) return null;
 
   return (
     <>
       <ul className="flex flex-wrap gap-2">
-        {images.map((url, i) => (
-          <li key={url}>
-            <button
-              type="button"
+        {media.map((item, i) => (
+          <li key={item.url}>
+            <ThumbButton
+              item={item}
+              index={i}
+              total={media.length}
+              altPrefix={altPrefix}
               onClick={() => setActiveIndex(i)}
-              className={cn(
-                "relative block h-20 w-20 overflow-hidden rounded-lg border border-[color:var(--color-border)]",
-                "transition-colors hover:border-[color:var(--color-ink)]",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-ink)] focus-visible:ring-offset-1",
-              )}
-              aria-label={`Open photo ${i + 1} of ${images.length}`}
-            >
-              <Image
-                src={url}
-                alt={`${altPrefix} — photo ${i + 1}`}
-                fill
-                sizes="80px"
-                className="object-cover"
-              />
-            </button>
+            />
           </li>
         ))}
       </ul>
 
-      <Modal
-        open={open}
-        onClose={close}
-        layer="preview"
-        ariaLabel={`${altPrefix} — photo ${
-          activeIndex !== null ? activeIndex + 1 : 1
-        } of ${images.length}`}
-        className="max-w-3xl bg-transparent border-0 shadow-none"
-      >
-        {activeUrl && (
-          <div className="relative flex items-center justify-center">
-            {/* Plain <img> for the full-size lightbox — Next/Image
-             *  needs intrinsic dimensions or a sized parent to
-             *  avoid layout shift, and user-uploaded photos
-             *  arrive at unknown aspect ratios. The browser
-             *  handles ratio naturally; we cap the box so neither
-             *  axis overruns the viewport. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activeUrl}
-              alt={`${altPrefix} — photo ${(activeIndex ?? 0) + 1} of ${images.length}`}
-              className="max-h-[80vh] max-w-full rounded-lg object-contain"
-            />
-
-            {canStep && (
-              <>
-                <ArrowButton
-                  side="left"
-                  onClick={() =>
-                    setActiveIndex(
-                      (i) =>
-                        i === null
-                          ? 0
-                          : (i - 1 + images.length) % images.length,
-                    )
-                  }
-                />
-                <ArrowButton
-                  side="right"
-                  onClick={() =>
-                    setActiveIndex((i) =>
-                      i === null ? 0 : (i + 1) % images.length,
-                    )
-                  }
-                />
-                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
-                  {(activeIndex ?? 0) + 1} / {images.length}
-                </span>
-              </>
-            )}
-          </div>
-        )}
-      </Modal>
+      <MediaLightbox
+        media={lightboxItems}
+        open={activeIndex !== null}
+        initialIndex={activeIndex ?? 0}
+        onClose={() => setActiveIndex(null)}
+      />
     </>
   );
 }
 
-function ArrowButton({
-  side,
+/* ---------- internal ---------- */
+
+function ThumbButton({
+  item,
+  index,
+  total,
+  altPrefix,
   onClick,
 }: {
-  side: "left" | "right";
+  item: ReviewMedia;
+  index: number;
+  total: number;
+  altPrefix: string;
   onClick: () => void;
 }) {
+  const label = `${altPrefix} — ${item.kind === "video" ? "video" : "photo"} ${index + 1} of ${total}`;
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={side === "left" ? "Previous photo" : "Next photo"}
+      aria-label={`Open ${item.kind === "video" ? "video" : "photo"} ${index + 1} of ${total}`}
       className={cn(
-        "absolute top-1/2 -translate-y-1/2",
-        side === "left" ? "left-2" : "right-2",
-        "inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white",
-        "transition-colors hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white",
+        // Exact `<ProductGallery>` thumb chrome — 64px square,
+        // 2px hairline border, hover-to-ink, focus ring offset
+        // off the surface. Keeps both surfaces visually identical.
+        "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg",
+        "border-2 border-[color:var(--color-border-strong)] transition-colors duration-150",
+        "hover:border-[color:var(--color-ink)]",
+        "focus-visible:outline-none focus-visible:ring-2",
+        "focus-visible:ring-[color:var(--color-ink)] focus-visible:ring-offset-2",
       )}
     >
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden
-        className={cn("h-4 w-4 fill-none stroke-current", side === "right" && "rotate-180")}
-      >
-        <path d="M10 3L5 8l5 5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+      {item.kind === "image" ? (
+        <Image
+          src={item.url}
+          alt={label}
+          fill
+          sizes="64px"
+          className="object-cover"
+        />
+      ) : (
+        // Native video element with `preload="metadata"` so the
+        // browser shows the first frame as the thumbnail without
+        // downloading the full file. `muted` + `playsInline` keep
+        // mobile browsers from auto-promoting it to fullscreen.
+        <video
+          src={item.url}
+          preload="metadata"
+          muted
+          playsInline
+          aria-label={label}
+          className="h-full w-full object-cover"
+        />
+      )}
+
+      {item.kind === "video" && (
+        // Identical to `<ProductGallery>`'s video badge: dark
+        // scrim + filled white play disc.
+        <span
+          aria-hidden
+          className="absolute inset-0 flex items-center justify-center bg-black/30 text-white"
+        >
+          <PlayBadgeIcon className="h-8 w-8" />
+        </span>
+      )}
     </button>
   );
+}
+
+function toLightboxItem(
+  m: ReviewMedia,
+  altPrefix: string,
+  index: number,
+  total: number,
+): LightboxMediaItem {
+  const alt = `${altPrefix} — ${m.kind === "video" ? "video" : "photo"} ${index + 1} of ${total}`;
+  if (m.kind === "image") {
+    return { kind: "image", url: m.url, alt };
+  }
+  return {
+    kind: "video",
+    sources: [{ url: m.url, mimeType: m.mimeType ?? "video/mp4" }],
+    alt,
+  };
 }

@@ -158,6 +158,15 @@
   --animate-shimmer: shimmer 1.5s linear infinite;
   --animate-modal-in: modal-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-modal-out: modal-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  /* Pure-opacity in/out — same cadence as the modal pair, no
+   * scale / translate. Used by surfaces that already cover the
+   * full viewport (the media lightbox), where the modal's
+   * "lift-from-corner" transform reads as the chrome rubber-
+   * banding in rather than fading in. Opacity alone keeps the
+   * entrance / exit clean against a fixed full-bleed canvas. */
+  --animate-fade-in: fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-out: fade-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes shimmer {
@@ -188,6 +197,24 @@
   to {
     opacity: 0;
     transform: scale(0.96) translateY(6px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

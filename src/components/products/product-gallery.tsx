@@ -1,25 +1,29 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { PlayBadgeIcon, SmoothCaretIcon } from "@/components/ui/icons";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  MediaLightbox,
+  type LightboxMediaItem,
+} from "@/components/products/media-lightbox";
+import { PlayBadgeIcon, SmoothCaretIcon } from "@/components/ui/icons";
+import { useActiveVideoControl } from "@/lib/hooks/use-active-video-control";
+import { useCrossfade } from "@/lib/hooks/use-crossfade";
+import {
+  crossfadeLayerClasses,
   MEDIA_HOVER_ZOOM_CLASSES,
-  MEDIA_LAYER_FADE_CLASSES,
   MEDIA_OVERLAY_BUBBLE_CLASSES,
   MEDIA_STAGE_CLASSES,
 } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { ProductMedia } from "@/types/product";
 
-/* The gallery runs a snappier cadence than the shared
- * `MEDIA_*_CLASSES` defaults (300ms — tuned for product cards).
- * `MEDIA_DURATION_CLASS` overrides the CSS timing via tailwind-merge,
- * and `CROSSFADE_DURATION_MS` mirrors it on the React side so the
- * outgoing-layer release timer is released exactly when the incoming
- * one reaches full opacity. Keep the two numbers in lockstep. */
+/* The image's hover-zoom inherits a 300ms cadence from
+ * `MEDIA_HOVER_ZOOM_CLASSES` (tuned for product cards). The PDP
+ * runs a snappier 200ms to match the layer crossfade so the two
+ * motions read as one; tailwind-merge collapses the duplicate
+ * `duration-*` to the latter value. */
 const MEDIA_DURATION_CLASS = "duration-200";
-const CROSSFADE_DURATION_MS = 200;
 
 /**
  * Product media gallery — images + videos with a vertical
@@ -100,56 +104,46 @@ export function ProductGallery({
   className,
   syncedIndex,
 }: ProductGalleryProps) {
-  const [activeIndex, setActiveIndex] = useState(syncedIndex ?? 0);
-  /* Pointer at the *previously*-active layer for the duration of the
-   * crossfade. Keeping that frame painted at full opacity beneath the
-   * incoming one prevents the gallery's search-tint backdrop from
-   * bleeding through during the transition (the cause of the
-   * mid-fade flash). `null` whenever no transition is in flight. */
-  const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
+  /* Crossfade state — shared with the lightbox via the same
+   * `useCrossfade` hook so both surfaces feel identical when
+   * stepping through media. */
+  const { activeIndex, outgoingIndex, navigate } = useCrossfade(
+    syncedIndex ?? 0,
+  );
+
   /* Mirror of the last `syncedIndex` we've reacted to. Pairs with
    * the render-time change detector below to drive external
    * navigation without a useEffect — React's recommended pattern
    * for deriving state from props. */
   const [lastSyncedIndex, setLastSyncedIndex] = useState(syncedIndex);
 
-  /* Capture the outgoing index synchronously inside the state setter
-   * so the previously-active layer is still marked "outgoing" on the
-   * very first render that promotes its replacement to "active" —
-   * without that, the previous layer would render as a plain
-   * inactive layer (opacity 0) for one frame and the flash would be
-   * back. */
-  const navigate = useCallback((next: number) => {
-    setActiveIndex((curr) => {
-      if (curr !== next) setOutgoingIndex(curr);
-      return next;
-    });
-  }, []);
-
   /* Render-time prop sync — when an external nudge arrives, mirror
    * it into local state and crossfade to the new index. Equivalent
    * to a useEffect with a guard, but without the extra commit cycle
-   * (and without the React 19 setState-in-effect lint). The
-   * `activeIndex !== syncedIndex` guard skips the no-op case (mount
-   * with seeded state) so no transition fires on first paint. */
+   * (and without the React 19 setState-in-effect lint). `navigate`
+   * is a no-op when the index is already current, so it's safe to
+   * call unconditionally. */
   if (syncedIndex !== lastSyncedIndex) {
     setLastSyncedIndex(syncedIndex);
-    if (syncedIndex != null && syncedIndex !== activeIndex) {
-      setOutgoingIndex(activeIndex);
-      setActiveIndex(syncedIndex);
-    }
+    if (syncedIndex != null) navigate(syncedIndex);
   }
 
-  /* Release the outgoing reference once the incoming has reached full
-   * opacity. Re-running on each change naturally cancels in-flight
-   * timers via the cleanup return, so rapid navigations always keep
-   * `outgoingIndex` pinned to the most recently displaced layer
-   * rather than an older one. */
-  useEffect(() => {
-    if (outgoingIndex === null) return;
-    const t = setTimeout(() => setOutgoingIndex(null), CROSSFADE_DURATION_MS);
-    return () => clearTimeout(t);
-  }, [outgoingIndex]);
+  /* Lightbox plumbing — `lightboxIndex` is `null` when closed, a
+   * numeric index when open. The lightbox itself manages
+   * navigation; we just seed `initialIndex` and forward the
+   * close. Items are memoised so the lightbox sees a stable
+   * payload across re-renders. Hooks live ABOVE the empty-state
+   * early return below so they aren't conditionally called. */
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightboxItems = useMemo<LightboxMediaItem[]>(
+    () => media.map((m) => toLightboxItem(m, title)),
+    [media, title],
+  );
+  const openLightbox = useCallback(
+    (index: number) => setLightboxIndex(index),
+    [],
+  );
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
   if (media.length === 0) {
     return (
@@ -199,9 +193,32 @@ export function ProductGallery({
             ? () => navigate(safeIndex + 1)
             : undefined
         }
+        onImageClick={openLightbox}
+      />
+
+      <MediaLightbox
+        media={lightboxItems}
+        open={lightboxIndex !== null}
+        initialIndex={lightboxIndex ?? 0}
+        onClose={closeLightbox}
       />
     </div>
   );
+}
+
+/* Adapter — `ProductMedia` shape → the lightbox's generic
+ * `LightboxMediaItem` shape. Images drop their dimensions
+ * (the lightbox lets the browser size them); videos pass their
+ * full source list + the preview frame as a poster. */
+function toLightboxItem(m: ProductMedia, title: string): LightboxMediaItem {
+  const alt = m.preview.altText ?? title;
+  if (m.kind === "image") return { kind: "image", url: m.preview.url, alt };
+  return {
+    kind: "video",
+    sources: m.videoSources ?? [],
+    poster: m.preview.url,
+    alt,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -256,6 +273,7 @@ function GalleryMain({
   title,
   onPrev,
   onNext,
+  onImageClick,
 }: {
   media: ReadonlyArray<ProductMedia>;
   activeIndex: number;
@@ -268,28 +286,18 @@ function GalleryMain({
   onPrev?: () => void;
   /** Undefined when there's no next media to step to. */
   onNext?: () => void;
+  /** Fires when the user clicks the active *image* layer. The
+   *  PDP wires this to open the shared `<MediaLightbox>`. Only
+   *  images opt in — videos keep their native controls (clicks
+   *  there toggle play/pause, which would conflict with a zoom
+   *  intent). */
+  onImageClick?: (index: number) => void;
 }) {
-  /* One ref slot per media item. Re-allocated each render via the
-   * inline callback so a shrinking media list (e.g. revalidation)
-   * doesn't leave stale entries behind. */
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-
-  useEffect(() => {
-    videoRefs.current.forEach((video, i) => {
-      if (!video) return;
-      if (i === activeIndex) {
-        // `.play()` returns a Promise that rejects when autoplay
-        // is blocked (mobile Safari with low-power mode, etc.).
-        // Swallowing the rejection avoids an unhandled promise
-        // warning; the video stays paused and the user can hit
-        // play on the controls.
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-        video.currentTime = 0;
-      }
-    });
-  }, [activeIndex]);
+  /* One ref slot per video item, populated by an inline callback
+   * on each `<video>`. Imperative play/pause + currentTime reset
+   * lives in the shared `useActiveVideoControl` hook — same
+   * behaviour as the lightbox. */
+  const videoRefs = useActiveVideoControl(activeIndex);
 
   return (
     <div className={cn(MEDIA_STAGE_CLASSES, "rounded-2xl")}>
@@ -300,23 +308,7 @@ function GalleryMain({
           <div
             key={item.id}
             aria-hidden={!isActive}
-            className={cn(
-              "absolute inset-0",
-              MEDIA_LAYER_FADE_CLASSES,
-              MEDIA_DURATION_CLASS,
-              /* Active + outgoing both render at full opacity. The
-               * incoming layer (now active) animates 0 → 100 because
-               * its prior class was `opacity-0`; the outgoing layer
-               * stays at 100 (no value change ⇒ no transition fires)
-               * until it slips back to the inactive pool a beat
-               * later, when the active above already covers it. */
-              isActive || isOutgoing ? "opacity-100" : "opacity-0",
-              /* z-stack: active on top, outgoing immediately below as
-               * the opaque backdrop for the fade, everything else
-               * tucked underneath so any delayed fade-out is hidden
-               * from view. */
-              isActive ? "z-10" : isOutgoing ? "z-0" : "-z-10",
-            )}
+            className={crossfadeLayerClasses(isActive, isOutgoing)}
           >
             {item.kind === "image" ? (
               <Image
@@ -326,7 +318,22 @@ function GalleryMain({
                 height={item.preview.height}
                 priority={i === 0}
                 sizes="(min-width: 768px) 45vw, 100vw"
-                className={cn(MEDIA_HOVER_ZOOM_CLASSES, MEDIA_DURATION_CLASS)}
+                /* Only the active layer reacts to clicks. The
+                 * other layers sit at `-z-10` so they can't be
+                 * hit visually anyway, but skipping the handler
+                 * altogether means we don't even pretend to be
+                 * clickable from an accessibility-tree
+                 * perspective when we aren't. */
+                onClick={
+                  isActive && onImageClick
+                    ? () => onImageClick(i)
+                    : undefined
+                }
+                className={cn(
+                  MEDIA_HOVER_ZOOM_CLASSES,
+                  MEDIA_DURATION_CLASS,
+                  isActive && onImageClick ? "cursor-zoom-in" : "",
+                )}
               />
             ) : (
               /* Videos here render with native controls, so they

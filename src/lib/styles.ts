@@ -98,25 +98,96 @@ export const MEDIA_HOVER_ZOOM_CLASSES =
   "h-full w-full object-cover transition-transform duration-300 ease-out group-hover/media:scale-[1.03]";
 
 /**
- * Opacity crossfade timing for stacked media layers — 300ms
- * ease-out, matching `MEDIA_HOVER_ZOOM_CLASSES` so a hover that
- * triggers both a zoom and a swap reads as one motion rather than
- * two. Override duration at the call site (see
- * `MEDIA_HOVER_ZOOM_CLASSES` for the same opt-out pattern).
+ * Opacity crossfade timing for stacked media layers driven purely
+ * by CSS hover — 300ms ease-out, matching `MEDIA_HOVER_ZOOM_CLASSES`
+ * so a hover that triggers both a zoom and a swap reads as one
+ * motion rather than two. The product card's hover overlay pairs
+ * this with `opacity-0 group-hover/media:opacity-100`.
  *
- * Pair with `absolute inset-0` (to stack the layer) and an opacity
- * driver at the call site — either CSS-only
- * (`opacity-0 group-hover/media:opacity-100`, used by the product
- * card's hover overlay) or state-driven (`opacity-0` ↔
- * `opacity-100`, used by the PDP gallery's active / outgoing
- * layers).
- *
- * Lives on a different element than `MEDIA_HOVER_ZOOM_CLASSES` —
- * each element transitions one property, so the two timings don't
- * conflict in `transition-property`.
+ * State-driven crossfades (the PDP gallery, the media lightbox)
+ * use `crossfadeLayerClasses(isActive, isOutgoing)` instead — that
+ * helper bakes in a snappier 200ms timing matched to
+ * `CROSSFADE_DURATION_MS` plus the active / outgoing / inactive
+ * z-index ladder.
  */
 export const MEDIA_LAYER_FADE_CLASSES =
   "transition-opacity duration-300 ease-out";
+
+/**
+ * How a `useCrossfade`-driven layer treats the *outgoing* item
+ * during the transition:
+ *
+ *   - **`"hold"`** (default): outgoing stays at `opacity-100` for
+ *     the duration, then snaps to `opacity-0` when the
+ *     hook's release timer fires. The incoming layer fades 0 →
+ *     100 *on top* of the still-opaque outgoing one, so the parent
+ *     surface can't bleed through at midpoint. Right choice for
+ *     surfaces backed by a *light* / non-contrasting background
+ *     (the PDP gallery sits on `--color-search` light gray; a
+ *     naive crossfade would flash gray mid-fade).
+ *
+ *     The trade-off: if the two layers have *different bounding
+ *     boxes* (e.g. landscape → portrait inside an `object-contain`
+ *     canvas), the outgoing layer's "extra extent" — the area not
+ *     covered by the incoming — stays at full opacity for the
+ *     entire duration and then snaps to 0. Reads as a brief tail.
+ *
+ *   - **`"fade"`**: outgoing fades 100 → 0 concurrently with the
+ *     incoming's 0 → 100. Symmetric crossfade. Picks up a brief
+ *     midpoint where both layers are semi-transparent — invisible
+ *     against a high-contrast backdrop (the lightbox's
+ *     `bg-black/85`), problematic against a light one. Use when
+ *     the surface IS the backdrop you want to see through any gap
+ *     between differently-sized layers.
+ */
+export type CrossfadeMode = "hold" | "fade";
+
+/**
+ * Classes for one layer inside a `useCrossfade`-driven media stack.
+ * Bundles the absolute positioning, the 200ms opacity transition
+ * (kept in lockstep with `CROSSFADE_DURATION_MS`), and the active
+ * / outgoing / inactive opacity + z-index ladder into a single
+ * call.
+ *
+ *     {media.map((item, i) => {
+ *       const isActive = i === activeIndex;
+ *       const isOutgoing = !isActive && i === outgoingIndex;
+ *       return (
+ *         <div
+ *           key={item.id}
+ *           aria-hidden={!isActive}
+ *           className={crossfadeLayerClasses(isActive, isOutgoing)}
+ *         >
+ *           {/ media element /}
+ *         </div>
+ *       );
+ *     })}
+ *
+ * See `CrossfadeMode` for picking between `"hold"` (default,
+ * fixed-bounds surfaces like the gallery's `aspect-square` viewer)
+ * and `"fade"` (natural-aspect surfaces like the lightbox's
+ * `object-contain` canvas). Surfaces that need to centre the
+ * media inside the layer (the lightbox does, since its layer is a
+ * 90vw × 85vh canvas hosting a `max-h-full` `object-contain`
+ * image) append their own utilities through
+ * `cn(crossfadeLayerClasses(...), "flex items-center …")`.
+ */
+export function crossfadeLayerClasses(
+  isActive: boolean,
+  isOutgoing: boolean,
+  mode: CrossfadeMode = "hold",
+): string {
+  /* In `"fade"` mode the outgoing layer drops to `opacity-0`
+   * immediately, so the CSS `transition-opacity` carries it
+   * smoothly from 100 → 0 alongside the incoming's 0 → 100. In
+   * `"hold"` mode it stays at 100 until the hook releases it. */
+  const outgoingOpacity = mode === "hold" ? "opacity-100" : "opacity-0";
+  return cn(
+    "absolute inset-0 transition-opacity duration-200 ease-out",
+    isActive ? "opacity-100" : isOutgoing ? outgoingOpacity : "opacity-0",
+    isActive ? "z-10" : isOutgoing ? "z-0" : "-z-10",
+  );
+}
 
 /**
  * Translucent circular bubble overlay used for icon buttons that

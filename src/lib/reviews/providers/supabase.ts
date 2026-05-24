@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/env";
+import { parseReviewMedia } from "@/lib/reviews/media";
 import type { ProductReview, ProductReviewSummary } from "@/lib/reviews/types";
 
 /* Worst-case cap on the page we pull per PDP render.
@@ -126,12 +127,11 @@ function toReview(row: SupabaseRow): ProductReview | null {
   const body = (row.description ?? "").trim();
   if (!body) return null;
 
-  /* Drop any non-string / empty entries the legacy may have
-   * left behind — keeps the UI loop safe without an extra
-   * runtime guard there. */
-  const images = (row.images ?? []).filter(
-    (url): url is string => typeof url === "string" && url.length > 0,
-  );
+  /* Normalise the legacy `images` column (which actually holds a
+   * mixed bag of image + video URLs once we add video uploads)
+   * into typed `ReviewMedia[]` at the provider boundary — the
+   * UI never has to sniff URL extensions. */
+  const media = parseReviewMedia(row.images ?? []);
 
   return {
     id: String(row.id),
@@ -140,7 +140,7 @@ function toReview(row: SupabaseRow): ProductReview | null {
     body,
     authorName: row.customer?.name?.trim() || "Anonymous",
     createdAt: row.createdAt ?? new Date(0).toISOString(),
-    images: images.length > 0 ? images : undefined,
+    media: media.length > 0 ? media : undefined,
   };
 }
 

@@ -13,6 +13,8 @@
  * extend this file — once.
  */
 
+import type { ReviewMedia } from "@/lib/reviews/media";
+
 /** A single customer review. */
 export interface ProductReview {
   /** Stable provider-side id. Used for React keys + future
@@ -34,11 +36,12 @@ export interface ProductReview {
    *  exact product (Shopify order match, Salespace receipt link,
    *  etc.). Surfaces a "Verified Purchase" pill. */
   verifiedPurchase?: boolean;
-  /** Photo URLs uploaded with the review. Already fully-qualified
-   *  by the provider (Supabase public-object URL, Judge.me CDN,
-   *  etc.), so the UI can drop them into `<Image>` without
-   *  knowing the source. Empty / absent = no media row rendered. */
-  images?: ReadonlyArray<string>;
+  /** Photo + video attachments. URLs already fully-qualified by
+   *  the provider; image / video kind already resolved at the
+   *  provider boundary (see `lib/reviews/media.ts`). The UI
+   *  never has to inspect URLs. Empty / absent = no media row
+   *  rendered. */
+  media?: ReadonlyArray<ReviewMedia>;
 }
 
 /** Aggregate stats + a page of reviews. */

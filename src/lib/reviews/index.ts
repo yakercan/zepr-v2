@@ -17,17 +17,12 @@ import type { ProductReviewSummary } from "@/lib/reviews/types";
  * what `ProductDetail.id` carries and what the legacy review
  * rows are keyed on.
  *
- * Returns `null` when:
- *   - The active provider couldn't reach its backend (network,
- *     missing secrets in CI / preview builds, schema drift).
- *   - The product genuinely has no reviews AND the provider
- *     collapses "missing" with "empty" (only the stub does).
- *
- * Returns `{ totalCount: 0, reviews: [] }` when the provider
- * confirms "system wired, this product has no reviews yet".
- * The PDP route treats `null` and `totalCount === 0` identically
- * for visibility gating, but downstream code can distinguish
- * them if needed.
+ * Returns `null` on provider failure (missing secrets, RLS
+ * denied, network error, schema drift). Returns
+ * `{ totalCount: 0, reviews: [] }` when the provider confirms
+ * the product simply has no reviews yet. The PDP route treats
+ * both identically for visibility gating; downstream code can
+ * distinguish them if needed.
  */
 export async function getProductReviews(
   productId: string,
