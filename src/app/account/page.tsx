@@ -242,15 +242,17 @@ function OrdersCardSkeleton() {
         aria-busy
       >
         {Array.from({ length: 3 }).map((_, i) => (
-          <li
-            key={i}
-            className="flex items-center justify-between gap-4 py-4"
-          >
-            <div className="flex flex-col gap-2">
+          <li key={i} className="flex items-center gap-4 py-4">
+            {/* 48×48 thumbnail placeholder mirroring the real
+             *  `OrderRow` layout — keeps the swap CLS-free when the
+             *  fetch lands. `rounded-lg` matches the real
+             *  thumbnail's border radius. */}
+            <Skeleton className="h-12 w-12 shrink-0" rounded="lg" />
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
               <Skeleton className="h-4 w-20" />
               <Skeleton className="h-3 w-28" />
             </div>
-            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-16 shrink-0" />
           </li>
         ))}
       </ul>

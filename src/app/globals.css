@@ -109,7 +109,7 @@
 
   /* Warning / neutral-termination accent — the amber shared by
    * every "this ended without harm but didn't reach the happy
-   * path" affordance: order canceled, return canceled, future
+   * path" affordance: order cancelled, return cancelled, future
    * "pending review" pills. Same shape as the success / danger
    * blocks: a main ink colour, a darker hover step, a soft tint
    * for hover backgrounds under flat surfaces. Matches Tailwind's

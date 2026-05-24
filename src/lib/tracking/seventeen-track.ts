@@ -3,17 +3,23 @@ import "server-only";
 import { env } from "@/env";
 
 /**
- * 17track integration — the bridge that lets the order timeline
- * surface a "Delivered" milestone Shopify itself can't tell us
- * about. (Shopify's `Fulfillment` only knows "the merchant has
- * shipped this"; the carrier-side status — in transit, out for
- * delivery, delivered — lives at 17track.)
+ * 17track integration — *fallback* source of delivery timestamps.
+ *
+ * Shopify itself is the primary source: `Fulfillment.events` on
+ * the Customer Account API carries a `DELIVERED` event with a
+ * `happenedAt` for every package Shopify's carrier-side webhooks
+ * have caught up with, and `fetchOrderDetail` reads that straight
+ * into `OrderFulfillmentEvent.deliveredAt`. The order-detail page
+ * only reaches 17track for fulfilments Shopify hasn't logged a
+ * DELIVERED event against yet — usually a freshly-shipped order
+ * whose carrier update hasn't propagated through Shopify's
+ * fulfilment webhook. Most orders never call this module at all.
  *
  * Surface area is intentionally narrow: one read helper, one
  * type, no caching layer of our own. Callers fold the result
  * into their `OrderFulfillmentEvent` shape and the rest of the
  * app keeps reading the same `deliveredAt` field whether the
- * value originated here or in Shopify.
+ * value originated in Shopify or here.
  *
  * Two-step protocol (`/register` then `/gettrackinfo`) — 17track
  * returns nothing for a tracking number it doesn't know about,
@@ -26,8 +32,10 @@ import { env } from "@/env";
  * as pending until a later page load picks up the polled data.
  *
  * Failure mode is "silent null": any HTTP error, parse error,
- * or missing-field path returns `null` and the timeline degrades
- * gracefully to its 3-step "Placed / Paid / Shipped" shape.
+ * carrier-detection rejection, or missing-field path returns
+ * `null` and the timeline degrades gracefully to a pending
+ * Delivered row — which is the right outcome anyway, since
+ * Shopify will catch up with the delivery event soon enough.
  */
 
 const REGISTER_URL = "https://api.17track.net/track/v2.4/register";

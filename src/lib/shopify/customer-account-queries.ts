@@ -58,11 +58,24 @@ interface OrdersPageResponse {
         name: string;
         processedAt: string;
         totalPrice: { amount: string; currencyCode: string };
+        lineItems: {
+          nodes: Array<{
+            title: string;
+            image: { url: string; altText: string | null } | null;
+          }>;
+        };
       }>;
     };
   };
 }
 
+/* Line-item slice is small (title + image only) and capped at 10
+ * per order — enough to (a) pick a first image worth showing and
+ * (b) count distinct products for the "+N more" badge in the row,
+ * without ballooning the payload on orders that genuinely have a
+ * couple dozen items. Orders with >10 distinct products end up
+ * with a slightly-low `additionalProductCount`; the trade-off is
+ * intentional and fine for a dashboard preview. */
 const ORDERS_PAGE_QUERY = /* GraphQL */ `
   query OrdersPage($first: Int!, $after: String) {
     customer {
@@ -83,6 +96,15 @@ const ORDERS_PAGE_QUERY = /* GraphQL */ `
           totalPrice {
             amount
             currencyCode
+          }
+          lineItems(first: 10) {
+            nodes {
+              title
+              image {
+                url
+                altText
+              }
+            }
           }
         }
       }
@@ -110,13 +132,29 @@ export async function fetchOrdersPage(
   );
 
   return {
-    orders: data.customer.orders.nodes.map((node) => ({
-      id: node.id,
-      name: node.name,
-      processedAt: node.processedAt,
-      totalAmount: Number(node.totalPrice.amount),
-      currencyCode: node.totalPrice.currencyCode,
-    })),
+    orders: data.customer.orders.nodes.map((node) => {
+      /* First line item carrying an image becomes the row
+       * thumbnail — falls back to `null` for image-less orders
+       * (rare; the row renders a neutral placeholder in that
+       * case). Distinct-product count is "distinct titles" so a
+       * shopper buying two sizes of the same shirt reads as one
+       * product, not two. */
+      const items = node.lineItems.nodes;
+      const firstWithImage = items.find((i) => i.image?.url);
+      const distinctTitles = new Set(items.map((i) => i.title));
+
+      return {
+        id: node.id,
+        name: node.name,
+        processedAt: node.processedAt,
+        totalAmount: Number(node.totalPrice.amount),
+        currencyCode: node.totalPrice.currencyCode,
+        previewImageUrl: firstWithImage?.image?.url ?? null,
+        previewImageAlt:
+          firstWithImage?.image?.altText ?? firstWithImage?.title ?? null,
+        additionalProductCount: Math.max(0, distinctTitles.size - 1),
+      };
+    }),
     pageInfo: data.customer.orders.pageInfo,
   };
 }
@@ -174,7 +212,6 @@ interface OrderDetailResponse {
         id: string;
         name: string;
         processedAt: string;
-        statusPageUrl: string | null;
         financialStatus: string | null;
         cancelledAt: string | null;
         totalPrice: { amount: string; currencyCode: string };
@@ -201,6 +238,12 @@ interface OrderDetailResponse {
               number: string | null;
               url: string | null;
             }>;
+            events: {
+              nodes: Array<{
+                status: string;
+                happenedAt: string;
+              }>;
+            };
           }>;
         };
         returns: {
@@ -232,7 +275,6 @@ const ORDER_DETAIL_QUERY = /* GraphQL */ `
           id
           name
           processedAt
-          statusPageUrl
           financialStatus
           cancelledAt
           totalPrice {
@@ -292,6 +334,12 @@ const ORDER_DETAIL_QUERY = /* GraphQL */ `
                 number
                 url
               }
+              events(first: 50) {
+                nodes {
+                  status
+                  happenedAt
+                }
+              }
             }
           }
           returns(first: 10) {
@@ -341,7 +389,6 @@ export async function fetchOrderDetail(
     id: raw.id,
     name: raw.name,
     processedAt: raw.processedAt,
-    statusPageUrl: raw.statusPageUrl,
     financialStatus: raw.financialStatus,
     totalAmount: Number(raw.totalPrice.amount),
     currencyCode: raw.totalPrice.currencyCode,
@@ -363,12 +410,29 @@ export async function fetchOrderDetail(
       totalAmount: node.totalPrice ? Number(node.totalPrice.amount) : null,
       currencyCode: node.totalPrice?.currencyCode ?? null,
     })),
-    fulfillments: raw.fulfillments.nodes.map((f) => ({
-      createdAt: f.createdAt,
-      status: f.status,
-      trackingNumber: extractTrackingNumber(f.trackingInformation),
-      deliveredAt: null,
-    })),
+    fulfillments: raw.fulfillments.nodes.map((f) => {
+      /* Shopify is the primary source for `deliveredAt`. Each
+       * fulfilment carries an `events` list (driven by the
+       * carrier-side webhooks Shopify already subscribes to), and
+       * the `DELIVERED` event's `happenedAt` is the carrier-
+       * reported moment of delivery — same value 17track returns
+       * for the happy path, only without the extra round-trip,
+       * registration dance, or carrier-detection ambiguity. We
+       * fall back to 17track in the order-detail page only for
+       * fulfilments Shopify hasn't yet logged a DELIVERED event
+       * against (rare; usually a freshly-shipped order whose
+       * carrier-side update hasn't propagated through Shopify's
+       * fulfilment webhook yet). */
+      const deliveredEvent = f.events.nodes.find(
+        (e) => e.status === "DELIVERED",
+      );
+      return {
+        createdAt: f.createdAt,
+        status: f.status,
+        trackingNumber: extractTrackingNumber(f.trackingInformation),
+        deliveredAt: deliveredEvent?.happenedAt ?? null,
+      };
+    }),
     returns: raw.returns.nodes.map((r) => ({
       id: r.id,
       name: r.name,

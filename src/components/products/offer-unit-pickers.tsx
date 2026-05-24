@@ -30,10 +30,15 @@ import type { ProductOption, ProductVariant } from "@/types/product";
  */
 export interface UnitSlotConfig {
   kind: "anchor" | "companion";
-  /** Companion product title — surfaced as the card header for
-   *  companion slots. `undefined` on anchor (the page already
-   *  shows the anchor's title up top). */
-  title?: string;
+  /** Product title for this slot — always populated.
+   *
+   *  Rendered as the card header for *every* companion slot, and
+   *  for anchor slots only when the slot has no variant options
+   *  to show (single-configuration products). Anchor slots *with*
+   *  options skip the title to avoid restating the page header
+   *  next to a row that already speaks for itself through its
+   *  chips. */
+  title: string;
   /** Companion product handle — used to build the open-in-new-tab
    *  arrow link. `undefined` on anchor. */
   handle?: string;
@@ -63,13 +68,17 @@ export interface UnitSlotConfig {
  *   │ #2  [thumb]  Companion title  Color: [Red] [Blue]      [↗]│
  *   └────────────────────────────────────────────────────────────┘
  *
- *   - Anchor slots carry just the `#N` index — the PDP already
- *     shows the anchor's title up top, repeating it on every
- *     card would just be noise.
- *   - Companion slots carry the companion title inline, with the
- *     open-in-new-tab arrow pinned to the right edge of the row so
- *     a shopper can inspect the bundled product without losing
- *     their current cart configuration.
+ *   - Anchor slots carry just the `#N` index when they have chips
+ *     to render — the PDP already shows the anchor's title up
+ *     top, repeating it next to a chip row would just be noise.
+ *     But when the anchor has no variant options (single-
+ *     configuration product), the chip row is empty and the title
+ *     becomes the only piece of copy that distinguishes the row
+ *     from a hollow strip; in that case the title renders too.
+ *   - Companion slots always carry the companion title inline,
+ *     with the open-in-new-tab arrow pinned to the right edge of
+ *     the row so a shopper can inspect the bundled product
+ *     without losing their current cart configuration.
  *
  * Per-option presentation via `shouldUseDropdownForOfferUnit`:
  *
@@ -135,7 +144,14 @@ function UnitCard({ unitNumber, slot }: UnitCardProps) {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-        {isCompanion && slot.title && (
+        {/* Title rules — always for companion slots, and for anchor
+         *  slots that have no variant chips to render. Skipping the
+         *  title when the anchor has options keeps the row from
+         *  reading as "Cool Product Title  Color: [Red] [Blue]" and
+         *  doubling the PDP header for no reason, while still
+         *  filling the otherwise-empty single-configuration row
+         *  with the only piece of context that identifies it. */}
+        {(isCompanion || slot.options.length === 0) && (
           <span className="line-clamp-1 text-xs font-semibold text-[color:var(--color-ink)]">
             {slot.title}
           </span>

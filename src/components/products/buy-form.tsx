@@ -15,7 +15,11 @@ import { TieredOffers } from "@/components/products/tiered-offers";
 import { TrustBadges } from "@/components/products/trust-badges";
 import { VariantPicker } from "@/components/products/variant-picker";
 import { Price } from "@/components/ui/price";
-import { tiersForCount } from "@/lib/offers";
+import {
+  type SlotPriceInfo,
+  tierPricingFromSlots,
+  tiersForCount,
+} from "@/lib/offers";
 import {
   cascadeSelect,
   defaultSelection,
@@ -56,6 +60,19 @@ import type {
  * just doesn't have that problem. The unit-card grid below the
  * tile reuses that same `selection` for unit #1's card, so chip
  * changes in either surface flow through one update path.
+ *
+ * Two pricing-related invariants worth knowing about:
+ *
+ *   - `slotSources` is always `product.offers.tilesCount` long
+ *     (not `activeTier.quantity`), so every tile's preview row
+ *     can sum its own slot prices without running short when a
+ *     smaller tier is currently active. Consumers that only care
+ *     about the active tier (`unitSlots`, `buyUnits`) slice it
+ *     down to `activeTier.quantity` at the point of use.
+ *   - When the metafield carries bundle companions
+ *     ("2:<pid>" / "3:[<p1>,<p2>]") the picker defaults to Buy 2
+ *     instead of Buy 1, with `extraUnitSelections` lazy-seeded
+ *     so the cart payload is complete from first render.
  */
 export interface BuyFormProps {
   product: ProductDetail;
@@ -129,15 +146,42 @@ export function BuyForm({
     [product.offers.tilesCount],
   );
   const offersActive = offerTiers.length > 0;
-  const [tierIndex, setTierIndex] = useState(0);
+
+  /* When the metafield carries bundle companions ("2:<pid>" /
+   * "3:[<p1>,<p2>]"), default-select Buy 2 instead of Buy 1 —
+   * the bundle is the merchant's intent, so the picker should
+   * land pre-committed to it instead of asking the shopper to
+   * click. Anchor-only tiers ("2" / "3") still default to Buy 1
+   * since there's no upsell story to lead with. */
+  const defaultTierIndex =
+    offersActive && product.offers.bundleCompanionIds.length > 0 ? 1 : 0;
+
+  const [tierIndex, setTierIndex] = useState(defaultTierIndex);
   const activeTier = offerTiers[tierIndex];
 
   /* Per-unit selections for units #2..#N. Length matches
    * `activeTier.quantity - 1`; resizes inline on tier change so
-   * the picker never reads past the array. */
+   * the picker never reads past the array. Lazy initialiser
+   * seeds entries that match the default tier — so when we
+   * default-select Buy 2, unit #2 already has a real selection
+   * from first render and the cart payload is complete without
+   * waiting for a user click. */
   const [extraUnitSelections, setExtraUnitSelections] = useState<
     OptionSelection[]
-  >([]);
+  >(() => {
+    const tier = offerTiers[defaultTierIndex];
+    if (!tier) return [];
+    const out: OptionSelection[] = [];
+    for (let i = 1; i < tier.quantity; i++) {
+      const source = resolveSlotSource(product, i);
+      out.push(
+        source.kind === "companion"
+          ? defaultSelection(source.product.variants)
+          : defaultSelection(product.variants),
+      );
+    }
+    return out;
+  });
 
   const anchorFallbackImageUrl =
     selectedVariant?.image?.url ??
@@ -145,17 +189,26 @@ export function BuyForm({
     product.media[0]?.preview.url ??
     "";
 
-  /* Per-slot source product — slot 0 is always the anchor; slot k
-   * looks up `bundleCompanions[k-1]`, falling back to anchor when
-   * the merchant didn't configure (or the loader couldn't resolve)
-   * a companion for that position. Single source of truth that the
-   * UI slot configs AND the cart-payload composer both read off. */
+  /* Per-slot source product for *every* configured tile slot —
+   * length matches `product.offers.tilesCount`, not the active
+   * tier's quantity. We need full coverage even when Buy 1 is
+   * the active tier, so the Buy 2 / Buy 3 preview rows can total
+   * `anchor + companion(s)` without missing slots. Slot 0 is
+   * always the anchor; slot k looks up `bundleCompanions[k-1]`,
+   * falling back to anchor when the merchant didn't configure
+   * (or the loader couldn't resolve) a companion for that
+   * position.
+   *
+   * Consumers that only care about the active tier (the unit
+   * picker grid, the cart payload composer) slice this down to
+   * `activeTier.quantity` at the point of use — the source of
+   * truth stays single. */
   const slotSources = useMemo<ReadonlyArray<SlotSource>>(() => {
-    if (!offersActive || !activeTier) return [];
-    return Array.from({ length: activeTier.quantity }, (_, i) =>
+    if (!offersActive) return [];
+    return Array.from({ length: product.offers.tilesCount }, (_, i) =>
       resolveSlotSource(product, i),
     );
-  }, [offersActive, activeTier, product]);
+  }, [offersActive, product]);
 
   const handleTierChange = (idx: number) => {
     setTierIndex(idx);
@@ -195,15 +248,18 @@ export function BuyForm({
   };
 
   /* Unit slot configs for `<OfferUnitPickers>`. One entry per
-   * unit in the active tier — slot 0 wires to the top picker so
+   * unit in the *active* tier (sliced from the full
+   * `slotSources` list) — slot 0 wires to the top picker so
    * unit #1's chips stay in sync with the page's primary picker;
    * later slots wire to `extraUnitSelections` with the slot's
    * source product (anchor fallback or configured companion). */
+  const activeSlotCount = activeTier?.quantity ?? 0;
   const unitSlots = useMemo<ReadonlyArray<UnitSlotConfig>>(() => {
-    return slotSources.map((source, slotIdx) => {
+    return slotSources.slice(0, activeSlotCount).map((source, slotIdx) => {
       if (slotIdx === 0) {
         return {
           kind: "anchor",
+          title: product.title,
           options: product.options,
           variants: product.variants,
           selection,
@@ -235,6 +291,7 @@ export function BuyForm({
       }
       return {
         kind: "anchor",
+        title: product.title,
         options: slotOptions,
         variants: slotVariants,
         selection: sel,
@@ -243,16 +300,68 @@ export function BuyForm({
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slotSources, selection, extraUnitSelections, anchorFallbackImageUrl]);
+  }, [
+    slotSources,
+    activeSlotCount,
+    selection,
+    extraUnitSelections,
+    anchorFallbackImageUrl,
+  ]);
+
+  /** Per-slot price info — one entry per slot in `slotSources`,
+   *  resolving each slot's *currently-relevant* variant:
+   *
+   *    - slot 0 (anchor) → the top picker's `selectedVariant`,
+   *      falling back to the product's first variant when the
+   *      picker is mid-cascade on an invalid combo.
+   *    - slot k>=1 → the slot's matching `extraUnitSelections[k-1]`
+   *      variant when the shopper has touched it; otherwise the
+   *      slot's *default* variant. This is what makes the preview
+   *      rows ("Buy 2" when Buy 1 is selected) total honestly —
+   *      we always have a real price to sum per slot, even before
+   *      the shopper has expanded the bundle picker.
+   *
+   *  Drives `tierPricings` below — which in turn feeds the picker
+   *  totals — so a multi-product bundle ("2:<pid>") totals
+   *  `anchor + companion`, not the old (wrong) `anchor × 2`. */
+  const slotPriceInfos = useMemo<ReadonlyArray<SlotPriceInfo>>(() => {
+    return slotSources.map((source, slotIdx) => {
+      const variants = source.product.variants;
+      let variant: ProductVariant | undefined;
+      if (slotIdx === 0) {
+        variant = selectedVariant ?? variants[0];
+      } else {
+        const sel = extraUnitSelections[slotIdx - 1];
+        variant = sel ? findVariant(variants, sel) : undefined;
+        variant ??= findVariant(variants, defaultSelection(variants));
+        variant ??= variants[0];
+      }
+      return {
+        priceCents: variant?.priceCents ?? 0,
+        compareAtCents: variant?.compareAtCents,
+      };
+    });
+  }, [slotSources, selectedVariant, extraUnitSelections]);
+
+  /** Per-tile preview totals, mirroring `offerTiers` index-for-
+   *  index. Each entry is `tier.quantity` slots summed and the
+   *  tier's savings % applied. Empty when offers are inactive. */
+  const tierPricings = useMemo(
+    () => offerTiers.map((tier) => tierPricingFromSlots(tier, slotPriceInfos)),
+    [offerTiers, slotPriceInfos],
+  );
 
   /** Cart payload — one `BuyUnit` per resolved variant. Same-line
    *  units (same product + same variant across slots) collapse
    *  into a single payload entry so the drawer and the Shopify
-   *  permalink read cleanly when a shopper picks "Blue × 2". */
+   *  permalink read cleanly when a shopper picks "Blue × 2". Only
+   *  the *active* tier's slots contribute (slicing
+   *  `slotSources`), so picking Buy 1 doesn't quietly inflate the
+   *  cart with the Buy 2 companion. */
   const buyUnits = useMemo<ReadonlyArray<BuyUnit> | undefined>(() => {
     if (!offersActive) return undefined;
     const byId = new Map<string, BuyUnit>();
-    slotSources.forEach((source, slotIdx) => {
+    slotSources.slice(0, activeSlotCount).forEach((source, slotIdx) => {
       const slotSelection =
         slotIdx === 0 ? selection : extraUnitSelections[slotIdx - 1];
       if (!slotSelection) return;
@@ -278,7 +387,14 @@ export function BuyForm({
       }
     });
     return Array.from(byId.values());
-  }, [offersActive, slotSources, selection, extraUnitSelections, product]);
+  }, [
+    offersActive,
+    slotSources,
+    activeSlotCount,
+    selection,
+    extraUnitSelections,
+    product,
+  ]);
 
   return (
     <div className={className ?? "flex flex-col gap-5"}>
@@ -337,9 +453,9 @@ export function BuyForm({
       {offersActive && selectedVariant && (
         <TieredOffers
           tiers={offerTiers}
+          tierPricings={tierPricings}
           selectedIndex={tierIndex}
           onSelect={handleTierChange}
-          variant={selectedVariant}
           currency={product.currency}
           /* Skip the expansion when there's nothing for it to show —
            * a Buy 2 of an option-less anchor with no companions

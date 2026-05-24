@@ -1,8 +1,8 @@
 import "server-only";
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { BackLink } from "@/components/ui/back-link";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import { getSession } from "@/lib/auth/session";
@@ -35,30 +35,39 @@ export async function generateMetadata({
 /**
  * Order detail.
  *
- * Single Customer Account API round-trip, no streaming holes —
- * the whole page is one query and there's nothing useful to
- * paint before it lands. Auth-gated like the dashboard, with a
- * `<BackLink>` at the top so the page reads like one level deep
- * in an app navigation stack even though it's a real URL (which
- * matters for transactional emails / order-status links).
+ * One Customer Account API read up front, then everything below
+ * the header paints synchronously. The only piece that can stream
+ * in late is the Timeline card's Delivered row, and only on
+ * orders where Shopify doesn't already carry a DELIVERED event
+ * for every shipped fulfilment — in that case the page wraps the
+ * card in a Suspense boundary, paints a loading row inline, and
+ * asks 17track for the rest in the background while the items /
+ * totals / shipping address render immediately. Auth-gated like
+ * the dashboard, with a `<BackLink>` at the top so the page reads
+ * like one level deep in an app navigation stack even though
+ * it's a real URL (which matters for transactional emails /
+ * order-status links).
  *
  * Layout, top to bottom:
  *
- *   1. Back nav + page header (order name + processed date)
+ *   1. Back nav + page header (order name + processed date).
  *   2. Timeline — Placed / Paid / Shipped / (Delivered or Order
- *      canceled), plus two rows per return (Requested + Approved
- *      / Declined / Canceled) and a closing "Refund issued" /
- *      "Partial refund issued" row when applicable. Pending steps
- *      render as muted placeholders, declined as a red ✕, and
- *      canceled (order or return) as an amber ❕.
+ *      cancelled). The Delivered slot is per-shipment: single-
+ *      package orders render one "Delivered" row, multi-package
+ *      orders render "Delivered (Package #1)", "Delivered
+ *      (Package #2)", … so partial progress is legible. Plus two
+ *      rows per return (Requested + Approved / Declined /
+ *      Cancelled) and a closing "Refund issued" / "Partial refund
+ *      issued" row when applicable. Pending steps render as muted
+ *      placeholders, declined as a red ✕, and cancelled (order
+ *      or return) as an amber ❕. The Delivered row(s) spin in
+ *      place while the 17track fallback resolves so the rest of
+ *      the card never has to wait on it.
  *   3. Items — line item list with image (qty as a corner badge),
  *      title, variant, line total; subtotal / shipping / tax /
  *      total breakdown in the card footer.
  *   4. Shipping address — omitted entirely for digital / pickup
  *      orders where no address was captured.
- *   5. Track CTA — links out to Shopify's hosted order status
- *      page, which already renders the fulfilment / tracking
- *      timeline.
  */
 export default async function OrderDetailPage({
   params,
@@ -84,13 +93,21 @@ export default async function OrderDetailPage({
   }
   if (!order) notFound();
 
-  /* Cross-check each fulfilment's tracking number against 17track
-   * so the timeline can resolve a "Delivered" milestone Shopify
-   * itself doesn't track. Runs in parallel; any individual failure
-   * resolves to `null` and the timeline degrades to "Shipped". */
-  order = await enrichWithDeliveryStatus(order);
-
-  const timeline = buildOrderTimeline(order);
+  /* 17track only runs as a fallback for fulfilments Shopify
+   * hasn't already logged a DELIVERED event against. Three gates:
+   *
+   *   1. Order is not cancelled (Delivered doesn't apply).
+   *   2. At least one fulfilment is missing `deliveredAt` from
+   *      Shopify (otherwise the timeline already has everything
+   *      it needs and 17track would be redundant).
+   *   3. That missing fulfilment has a tracking number for
+   *      17track to look up.
+   *
+   * Outside that narrow case we render synchronously — no
+   * Suspense boundary, no spinner, no extra round-trip. */
+  const needsDeliveryLookup =
+    !order.cancelledAt &&
+    order.fulfillments.some((f) => f.trackingNumber && !f.deliveredAt);
 
   return (
     <main className="page-container pt-6 pb-12 md:pt-8 md:pb-16">
@@ -99,17 +116,54 @@ export default async function OrderDetailPage({
       <PageHeader order={order} />
 
       <div className="mt-8 flex flex-col gap-6 md:gap-8">
-        <TimelineCard events={timeline} />
+        {needsDeliveryLookup ? (
+          <Suspense
+            fallback={
+              <TimelineCard
+                events={buildOrderTimeline(order, { deliveryLoading: true })}
+              />
+            }
+          >
+            <TimelineWithDeliveryLookup order={order} />
+          </Suspense>
+        ) : (
+          <TimelineCard events={buildOrderTimeline(order)} />
+        )}
+
         <ItemsCard order={order} />
         {order.shippingAddress && (
           <ShippingAddressCard address={order.shippingAddress} />
         )}
-        {order.statusPageUrl && (
-          <TrackingCTA href={order.statusPageUrl} />
-        )}
       </div>
     </main>
   );
+}
+
+/**
+ * Async island wrapped by the page's Suspense boundary.
+ *
+ * Folds 17track's delivery status onto each fulfilment in
+ * parallel — so an order with N packages waits on
+ * max(per-lookup latency), not the sum — and re-renders the
+ * Timeline card with the resolved data. The matching fallback in
+ * the parent renders the same card with `deliveryLoading: true`,
+ * which paints the Delivered row as a rotating arc until this
+ * resolves and React swaps it for the real row.
+ */
+async function TimelineWithDeliveryLookup({ order }: { order: OrderDetail }) {
+  /* Only ask 17track about fulfilments that (a) have a tracking
+   * number, and (b) Shopify hasn't already given us a `deliveredAt`
+   * for. Anything Shopify has already marked delivered passes
+   * through untouched. */
+  const fulfillments = await Promise.all(
+    order.fulfillments.map(async (f) => {
+      if (!f.trackingNumber || f.deliveredAt) return f;
+      const status = await getTrackingDelivery(f.trackingNumber);
+      return { ...f, deliveredAt: status?.deliveredAt ?? null };
+    }),
+  );
+  const enriched = { ...order, fulfillments };
+  return <TimelineCard events={buildOrderTimeline(enriched)} />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -176,12 +230,14 @@ function TimelineCard({ events }: { events: TimelineEvent[] }) {
 }
 
 function TimelineRow({ event }: { event: TimelineEvent }) {
-  /* "Resolved" = "this milestone has a definite outcome", which
-   * is everything except `pending`. Complete (green), declined
-   * (red), and canceled (amber) all render with strong ink so
-   * the date next to them reads as a real timestamp, not a
-   * placeholder. */
-  const isResolved = event.status !== "pending";
+  /* "Resolved" = "this milestone has a definite outcome".
+   * Complete (green), declined (red), and cancelled (amber) all
+   * render with strong ink so the date next to them reads as a
+   * real timestamp. Pending and loading rows get the muted
+   * treatment — pending because nothing's happened yet, loading
+   * because we don't yet know which way it'll resolve. */
+  const isResolved =
+    event.status !== "pending" && event.status !== "loading";
 
   return (
     <li className="flex items-center gap-3">
@@ -226,7 +282,7 @@ function TimelineDot({ status }: { status: TimelineEventStatus }) {
       </span>
     );
   }
-  if (status === "canceled") {
+  if (status === "cancelled") {
     return (
       <span
         aria-hidden
@@ -234,6 +290,21 @@ function TimelineDot({ status }: { status: TimelineEventStatus }) {
       >
         <ExclamationIcon />
       </span>
+    );
+  }
+  if (status === "loading") {
+    /* Same outer shape as the `pending` dot below; the
+     * difference is one of the four border quarters is darkened
+     * to ink, and the whole circle spins. Reads as "we know
+     * something is going to happen here, we just don't know
+     * the outcome yet". */
+    return (
+      <span
+        aria-hidden
+        role="status"
+        aria-label="Checking delivery status"
+        className="h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-[color:var(--color-border-strong)] border-t-[color:var(--color-ink)] bg-[color:var(--color-surface)]"
+      />
     );
   }
   return (
@@ -337,9 +408,17 @@ function ItemThumbnail({
           />
         )}
       </div>
+      {/* Forced 20×20 (`h-5 w-5`, no min-width / horizontal
+       *  padding) plus 10px-bold matches the "+N" badge over on
+       *  the order-row thumbnail — both badges are now the same
+       *  clean circle. At the previous 11px-semibold + `px-1`
+       *  setting the digit looked slightly off-axis inside the
+       *  circle because the padding stretched the box past 20px
+       *  for single digits and pushed two-digit content even
+       *  further. Squaring the container removes both effects. */}
       <span
         aria-label={`Quantity ${quantity}`}
-        className="absolute right-0 top-0 flex h-5 min-w-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-[color:var(--color-ink)] px-1 text-[11px] font-semibold leading-none text-white"
+        className="absolute right-0 top-0 flex h-5 w-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-[color:var(--color-ink)] text-[10px] font-bold leading-none text-white"
       >
         {quantity}
       </span>
@@ -448,25 +527,6 @@ function ShippingAddressCard({ address }: { address: CustomerAddress }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Track CTA                                                           */
-/* ------------------------------------------------------------------ */
-
-function TrackingCTA({ href }: { href: string }) {
-  return (
-    <div className="flex justify-start">
-      <Link
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn-primary"
-      >
-        Track your order
-      </Link>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* Icons                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -524,36 +584,6 @@ function ExclamationIcon() {
       <path d="M12 18.5v.5" />
     </svg>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/* Delivery enrichment (17track)                                       */
-/* ------------------------------------------------------------------ */
-
-/**
- * Fold 17track's delivery status onto each Shopify fulfilment.
- *
- * Returns a new `OrderDetail` with `fulfillments[].deliveredAt`
- * populated where 17track confirmed a delivery. Untrackable
- * fulfilments (no number) and failed lookups pass through with
- * `deliveredAt: null`, which the timeline reads as "still
- * pending" — same shape as if the merchant never enabled
- * tracking at all.
- *
- * Done in parallel so an order with N packages waits on
- * max(per-lookup latency), not the sum.
- */
-async function enrichWithDeliveryStatus(
-  order: OrderDetail,
-): Promise<OrderDetail> {
-  const fulfillments = await Promise.all(
-    order.fulfillments.map(async (f) => {
-      if (!f.trackingNumber) return f;
-      const status = await getTrackingDelivery(f.trackingNumber);
-      return { ...f, deliveredAt: status?.deliveredAt ?? null };
-    }),
-  );
-  return { ...order, fulfillments };
 }
 
 /* ------------------------------------------------------------------ */

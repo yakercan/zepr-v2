@@ -31,6 +31,16 @@ export interface OrderSummary {
   processedAt: string;
   totalAmount: number;
   currencyCode: string;
+  /** First line-item image on the order. `null` when none of the
+   *  items carry one (rare — typically a digital / gift-card
+   *  order). Drives the thumbnail rendered by `OrderRow`. */
+  previewImageUrl: string | null;
+  previewImageAlt: string | null;
+  /** Distinct products beyond the first, rendered as a "+N" badge
+   *  overlaid on the thumbnail. Distinctness is by line-item title
+   *  so variants of the same product fold together — buying two
+   *  sizes of one shirt reads as a single product, not two. */
+  additionalProductCount: number;
 }
 
 export interface OrdersPageInfo {
@@ -65,9 +75,13 @@ export interface OrderFulfillmentEvent {
    *  whether the package has been delivered. */
   trackingNumber: string | null;
   /** ISO-8601 timestamp of when the package was reported delivered.
-   *  Shopify's Customer Account API doesn't expose a delivered
-   *  state, so this is filled in by the 17track enrichment step
-   *  on the order detail page — left `null` everywhere else. */
+   *  Sourced from Shopify's `Fulfillment.events` (the `DELIVERED`
+   *  event's `happenedAt`) where possible — that's the same
+   *  carrier-reported timestamp 17track returns, and it costs
+   *  nothing extra to fetch on the same query. `null` means
+   *  Shopify hasn't logged a DELIVERED event yet; the order detail
+   *  page then asks 17track as a fallback for those specific
+   *  fulfilments. */
   deliveredAt: string | null;
 }
 
@@ -105,10 +119,6 @@ export interface OrderDetail {
   /** Display name Shopify assigns to an order, e.g. `#1234`. */
   name: string;
   processedAt: string;
-  /** Hosted Shopify "Order status" page — the canonical tracking
-   *  destination. We surface a CTA instead of re-implementing the
-   *  fulfilment / tracking UI inside the dashboard. */
-  statusPageUrl: string | null;
   /** Raw Shopify financial status enum (`PAID`, `PENDING`,
    *  `REFUNDED`, `PARTIALLY_REFUNDED`, …). The status helper
    *  interprets this for both the "Paid" and "Refund" milestones. */
@@ -121,11 +131,12 @@ export interface OrderDetail {
   totalTaxAmount: number | null;
   totalAmount: number;
   currencyCode: string;
-  /** ISO-8601 of when the merchant canceled the order, or `null`
-   *  for orders that were never canceled. When non-null, the
-   *  timeline swaps its "Delivered" row for an "Order canceled"
-   *  one — Shipped / Paid / Placed above it stay as-is, since an
-   *  order can be canceled before *or* after shipping. */
+  /** ISO-8601 of when the merchant cancelled the order, or `null`
+   *  for orders that were never cancelled. When non-null, the
+   *  timeline swaps its "Delivered" row for an "Order cancelled"
+   *  one (and drops the Shipped row if the order never actually
+   *  shipped). Otherwise Shipped / Paid / Placed stay as-is — an
+   *  order can be cancelled before *or* after shipping. */
   cancelledAt: string | null;
   /** Sum across `Order.refunds[]` as Shopify reports it on
    *  `Order.totalRefunded`. `0` when no refund has been issued. */

@@ -19,32 +19,41 @@ import type {
  *   - There's one obvious file to look at when Shopify shifts
  *     a status-enum name and the timeline goes stale.
  *
- * Tracking-API enrichment (17track) lives in
- * `src/lib/tracking/seventeen-track.ts`. The order detail page
- * folds 17track's delivery timestamp into each fulfilment's
- * `deliveredAt` *before* calling into this builder, so the helper
- * never has to know that 17track exists — it just reads a
- * `deliveredAt` field like any other Shopify field.
+ * Delivery timestamps come from Shopify itself —
+ * `Fulfillment.events`' DELIVERED event carries a `happenedAt`,
+ * which `fetchOrderDetail` reads straight into
+ * `OrderFulfillmentEvent.deliveredAt`. For the rare case Shopify
+ * hasn't logged a DELIVERED event yet, the order-detail page
+ * falls back to 17track and folds its answer into the same
+ * `deliveredAt` field before calling into this builder. Either
+ * way, the helper just reads `deliveredAt` and doesn't care where
+ * the value came from.
  */
 
-/** Four visual states a timeline row can be in:
+/** Five visual states a timeline row can be in:
  *
- *  - `complete`  → green check, ink text (happened, positive)
- *  - `pending`   → empty bordered circle, muted text (not yet)
- *  - `declined`  → red filled circle with white ✕, ink text
- *                  (happened, an explicit rejection — return
- *                  declined by the merchant)
- *  - `canceled`  → amber filled circle with white ❕, ink text
- *                  (happened, a neutral termination — order
- *                  canceled by the merchant or return withdrawn
- *                  by the customer; neither is a "failure" in
- *                  the way `declined` is)
+ *  - `complete`   → green check, ink text (happened, positive)
+ *  - `pending`    → empty bordered circle, muted text (not yet)
+ *  - `loading`    → spinning quarter-arc, muted text (outcome
+ *                   still being resolved — the row will flip to
+ *                   `complete` or `pending` once the async
+ *                   lookup behind it finishes; only used for the
+ *                   Delivered row during the 17track call)
+ *  - `declined`   → red filled circle with white ✕, ink text
+ *                   (happened, an explicit rejection — return
+ *                   declined by the merchant)
+ *  - `cancelled`  → amber filled circle with white ❕, ink text
+ *                   (happened, a neutral termination — order
+ *                   cancelled by the merchant or return withdrawn
+ *                   by the customer; neither is a "failure" in
+ *                   the way `declined` is)
  */
 export type TimelineEventStatus =
   | "complete"
   | "pending"
+  | "loading"
   | "declined"
-  | "canceled";
+  | "cancelled";
 
 export interface TimelineEvent {
   /** Stable identifier, useful as a React key. Fixed values for
@@ -85,6 +94,15 @@ const SHIPPED_STATES = new Set([
 ]);
 const REFUNDED_STATES = new Set(["REFUNDED", "PARTIALLY_REFUNDED"]);
 
+export interface BuildOrderTimelineOptions {
+  /** When `true`, the Delivered row renders in the `loading`
+   *  state (rotating arc) instead of `complete` / `pending`. Set
+   *  by the page when it's about to await 17track for the real
+   *  answer; the Suspense child re-renders with the default
+   *  (`false`) once the lookup resolves. */
+  deliveryLoading?: boolean;
+}
+
 /**
  * Build the order timeline from an `OrderDetail`.
  *
@@ -101,19 +119,31 @@ const REFUNDED_STATES = new Set(["REFUNDED", "PARTIALLY_REFUNDED"]);
  *                      default and orders that paid later are a
  *                      rounding error worth not modelling for v1.
  *   3. Shipped      — the earliest `createdAt` across any
- *                      fulfilment in a shipped-ish state.
- *   4. Delivered  *or*  Order canceled — exactly one of the two
- *                      shows. Cancellation replaces delivery in
- *                      the same slot since the two are mutually
- *                      exclusive end-states from a fulfilment
- *                      perspective. Delivered uses 17track-fed
- *                      `deliveredAt` (green ✓); canceled uses
- *                      Shopify's `cancelledAt` (amber ❕).
+ *                      fulfilment in a shipped-ish state. Omitted
+ *                      entirely when the order was cancelled
+ *                      before anything ever shipped — showing a
+ *                      pending Shipped row in that case would
+ *                      promise progress that's never coming.
+ *   4. Delivered  *or*  Order cancelled — Delivered is one row
+ *                      *per shipped fulfilment*, so an order
+ *                      shipped in N boxes shows N rows ordered
+ *                      by ship time. Single-package orders read
+ *                      as a single "Delivered" row (no suffix);
+ *                      multi-package orders read as
+ *                      "Delivered (Package #1)", "Delivered
+ *                      (Package #2)", … so partial progress is
+ *                      legible at a glance — one row complete
+ *                      with its real delivery date, another row
+ *                      still pending or loading. Cancellation
+ *                      replaces the whole slot since Delivered
+ *                      and Cancelled are mutually exclusive
+ *                      end-states. Cancelled uses Shopify's
+ *                      `cancelledAt` (amber ❕).
  *
  * Then, conditionally appended:
  *
  *   5. Return rows  — two per return (Requested + Approved /
- *                      Declined / Canceled), only when the order
+ *                      Declined / Cancelled), only when the order
  *                      has any returns at all.
  *   6. Refund row   — single row at the very bottom, only when
  *                      Shopify reports a refund. "Refund issued"
@@ -126,7 +156,10 @@ const REFUNDED_STATES = new Set(["REFUNDED", "PARTIALLY_REFUNDED"]);
  *                      `totalRefunded >= totalAmount` check
  *                      would mis-classify return-driven refunds).
  */
-export function buildOrderTimeline(order: OrderDetail): TimelineEvent[] {
+export function buildOrderTimeline(
+  order: OrderDetail,
+  options: BuildOrderTimelineOptions = {},
+): TimelineEvent[] {
   const events: TimelineEvent[] = [];
 
   events.push({
@@ -145,54 +178,94 @@ export function buildOrderTimeline(order: OrderDetail): TimelineEvent[] {
   });
 
   /* Earliest createdAt across the shipped-ish fulfilments —
-   * "shipped" reads as "when did the first package leave?". */
+   * "shipped" reads as "when did the first package leave?".
+   * Skip the row entirely if the order was cancelled and never
+   * actually shipped; a permanently-pending Shipped row in
+   * that case would imply something is still on the way. */
   const shippedAt = earliest(
     order.fulfillments
       .filter((f) => SHIPPED_STATES.has(normalize(f.status)))
       .map((f) => f.createdAt),
   );
-  events.push({
-    key: "shipped",
-    label: "Shipped",
-    date: shippedAt,
-    status: shippedAt ? "complete" : "pending",
-  });
+  const skipShippedRow = order.cancelledAt && !shippedAt;
+  if (!skipShippedRow) {
+    events.push({
+      key: "shipped",
+      label: "Shipped",
+      date: shippedAt,
+      status: shippedAt ? "complete" : "pending",
+    });
+  }
 
   if (order.cancelledAt) {
-    /* Cancellation swaps the "Delivered" slot. The shipped row
-     * above is left as-is — orders *can* be canceled after they
-     * ship (rare but real), and showing a real shipped-at date
-     * with a canceled outcome is more honest than back-flipping
-     * shipped to pending. Uses the `canceled` (amber ❕) visual
-     * rather than `declined` (red ✕) because the merchant
-     * canceling an order is a neutral close, not a rejection. */
+    /* Cancellation swaps the "Delivered" slot. When the order
+     * *was* shipped before being cancelled the Shipped row above
+     * stays — back-flipping a real shipped-at to pending would
+     * lie about what happened. Uses the `cancelled` (amber ❕)
+     * visual rather than `declined` (red ✕) because the merchant
+     * cancelling an order is a neutral close, not a rejection. */
     events.push({
-      key: "canceled",
-      label: "Order canceled",
+      key: "cancelled",
+      label: "Order cancelled",
       date: order.cancelledAt,
-      status: "canceled",
+      status: "cancelled",
     });
   } else {
-    /* Multi-package orders are only "delivered" when every
-     * shipped package has landed. Treat the milestone as complete
-     * when at least one fulfilment has a `deliveredAt` AND no
-     * shipped fulfilment is still missing one — otherwise it
-     * sits pending. */
-    const deliveredDates = order.fulfillments
-      .map((f) => f.deliveredAt)
-      .filter((d): d is string => Boolean(d));
-    const shippedCount = order.fulfillments.filter((f) =>
-      SHIPPED_STATES.has(normalize(f.status)),
-    ).length;
-    const allDelivered =
-      shippedCount > 0 && deliveredDates.length >= shippedCount;
-    const deliveredAt = allDelivered ? latest(deliveredDates) : null;
-    events.push({
-      key: "delivered",
-      label: "Delivered",
-      date: deliveredAt,
-      status: deliveredAt ? "complete" : "pending",
-    });
+    /* One Delivered row per shipped fulfilment, ordered by
+     * `createdAt` so Package #1 is the box that shipped first.
+     * Per-row status is derived in isolation:
+     *
+     *   - `deliveredAt` set → complete (green ✓ + real date).
+     *     Sourced from Shopify's DELIVERED event when available,
+     *     filled in by 17track on the fallback path otherwise.
+     *   - `deliveryLoading` is on AND the row has a tracking
+     *     number → loading (rotating arc). This is the narrow
+     *     case where the page is mid-17track call and we
+     *     genuinely don't know yet whether this specific package
+     *     has landed.
+     *   - Otherwise → pending (empty circle).
+     *
+     * Note that Shopify-confirmed deliveries still render as
+     * "complete" inside the Suspense fallback — `deliveredAt` is
+     * already set on those, so the per-row check short-circuits
+     * before the loading branch even fires. The spinner only
+     * shows on the rows we're actually waiting on. */
+    const shippedFulfillments = order.fulfillments
+      .filter((f) => SHIPPED_STATES.has(normalize(f.status)))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const shippedCount = shippedFulfillments.length;
+
+    if (shippedCount === 0) {
+      events.push({
+        key: "delivered",
+        label: "Delivered",
+        date: null,
+        status: "pending",
+      });
+    } else {
+      shippedFulfillments.forEach((f, i) => {
+        const label =
+          shippedCount === 1
+            ? "Delivered"
+            : `Delivered (Package #${i + 1})`;
+
+        let status: TimelineEventStatus;
+        if (f.deliveredAt) {
+          status = "complete";
+        } else if (options.deliveryLoading && f.trackingNumber) {
+          status = "loading";
+        } else {
+          status = "pending";
+        }
+
+        events.push({
+          key: `delivered:${i}`,
+          label,
+          date: f.deliveredAt,
+          status,
+        });
+      });
+    }
   }
 
   /* Returns slot in after the fulfilment outcome. Each return
@@ -237,7 +310,7 @@ export function buildOrderTimeline(order: OrderDetail): TimelineEvent[] {
  *        REQUESTED            → "Return approved" pending (empty)
  *        OPEN / CLOSED        → "Return approved" complete (green ✓)
  *        DECLINED             → "Return declined" declined (red ✕)
- *        CANCELED             → "Return canceled" canceled (amber ❕)
+ *        CANCELED             → "Return cancelled" cancelled (amber ❕)
  *
  * The `key` field encodes the return id so React doesn't reconcile
  * across distinct returns when there's more than one.
@@ -280,12 +353,15 @@ function returnEvents(ret: OrderReturnEvent): TimelineEvent[] {
     case "CANCELED":
       /* User-withdrawn returns share the amber ❕ treatment with
        * order cancellations — they're neutral terminations, not
-       * the merchant rejecting the request (that's `DECLINED`). */
+       * the merchant rejecting the request (that's `DECLINED`).
+       * (Note: Shopify's enum value is `CANCELED` with one `l`;
+       * our UI label uses the `cancelled` spelling for consistency
+       * with `cancelledAt` and the order-cancelled row above.) */
       decision = {
         key: `return:${ret.id}:decision`,
-        label: "Return canceled",
+        label: "Return cancelled",
         date: ret.updatedAt ?? ret.createdAt,
-        status: "canceled",
+        status: "cancelled",
       };
       break;
   }
@@ -293,15 +369,10 @@ function returnEvents(ret: OrderReturnEvent): TimelineEvent[] {
   return [requested, decision];
 }
 
-/* Earliest / latest of a list of ISO timestamps. Lexicographic
- * sort works for ISO 8601 — `2026-01-…` < `2026-02-…` etc. — so
- * we skip the Date round-trip. */
+/* Earliest of a list of ISO timestamps. Lexicographic sort works
+ * for ISO 8601 — `2026-01-…` < `2026-02-…` etc. — so we skip the
+ * Date round-trip. */
 function earliest(dates: string[]): string | null {
   if (dates.length === 0) return null;
   return [...dates].sort()[0];
-}
-
-function latest(dates: string[]): string | null {
-  if (dates.length === 0) return null;
-  return [...dates].sort()[dates.length - 1];
 }

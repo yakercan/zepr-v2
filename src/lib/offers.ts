@@ -187,22 +187,54 @@ export function productIdToGid(numericId: string): string {
 }
 
 /**
- * Compute the per-tile preview pricing from the active variant.
- * Returns all-cents integers so the call site can hand them
- * straight to `<Price>` without unit conversion.
+ * Per-slot price info — the minimum slice a tile needs about a
+ * single bundle slot's variant to participate in tile-total math.
+ * The caller resolves what variant fills each slot (anchor's
+ * top-picker variant, companion's selected variant, or each
+ * source's default-selection variant when nothing's been picked
+ * yet) and hands the resulting `priceCents` / `compareAtCents`
+ * straight in.
+ */
+export interface SlotPriceInfo {
+  priceCents: number;
+  /** Strike-through compare-at price for this slot, or `undefined`
+   *  when the slot's variant has no compare. The tile-total sums
+   *  fall back to `priceCents` for slots without a compare so a
+   *  bundle of "one-on-sale + one-not-on-sale" still totals
+   *  honestly instead of zeroing out the non-sale side. */
+  compareAtCents?: number;
+}
+
+/**
+ * Compute a tile's preview totals by summing the first
+ * `tier.quantity` slots' prices, then applying the tier's
+ * percentage saving. Returns all-cents integers so the caller can
+ * hand them straight to `<Price>` without unit conversion.
+ *
+ * Why slot-based: a "Buy 2" tier whose slot 1 is a *different*
+ * product than slot 0 (the metafield form `"2:<pid>"`) must total
+ * `anchor + companion`, not `anchor × 2`. The old single-variant
+ * helper this replaces silently doubled the anchor price even
+ * when the second slot belonged to a different product, which
+ * misled shoppers on multi-product bundles. Summing per slot
+ * makes the math correct for both same-product and mixed bundles
+ * without a special case.
  *
  * Rounding is to the nearest cent on the discounted side; the
  * worst-case display drift vs the eventual Shopify-side discount
- * is sub-cent and won't ever mislead a shopper because the cart
- * math stays server-authoritative.
+ * is sub-cent and won't mislead a shopper because the cart math
+ * stays server-authoritative.
  */
-export function tierPricingCents(
+export function tierPricingFromSlots(
   tier: OfferTier,
-  variant: { priceCents: number; compareAtCents?: number },
+  slotPrices: ReadonlyArray<SlotPriceInfo>,
 ): { discountedTotalCents: number; compareTotalCents: number } {
-  const baseTotal = variant.priceCents * tier.quantity;
-  const compareTotalCents =
-    (variant.compareAtCents ?? variant.priceCents) * tier.quantity;
+  const slots = slotPrices.slice(0, tier.quantity);
+  const baseTotal = slots.reduce((sum, s) => sum + s.priceCents, 0);
+  const compareTotalCents = slots.reduce(
+    (sum, s) => sum + (s.compareAtCents ?? s.priceCents),
+    0,
+  );
   const discountedTotalCents =
     tier.savingsPercent === 0
       ? baseTotal

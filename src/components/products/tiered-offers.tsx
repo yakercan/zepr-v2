@@ -3,9 +3,18 @@
 import { type ReactNode } from "react";
 import { Price } from "@/components/ui/price";
 import { qualifiesForFreeShipping } from "@/lib/badges";
-import { tierPricingCents, type OfferTier } from "@/lib/offers";
+import { type OfferTier } from "@/lib/offers";
 import { cn } from "@/lib/utils";
-import type { ProductVariant } from "@/types/product";
+
+/** One tile's preview totals — discounted (what the shopper pays
+ *  after the tier % saving) plus compare (sum of strike-through
+ *  prices across the tile's slots). The parent computes these
+ *  once per tier with full slot context and passes them in; the
+ *  picker stays purely presentational about pricing. */
+export interface TierPricing {
+  discountedTotalCents: number;
+  compareTotalCents: number;
+}
 
 /**
  * Tiered offers picker — the "Buy 1 / Buy 2 Save 15% / Buy 3
@@ -37,18 +46,25 @@ import type { ProductVariant } from "@/types/product";
  *     storefront's standard selectable-surface look so the chosen
  *     tile draws the eye without the others looking dead.
  *
- * Pricing math lives in `lib/offers#tierPricingCents` — frontend
- * preview only. The real discount applies at Shopify checkout
- * once the cart wiring stamps the tier id; display drift can't
- * silently overcharge because the cart math stays server-
- * authoritative.
+ * Pricing math lives in `lib/offers#tierPricingFromSlots` — the
+ * parent in `<BuyForm>` sums each tile's slot prices and hands
+ * the totals to this picker as the `tierPricings` array, so the
+ * picker itself does no money arithmetic. Frontend preview only:
+ * the real discount applies at Shopify checkout once the cart
+ * wiring stamps the tier id; display drift can't silently
+ * overcharge because the cart math stays server-authoritative.
  */
 
 export interface TieredOffersProps {
   tiers: ReadonlyArray<OfferTier>;
+  /** Precomputed totals, one entry per tile in tile order. The
+   *  parent has the full slot context (anchor variant +
+   *  per-companion selections), so per-tile pricing is computed
+   *  there and passed in — this picker stays purely
+   *  presentational about money. */
+  tierPricings: ReadonlyArray<TierPricing>;
   selectedIndex: number;
   onSelect: (index: number) => void;
-  variant: ProductVariant;
   currency: string;
   /** Optional body rendered INSIDE the currently-selected tile,
    *  below its header row, separated by a hairline divider. The
@@ -63,9 +79,9 @@ export interface TieredOffersProps {
 
 export function TieredOffers({
   tiers,
+  tierPricings,
   selectedIndex,
   onSelect,
-  variant,
   currency,
   selectedTierContent,
   className,
@@ -79,7 +95,7 @@ export function TieredOffers({
    * the gate once here so the chip is either enabled across the
    * whole picker or suppressed across it, consistently. */
   const baseAlreadyShipsFree = qualifiesForFreeShipping(
-    tierPricingCents(tiers[0], variant).discountedTotalCents,
+    tierPricings[0]?.discountedTotalCents ?? 0,
   );
 
   return (
@@ -96,9 +112,9 @@ export function TieredOffers({
           <OfferRow
             key={tier.id}
             tier={tier}
+            pricing={tierPricings[idx]}
             isSelected={isSelected}
             onSelect={() => onSelect(idx)}
-            variant={variant}
             currency={currency}
             baseAlreadyShipsFree={baseAlreadyShipsFree}
             /* Only render the expansion body in the selected tile
@@ -115,9 +131,9 @@ export function TieredOffers({
 
 interface OfferRowProps {
   tier: OfferTier;
+  pricing: TierPricing | undefined;
   isSelected: boolean;
   onSelect: () => void;
-  variant: ProductVariant;
   currency: string;
   /** When `true`, the product's anchor tier already qualifies for
    *  free shipping on its own — every tier inherits the perk, so
@@ -129,17 +145,20 @@ interface OfferRowProps {
 
 function OfferRow({
   tier,
+  pricing,
   isSelected,
   onSelect,
-  variant,
   currency,
   baseAlreadyShipsFree,
   expansionContent,
 }: OfferRowProps) {
-  const { discountedTotalCents, compareTotalCents } = tierPricingCents(
-    tier,
-    variant,
-  );
+  /* `pricing` is always defined in practice — the parent maps
+   * `tiers` and `tierPricings` from the same source. The fallback
+   * here is a safety net for hot-reload races / future callers
+   * that forget to pass the matching array; it keeps the row
+   * rendering with zeros rather than throwing. */
+  const discountedTotalCents = pricing?.discountedTotalCents ?? 0;
+  const compareTotalCents = pricing?.compareTotalCents ?? 0;
   const showCompare = compareTotalCents > discountedTotalCents;
   const hasExpansion = isSelected && !!expansionContent;
   /* The free-shipping threshold lives at the *cart-total* level
