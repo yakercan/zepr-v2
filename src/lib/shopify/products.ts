@@ -1,5 +1,6 @@
 import "server-only";
 
+import { resolveLegalDisclaimerHtml } from "@/lib/legal/disclaimers";
 import { parseOffersMetafield, productIdToGid } from "@/lib/offers";
 import { shopifyFetch } from "@/lib/shopify/client";
 import type {
@@ -130,6 +131,9 @@ const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
       offers: metafield(namespace: "custom", key: "offers") {
         value
       }
+      legalDisclaimer: metafield(namespace: "custom", key: "legal_disclaimer") {
+        value
+      }
     }
   }
 `;
@@ -219,6 +223,12 @@ interface RawProduct {
    *  Free-text value normalised in `parseOffersMetafield`; see
    *  `lib/offers.ts` for the recognised shapes. */
   offers: { value: string } | null;
+  /** `custom.legal_disclaimer` metafield — the merchant flag /
+   *  category selector that drives the PDP Disclaimer section.
+   *  Raw text is never rendered; `resolveLegalDisclaimerHtml`
+   *  picks a hardcoded HTML body off this value's leading text.
+   *  Null when the section should be hidden. */
+  legalDisclaimer: { value: string } | null;
 }
 
 interface ProductByHandleResponse {
@@ -532,6 +542,14 @@ function normaliseProduct(raw: RawProduct): ProductDetail {
     variants: parseVariants(raw.variants.nodes),
     deliveryTime: raw.deliveryTime?.value?.trim() || undefined,
     offers: parseOffersMetafield(raw.offers?.value),
+    /* Resolve to HTML at the fetcher boundary so the PDP route
+     * just renders the result through `<RichText>`. The resolver
+     * is server-only — the legalese constants live in
+     * `lib/legal/disclaimers.ts` and never leak into the client
+     * bundle; only the resolved HTML rides the RSC payload, the
+     * same way `descriptionHtml` does today. */
+    legalDisclaimerHtml:
+      resolveLegalDisclaimerHtml(raw.legalDisclaimer?.value) ?? undefined,
     /* Hydrated by the PDP server route (`getCompanionProducts`)
      * after the anchor product lands; the fetcher leaves it
      * empty so callers that don't care about bundles (modal

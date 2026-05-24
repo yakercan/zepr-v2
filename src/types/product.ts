@@ -341,6 +341,19 @@ export interface ProductDetail {
    *  back to a safe default range when missing. */
   deliveryTime?: string;
 
+  /** Resolved legal-disclaimer HTML — derived at the fetcher
+   *  boundary by running the merchant's `custom.legal_disclaimer`
+   *  metafield through `resolveLegalDisclaimerHtml`. Either one
+   *  of the hardcoded HTML bodies (cosmetics / wellness default
+   *  or a category-specific variant like the radar-detector
+   *  warning), or `undefined` when the metafield is empty (the
+   *  PDP hides the Disclaimer accordion section entirely).
+   *
+   *  Raw merchant prose is never surfaced — the metafield is a
+   *  category flag, not editable copy; see
+   *  `lib/legal/disclaimers.ts` for the variant table. */
+  legalDisclaimerHtml?: string;
+
   /** Parsed `custom.offers` metafield — tile count plus any
    *  bundle-companion product ids that fill slots 1..N. See
    *  `lib/offers.ts#parseOffersMetafield` for the recognised

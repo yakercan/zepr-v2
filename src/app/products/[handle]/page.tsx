@@ -140,6 +140,19 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 />
               </ProductAccordionItem>
             )}
+            {/* Legal disclaimer — last in the stack. Hidden when
+             *  the merchant didn't set `custom.legal_disclaimer`
+             *  on this product; otherwise the resolver picked
+             *  either the cosmetics / wellness default or a
+             *  category-specific variant (see
+             *  `lib/legal/disclaimers.ts`). Defaults closed so
+             *  it doesn't overwhelm the more shopper-relevant
+             *  sections above it. */}
+            {product.legalDisclaimerHtml && (
+              <ProductAccordionItem title="Disclaimer">
+                <RichText html={product.legalDisclaimerHtml} />
+              </ProductAccordionItem>
+            )}
           </ProductAccordion>
         }
       />
