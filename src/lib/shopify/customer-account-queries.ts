@@ -3,6 +3,7 @@ import "server-only";
 import { customerAccountFetch } from "@/lib/shopify/customer-account";
 import type {
   CustomerAddress,
+  CustomerAddressInput,
   OrderDetail,
   OrderReturnStatus,
   OrdersPage,
@@ -35,6 +36,7 @@ import type {
  * the server side, no rippling churn through page files. */
 export type {
   CustomerAddress,
+  CustomerAddressInput,
   OrderDetail,
   OrderLineItem,
   OrderReturnEvent,
@@ -301,15 +303,18 @@ const ORDER_DETAIL_QUERY = /* GraphQL */ `
             createdAt
           }
           shippingAddress {
+            id
             firstName
             lastName
-            company
             address1
             address2
             city
             province
+            zoneCode
             country
+            territoryCode
             zip
+            phoneNumber
           }
           lineItems(first: 100) {
             nodes {
@@ -444,8 +449,29 @@ export async function fetchOrderDetail(
 }
 
 /* ------------------------------------------------------------------ */
-/* Default address                                                     */
+/* Addresses                                                           */
 /* ------------------------------------------------------------------ */
+
+/* Shared GraphQL field set for `CustomerAddress` — both the
+ * default-address fetch (dashboard) and the full-list fetch
+ * (addresses page) read the same shape, and so do the mutation
+ * payloads. Inlining the fragment as a template-string constant
+ * keeps the GraphQL self-contained (no @fragment directives) and
+ * keeps every reader / writer in lockstep on the field list. */
+const CUSTOMER_ADDRESS_FIELDS = /* GraphQL */ `
+  id
+  firstName
+  lastName
+  address1
+  address2
+  city
+  province
+  zoneCode
+  country
+  territoryCode
+  zip
+  phoneNumber
+`;
 
 interface DefaultAddressResponse {
   customer: {
@@ -457,15 +483,7 @@ const DEFAULT_ADDRESS_QUERY = /* GraphQL */ `
   query DefaultAddress {
     customer {
       defaultAddress {
-        firstName
-        lastName
-        company
-        address1
-        address2
-        city
-        province
-        country
-        zip
+        ${CUSTOMER_ADDRESS_FIELDS}
       }
     }
   }
@@ -476,4 +494,223 @@ export async function fetchDefaultAddress(): Promise<CustomerAddress | null> {
     DEFAULT_ADDRESS_QUERY,
   );
   return data.customer.defaultAddress;
+}
+
+interface AddressesResponse {
+  customer: {
+    defaultAddress: { id: string } | null;
+    addresses: { nodes: CustomerAddress[] };
+  };
+}
+
+const ADDRESSES_QUERY = /* GraphQL */ `
+  query Addresses($first: Int!) {
+    customer {
+      defaultAddress {
+        id
+      }
+      addresses(first: $first) {
+        nodes {
+          ${CUSTOMER_ADDRESS_FIELDS}
+        }
+      }
+    }
+  }
+`;
+
+export interface AddressesPayload {
+  addresses: CustomerAddress[];
+  /** The id of the address currently marked as default, or `null`
+   *  when the customer hasn't designated one. Drives the
+   *  "Default" pill + the "Set as default" button visibility on
+   *  each card in the addresses page. */
+  defaultAddressId: string | null;
+}
+
+/**
+ * Fetch every saved address for the authenticated customer, plus
+ * the id of whichever one is currently default.
+ *
+ * `first: 50` is a safe upper bound — Shopify caps `Customer
+ * .addresses` connections at 50 per page anyway, and shoppers
+ * with more than a handful of saved addresses are vanishingly
+ * rare. Pagination isn't surfaced for that reason; if a customer
+ * ever bumps the ceiling we'll switch to cursor pagination then.
+ */
+export async function fetchAddresses(): Promise<AddressesPayload> {
+  const data = await customerAccountFetch<AddressesResponse>(
+    ADDRESSES_QUERY,
+    { first: 50 },
+  );
+  return {
+    addresses: data.customer.addresses.nodes,
+    defaultAddressId: data.customer.defaultAddress?.id ?? null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Address mutations                                                   */
+/* ------------------------------------------------------------------ */
+
+/** Shape of the per-mutation `userErrors` array from Shopify.
+ *  Surfaced as-is so server actions can build a human-readable
+ *  message ("Phone number is invalid") without re-mapping. */
+export interface AddressUserError {
+  code: string | null;
+  field: string[] | null;
+  message: string;
+}
+
+interface CustomerAddressCreatePayload {
+  customerAddressCreate: {
+    customerAddress: { id: string } | null;
+    userErrors: AddressUserError[];
+  };
+}
+
+interface CustomerAddressUpdatePayload {
+  customerAddressUpdate: {
+    customerAddress: { id: string } | null;
+    userErrors: AddressUserError[];
+  };
+}
+
+interface CustomerAddressDeletePayload {
+  customerAddressDelete: {
+    deletedAddressId: string | null;
+    userErrors: AddressUserError[];
+  };
+}
+
+/* Tiny helper so each mutation can early-return a typed
+ * "first error message" without four near-identical blocks
+ * inline. Shopify always returns at least one entry in
+ * `userErrors` when the mutation didn't apply cleanly. */
+function firstErrorMessage(errors: AddressUserError[]): string | null {
+  return errors[0]?.message ?? null;
+}
+
+const CUSTOMER_ADDRESS_CREATE = /* GraphQL */ `
+  mutation CustomerAddressCreate(
+    $address: CustomerAddressInput!
+    $defaultAddress: Boolean
+  ) {
+    customerAddressCreate(address: $address, defaultAddress: $defaultAddress) {
+      customerAddress {
+        id
+      }
+      userErrors {
+        code
+        field
+        message
+      }
+    }
+  }
+`;
+
+const CUSTOMER_ADDRESS_UPDATE = /* GraphQL */ `
+  mutation CustomerAddressUpdate(
+    $addressId: ID!
+    $address: CustomerAddressInput
+    $defaultAddress: Boolean
+  ) {
+    customerAddressUpdate(
+      addressId: $addressId
+      address: $address
+      defaultAddress: $defaultAddress
+    ) {
+      customerAddress {
+        id
+      }
+      userErrors {
+        code
+        field
+        message
+      }
+    }
+  }
+`;
+
+const CUSTOMER_ADDRESS_DELETE = /* GraphQL */ `
+  mutation CustomerAddressDelete($addressId: ID!) {
+    customerAddressDelete(addressId: $addressId) {
+      deletedAddressId
+      userErrors {
+        code
+        field
+        message
+      }
+    }
+  }
+`;
+
+/** Result envelope every address mutation returns to its server-
+ *  action caller. The action funnels both "Shopify returned
+ *  userErrors" and "network / GraphQL transport blew up" through
+ *  the same `{ ok: false, error }` shape so the form UI has one
+ *  branch to render. */
+export type AddressMutationResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/* Sanitise a `CustomerAddressInput` before the wire trip — empty
+ * strings become `null` so Shopify treats a blank field as
+ * "leave it unset" rather than "set to empty string" (which the
+ * schema then rejects for fields like phoneNumber). */
+function sanitiseAddressInput(input: CustomerAddressInput) {
+  const blank = (s: string) => (s.trim() === "" ? null : s.trim());
+  return {
+    firstName: blank(input.firstName),
+    lastName: blank(input.lastName),
+    address1: blank(input.address1),
+    address2: blank(input.address2),
+    city: blank(input.city),
+    zoneCode: blank(input.zoneCode),
+    territoryCode: blank(input.territoryCode),
+    zip: blank(input.zip),
+    phoneNumber: blank(input.phoneNumber),
+  };
+}
+
+export async function createCustomerAddress(
+  input: CustomerAddressInput,
+  defaultAddress: boolean,
+): Promise<AddressMutationResult> {
+  const data = await customerAccountFetch<CustomerAddressCreatePayload>(
+    CUSTOMER_ADDRESS_CREATE,
+    {
+      address: sanitiseAddressInput(input),
+      defaultAddress,
+    },
+  );
+  const error = firstErrorMessage(data.customerAddressCreate.userErrors);
+  return error ? { ok: false, error } : { ok: true };
+}
+
+export async function updateCustomerAddress(
+  addressId: string,
+  input: CustomerAddressInput | null,
+  defaultAddress: boolean | null,
+): Promise<AddressMutationResult> {
+  const data = await customerAccountFetch<CustomerAddressUpdatePayload>(
+    CUSTOMER_ADDRESS_UPDATE,
+    {
+      addressId,
+      address: input ? sanitiseAddressInput(input) : null,
+      defaultAddress,
+    },
+  );
+  const error = firstErrorMessage(data.customerAddressUpdate.userErrors);
+  return error ? { ok: false, error } : { ok: true };
+}
+
+export async function deleteCustomerAddress(
+  addressId: string,
+): Promise<AddressMutationResult> {
+  const data = await customerAccountFetch<CustomerAddressDeletePayload>(
+    CUSTOMER_ADDRESS_DELETE,
+    { addressId },
+  );
+  const error = firstErrorMessage(data.customerAddressDelete.userErrors);
+  return error ? { ok: false, error } : { ok: true };
 }

@@ -504,7 +504,6 @@ function ShippingAddressCard({ address }: { address: CustomerAddress }) {
 
   const lines = [
     recipientName || null,
-    address.company,
     address.address1,
     address.address2,
     [address.city, address.province, address.zip]

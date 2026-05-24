@@ -16,6 +16,8 @@ import {
 } from "@/lib/shopify/customer-account-queries";
 import { cn } from "@/lib/utils";
 
+const ADDRESSES_HREF = "/account/addresses";
+
 export const metadata: Metadata = {
   title: "My Account",
 };
@@ -274,7 +276,15 @@ async function AddressCard() {
   }
 
   return (
-    <SectionCard id="addresses" title="Default address">
+    <SectionCard
+      id="addresses"
+      title="Default address"
+      /* "Manage" is the entry point into the full CRUD surface
+       *  — present on every state of the card (saved address,
+       *  empty, or load error) so the shopper always has a way
+       *  in. The dashboard view itself stays read-only. */
+      action={<ViewAllLink href={ADDRESSES_HREF} label="Manage" />}
+    >
       {address ? (
         <FormattedAddress address={address} />
       ) : (
@@ -295,7 +305,6 @@ function FormattedAddress({ address }: { address: CustomerAddress }) {
    * easier to extend if we add phone or other fields later. */
   const lines = [
     recipientName || null,
-    address.company,
     address.address1,
     address.address2,
     [address.city, address.province, address.zip]

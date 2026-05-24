@@ -29,10 +29,11 @@ import { cn } from "@/lib/utils";
  *                     "HELP & INFO" (Wishlist, Tracking, Returns,
  *                     Contact, FAQ).
  *
- * The `/account/{dashboard,details,orders,addresses}` links are
- * placeholders — the actual customer pages land in a later step
- * once the Customer Account GraphQL client is wired up. The
- * sign-in CTA and sign-out link are live today.
+ * Every `/account/*` link is live today (Dashboard, Profile
+ * anchor, Orders list, Addresses CRUD, Logout). The
+ * `DiscoverItems` group (Favorites, Order Tracking, Returns,
+ * Contact, FAQ) is still partly placeholder — those pages land
+ * in later steps.
  */
 export async function AccountDropdown() {
   const { isLoggedIn } = await getAuthState();
@@ -97,7 +98,7 @@ function AccountPanelLoggedIn() {
         <DropdownItem href="/account/orders" icon={<OrdersIcon />}>
           Orders
         </DropdownItem>
-        <DropdownItem href="/account#addresses" icon={<AddressIcon />}>
+        <DropdownItem href="/account/addresses" icon={<AddressIcon />}>
           My Addresses
         </DropdownItem>
         <DropdownItem

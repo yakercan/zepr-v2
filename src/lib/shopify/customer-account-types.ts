@@ -157,16 +157,72 @@ export interface OrderDetail {
 /* Addresses                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * One of the customer's saved addresses, as it comes back from
+ * `customer.addresses` / `customer.defaultAddress` / the
+ * `customerAddress*` mutations.
+ *
+ * Two parallel views of "where in the world is this":
+ *
+ *   - `province` / `country` are the *human-readable* names
+ *     ("California" / "United States") used by the dashboard
+ *     and address-page card UI when displaying an address.
+ *   - `zoneCode` / `territoryCode` are the *codes* ("CA" / "US")
+ *     that Shopify's `CustomerAddressInput` accepts on write,
+ *     so the edit form pre-fills its country / region inputs
+ *     off the codes (not the names) to stay round-trippable.
+ *
+ *  `id` is null only on the orphan address inside
+ *  `Order.shippingAddress` — that's a snapshot the customer
+ *  never edits, so the type stays nullable instead of forking
+ *  into two shapes. Live addresses (the ones the addresses page
+ *  CRUDs) always carry one.
+ */
 export interface CustomerAddress {
+  id: string | null;
   firstName: string | null;
   lastName: string | null;
-  company: string | null;
   address1: string | null;
   address2: string | null;
   city: string | null;
+  /** Human-readable region name, e.g. "California". Display only. */
   province: string | null;
+  /** ISO-style region code, e.g. "CA". The edit form's region
+   *  input rides on this so a round-trip update doesn't lossily
+   *  re-resolve the name back to a code. */
+  zoneCode: string | null;
+  /** Human-readable country name, e.g. "United States". Display
+   *  only. */
   country: string | null;
+  /** ISO 3166-1 alpha-2 country code, e.g. "US". The edit form's
+   *  country input rides on this for the same reason as above. */
+  territoryCode: string | null;
   zip: string | null;
+  /** E.164-formatted phone number, e.g. "+16135551111". Shopify
+   *  rejects anything else on write. `null` when none was saved. */
+  phoneNumber: string | null;
+}
+
+/**
+ * Form-shaped input for `customerAddressCreate` /
+ * `customerAddressUpdate`. Mirrors `CustomerAddressInput` from
+ * Shopify's GraphQL schema — empty strings are coerced to `null`
+ * at the mutation boundary so the server treats a blank field as
+ * "unset", not "set to empty string".
+ *
+ * Note the codes-not-names rule: `territoryCode` and `zoneCode`
+ * are what Shopify accepts, so the form collects codes too.
+ */
+export interface CustomerAddressInput {
+  firstName: string;
+  lastName: string;
+  address1: string;
+  address2: string;
+  city: string;
+  zoneCode: string;
+  territoryCode: string;
+  zip: string;
+  phoneNumber: string;
 }
 
 /* ------------------------------------------------------------------ */
