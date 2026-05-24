@@ -115,22 +115,35 @@ export async function customerAccountFetch<
   });
 
   if (!res.ok) {
+    /* Read the body even on non-OK responses — Shopify embeds
+     * the actual GraphQL parse / validation error in there, and
+     * silently throwing a bare status code makes "which field
+     * is wrong?" debugging guesswork. Falls back to `null` if
+     * the body isn't JSON (e.g. a 502 from an upstream proxy). */
+    const detail = await res
+      .clone()
+      .json()
+      .catch(() => null);
+    const messages = (detail as GraphQLResponse<TData> | null)?.errors
+      ?.map((e) => e.message)
+      .join("; ");
     throw new CustomerAccountError(
       "http_error",
-      `Customer Account API returned ${res.status}`,
+      messages
+        ? `Customer Account API returned ${res.status}: ${messages}`
+        : `Customer Account API returned ${res.status}`,
       res.status,
     );
   }
 
   const json = (await res.json()) as GraphQLResponse<TData>;
   if (json.errors?.length) {
-    /* GraphQL-level error — surface the first message; the
-     * full list is on the original response if a caller ever
-     * needs deeper diagnostics. */
-    throw new CustomerAccountError(
-      "graphql_error",
-      json.errors[0]?.message ?? "GraphQL error",
-    );
+    /* GraphQL-level error — surface every message joined so a
+     * caller (or the dev terminal) sees the full picture in one
+     * line; the original response keeps the structured array if
+     * we ever want richer reporting upstream. */
+    const messages = json.errors.map((e) => e.message).join("; ");
+    throw new CustomerAccountError("graphql_error", messages);
   }
 
   if (!json.data) {

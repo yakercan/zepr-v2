@@ -4,14 +4,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { OrderRow } from "@/components/account/order-row";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatPrice } from "@/lib/format";
+import { ViewAllLink } from "@/components/ui/view-all-link";
 import { getSession, type Customer } from "@/lib/auth/session";
 import {
   type CustomerAddress,
   fetchDefaultAddress,
-  fetchRecentOrders,
-  type RecentOrder,
+  fetchOrdersPage,
+  type OrderSummary,
 } from "@/lib/shopify/customer-account-queries";
 import { cn } from "@/lib/utils";
 
@@ -195,16 +196,33 @@ function ProfileCard({ customer }: { customer: Customer }) {
 /* ------------------------------------------------------------------ */
 
 async function OrdersCard() {
-  let orders: RecentOrder[] | null;
+  let orders: OrderSummary[] | null;
+  let hasMore = false;
   try {
-    orders = await fetchRecentOrders(5);
+    const page = await fetchOrdersPage(5);
+    orders = page.orders;
+    hasMore = page.pageInfo.hasNextPage;
   } catch (err) {
     console.error("[account] orders fetch failed:", err);
     orders = null;
   }
 
+  /* The "View all" link is only meaningful when there's more history
+   *  beyond the 5-row preview. Showing it for shoppers with ≤ 5
+   *  orders would lead to a near-empty list page — better to hide
+   *  it until there's a real second page worth visiting. */
+  const showViewAll = orders !== null && hasMore;
+
   return (
-    <SectionCard id="orders" title="Recent orders">
+    <SectionCard
+      id="orders"
+      title="Recent orders"
+      action={
+        showViewAll ? (
+          <ViewAllLink href="/account/orders" label="View all" />
+        ) : null
+      }
+    >
       {orders === null ? (
         <EmptyState>
           We couldn&apos;t load your orders right now. Please try again
@@ -221,38 +239,6 @@ async function OrdersCard() {
       )}
     </SectionCard>
   );
-}
-
-function OrderRow({ order }: { order: RecentOrder }) {
-  const date = formatOrderDate(order.processedAt);
-  /* Order totals come back as decimal strings (e.g. `"42.99"`) from
-   * Shopify's MoneyV2; `formatPrice` expects integer cents, so
-   * normalise once here and call the shared formatter. */
-  const totalCents = Math.round(order.totalAmount * 100);
-
-  return (
-    <li className="flex items-center justify-between gap-4 py-4">
-      <div className="min-w-0">
-        <p className="font-semibold text-[color:var(--color-ink)]">
-          {order.name}
-        </p>
-        <p className="text-sm text-[color:var(--color-ink-muted)]">{date}</p>
-      </div>
-      <p className="shrink-0 text-sm font-semibold text-[color:var(--color-ink)]">
-        {formatPrice(totalCents, order.currencyCode)}
-      </p>
-    </li>
-  );
-}
-
-function formatOrderDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(date);
 }
 
 function OrdersCardSkeleton() {
