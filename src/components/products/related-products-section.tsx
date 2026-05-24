@@ -6,7 +6,6 @@ import { loadRelatedProducts } from "@/components/products/related-products-acti
 import { RelatedProductsLoader } from "@/components/products/related-products-loader";
 import { INITIAL_RELATED_CURSOR } from "@/components/products/related-products-types";
 import { RELATED_PRODUCTS_PAGE_SIZE } from "@/lib/pagination";
-import { searchProducts } from "@/lib/salespace/search";
 import type { ProductDetail } from "@/types/product";
 
 /**
@@ -26,8 +25,8 @@ import type { ProductDetail } from "@/types/product";
  * subcategory-first sourcing, same dedup contract, same cursor
  * shape. The only thing this server file owns end-to-end is the
  * "View all →" destination decision (which depends on
- * subcategory depth) and the static markup for the initial
- * `<ProductCard>` row.
+ * subcategory depth, free in the same response) and the static
+ * markup for the initial `<ProductCard>` row.
  *
  * "View all" destination — points into the *subcategory* page
  * when the subcategory genuinely has more than one band's worth
@@ -35,11 +34,11 @@ import type { ProductDetail } from "@/types/product";
  * into a near-empty subcategory page would feel like a dead end;
  * the category fallback keeps browse momentum.
  *
- * Fetch budget: one round-trip when the product has no
- * subcategory tag (category pool only), or two parallel
- * round-trips when it does — the subcategory call also gives us
- * the `total` we need to pick the View-all destination, so it
- * always runs.
+ * Fetch budget: exactly the work the rail itself needs — one
+ * Salespace round-trip for the subcategory pool (which already
+ * carries `total` on the response, so no separate probe call),
+ * plus the category top-up only when the subcategory pool
+ * didn't yield a full band.
  */
 
 export interface RelatedProductsSectionProps {
@@ -58,41 +57,24 @@ export async function RelatedProductsSection({
   const collection = product.primaryCollection.handle;
   const subcategory = product.subcategory ?? null;
 
-  /* Run the initial batch fetch *and* the subcategory-depth
-   * probe in parallel. The depth probe is what determines the
-   * "View all →" destination — it only matters when the product
-   * actually has a subcategory tag, and even then it's a cheap
-   * `limit=1` call just to read `total`. The two requests fire
-   * concurrently so the slowest is the only latency we pay. */
-  const [initial, subcategoryProbe] = await Promise.all([
-    loadRelatedProducts({
-      collection,
-      subcategory,
-      shownHandles: [product.handle],
-      cursor: INITIAL_RELATED_CURSOR,
-    }),
-    subcategory
-      ? searchProducts(
-          {
-            collection,
-            subcategory,
-            sort: "best_sellers:desc",
-            limit: 1,
-          },
-          { tags: [`related-probe:${collection}:${subcategory}`] },
-        )
-      : Promise.resolve(null),
-  ]);
+  const initial = await loadRelatedProducts({
+    collection,
+    subcategory,
+    shownHandles: [product.handle],
+    cursor: INITIAL_RELATED_CURSOR,
+  });
 
   if (initial.products.length === 0) return null;
 
   /* Subcategory deep enough to be worth deep-linking into?
    * "Deep enough" = strictly more than a single band's worth of
    * unique products; below that, sending the shopper to a
-   * near-empty subcategory page feels like a dead end. */
+   * near-empty subcategory page feels like a dead end. The
+   * `total` is threaded out of `loadRelatedProducts` from the
+   * subcategory fetch's own response — no probe round-trip. */
   const subcategoryHasDepth =
     !!subcategory &&
-    (subcategoryProbe?.total ?? 0) > RELATED_PRODUCTS_PAGE_SIZE;
+    (initial.subcategoryTotal ?? 0) > RELATED_PRODUCTS_PAGE_SIZE;
   const viewAllHref =
     subcategoryHasDepth && subcategory
       ? `/categories/${collection}?subcategory=${encodeURIComponent(subcategory)}`

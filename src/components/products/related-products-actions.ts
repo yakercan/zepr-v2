@@ -68,6 +68,12 @@ export async function loadRelatedProducts(
   const want = RELATED_PRODUCTS_PAGE_SIZE;
 
   let { subPageNext, catPageNext, subExhausted, catExhausted } = params.cursor;
+  /* Captured from the subcategory pool's first upstream response
+   * in this call — Salespace already returns `total` alongside
+   * the hits, so the View-all-destination decision doesn't need
+   * a separate probe round-trip. `null` when the subcategory
+   * pool wasn't fetched on this call. */
+  let subcategoryTotal: number | null = null;
 
   /* Pool 1 — subcategory. Skipped when the product has no
    * subcategory tag, or when the cursor says the pool is already
@@ -87,6 +93,7 @@ export async function loadRelatedProducts(
     );
     subPageNext = drained.pageNext;
     subExhausted = drained.exhausted;
+    subcategoryTotal = drained.firstTotal;
   } else if (!params.subcategory) {
     /* Nothing to fetch from this pool — mark it as exhausted so
      * `hasMore` collapses to the category pool's state. */
@@ -113,6 +120,7 @@ export async function loadRelatedProducts(
     products: out,
     cursor: { subPageNext, catPageNext, subExhausted, catExhausted },
     hasMore: !subExhausted || !catExhausted,
+    subcategoryTotal,
   };
 }
 
@@ -141,10 +149,15 @@ async function drainPool(
   want: number,
   seen: Set<string>,
   out: SearchProduct[],
-): Promise<{ pageNext: number; exhausted: boolean }> {
+): Promise<{ pageNext: number; exhausted: boolean; firstTotal: number }> {
   let page = pageStart;
   let exhausted = false;
   let attempts = 0;
+  /* The pool size as reported by the first upstream response in
+   * this drain — `total` is stable across pages, so capturing it
+   * once is enough. Threaded out for the caller to use without
+   * a probe round-trip. */
+  let firstTotal = 0;
 
   while (
     out.length < want &&
@@ -155,6 +168,7 @@ async function drainPool(
       { ...baseParams, limit: want, page },
       { tags: cacheTags },
     );
+    if (attempts === 0) firstTotal = result.total;
     attempts++;
     page++;
 
@@ -172,5 +186,5 @@ async function drainPool(
     }
   }
 
-  return { pageNext: page, exhausted };
+  return { pageNext: page, exhausted, firstTotal };
 }

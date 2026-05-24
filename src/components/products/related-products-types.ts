@@ -62,4 +62,12 @@ export interface LoadRelatedProductsResult {
   /** `false` once both pools are exhausted — the loader uses
    *  this to hide the "See more" button. */
   hasMore: boolean;
+  /** Subcategory pool size reported by Salespace on this call's
+   *  subcategory fetch (the response already carries `total`),
+   *  or `null` when the product has no subcategory or this
+   *  call didn't fetch the subcategory pool. Used by the
+   *  initial server render to pick the View-all destination
+   *  without an extra round-trip; subsequent reveal clicks
+   *  ignore it. */
+  subcategoryTotal: number | null;
 }

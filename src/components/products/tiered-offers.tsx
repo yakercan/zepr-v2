@@ -72,6 +72,16 @@ export function TieredOffers({
 }: TieredOffersProps) {
   if (tiers.length === 0) return null;
 
+  /* When the anchor tier (Buy 1, single unit) already crosses the
+   * free-shipping threshold, every higher tier ships free by
+   * definition — surfacing "+ Free Shipping" on each row adds no
+   * information and crowds the floating badge cluster. We compute
+   * the gate once here so the chip is either enabled across the
+   * whole picker or suppressed across it, consistently. */
+  const baseAlreadyShipsFree = qualifiesForFreeShipping(
+    tierPricingCents(tiers[0], variant).discountedTotalCents,
+  );
+
   return (
     <div
       role="radiogroup"
@@ -90,6 +100,7 @@ export function TieredOffers({
             onSelect={() => onSelect(idx)}
             variant={variant}
             currency={currency}
+            baseAlreadyShipsFree={baseAlreadyShipsFree}
             /* Only render the expansion body in the selected tile
              * — keeps the picker compact when an idle tile happens
              * to share the same content shape, and avoids paying
@@ -108,6 +119,11 @@ interface OfferRowProps {
   onSelect: () => void;
   variant: ProductVariant;
   currency: string;
+  /** When `true`, the product's anchor tier already qualifies for
+   *  free shipping on its own — every tier inherits the perk, so
+   *  the "+ Free Shipping" chip is redundant and suppressed across
+   *  the whole picker. Decided once by the parent. */
+  baseAlreadyShipsFree: boolean;
   expansionContent?: ReactNode;
 }
 
@@ -117,6 +133,7 @@ function OfferRow({
   onSelect,
   variant,
   currency,
+  baseAlreadyShipsFree,
   expansionContent,
 }: OfferRowProps) {
   const { discountedTotalCents, compareTotalCents } = tierPricingCents(
@@ -128,14 +145,15 @@ function OfferRow({
   /* The free-shipping threshold lives at the *cart-total* level
    * upstream, and a tiered-offer add-to-cart commits the whole
    * tier as a single line item — so the tier's discounted total
-   * is the right number to gate against. Higher tiers ($35+
-   * post-discount) light up; the Buy-1 tier on a sub-threshold
-   * product stays quiet. Same threshold + same green pill the
-   * product card uses, so the perk reads identically wherever
-   * the shopper sees it. */
-  const tierUnlocksFreeShipping = qualifiesForFreeShipping(
-    discountedTotalCents,
-  );
+   * is the right number to gate against. The chip surfaces only
+   * when *this* tier crosses the threshold *and* the anchor tier
+   * didn't already; that way the badge always communicates new
+   * value, never restates what the shopper already gets at base
+   * price. Same threshold + same green pill the product card
+   * uses, so the perk reads identically wherever the shopper
+   * sees it. */
+  const tierUnlocksFreeShipping =
+    !baseAlreadyShipsFree && qualifiesForFreeShipping(discountedTotalCents);
 
   return (
     /* Outer wrapper owns the border, selection state, and floating
