@@ -25,6 +25,14 @@
  *  the "See more" button. */
 export const PRODUCTS_PAGE_SIZE = 40;
 
+/** Batch size for embedded "you may also like" / "best sellers"
+ *  style sections that live on top of other pages (PDP, home,
+ *  account dashboard). Sized to a single 2-row × 5-col band so
+ *  the section reads as a finished snapshot rather than a
+ *  half-started feed; deeper exploration follows the "View all"
+ *  header link, not in-place pagination. */
+export const RELATED_PRODUCTS_PAGE_SIZE = 10;
+
 /**
  * Parse the `?page=` query string value into a sane positive
  * integer. Anything missing, negative, zero, NaN, or non-integer

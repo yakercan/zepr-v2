@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import {
   ProductAccordion,
   ProductAccordionItem,
 } from "@/components/products/product-accordion";
 import { ProductLayout } from "@/components/products/product-layout";
 import { ProductReviews } from "@/components/products/product-reviews";
+import { ProductSectionSkeleton } from "@/components/products/product-section";
+import { RelatedProductsSection } from "@/components/products/related-products-section";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { RatingChip } from "@/components/ui/rating-chip";
 import { RichText } from "@/components/ui/rich-text";
@@ -48,9 +51,10 @@ import type { ProductDetail } from "@/types/product";
  *     the next hour gets the prerendered HTML in <50 ms.
  *   - `generateStaticParams` will pre-bake the top-N handles at
  *     build time once we know which products to seed.
- *   - The "Also like" rail will be wrapped in `<Suspense>` and
- *     fetched from Salespace by collection so the hero paints
- *     immediately and the rail streams in below.
+ *   - "You may also like" lives inside `<Suspense>` so the hero
+ *     paints immediately and the related rail streams in below —
+ *     subcategory + category Salespace fetch happen in parallel
+ *     inside `<RelatedProductsSection>`.
  */
 
 export const revalidate = 3600;
@@ -157,10 +161,23 @@ export default async function ProductPage({ params }: ProductPageProps) {
         }
       />
 
-      {/* TODO round 7: "You may also like" rail — single Salespace
-       *  `searchProducts({ collection })` fetch inside <Suspense>
-       *  so the rail streams in below the fold without blocking
-       *  the hero paint. */}
+      {/* "You may also like" — subcategory + category Salespace
+       *  fetch inside <Suspense> so the section streams in below
+       *  the fold while the hero stays interactive. Gated on the
+       *  product actually belonging to a collection so we don't
+       *  flash a skeleton for products that won't render the
+       *  section anyway. */}
+      {product.primaryCollection && (
+        <Suspense
+          fallback={
+            <ProductSectionSkeleton className="mt-10 md:mt-14" />
+          }
+        >
+          <div className="mt-10 md:mt-14">
+            <RelatedProductsSection product={product} />
+          </div>
+        </Suspense>
+      )}
     </main>
   );
 }

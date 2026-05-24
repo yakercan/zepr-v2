@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ViewAllLink } from "@/components/ui/view-all-link";
 import {
   DEFAULT_MAIN_FEED_TAB,
   MAIN_FEED_TABS,
@@ -25,9 +26,10 @@ import { cn } from "@/lib/utils";
  * other tab — including Best Sellers — round-trips through
  * `?tab=<id>`.
  *
- * Visual: reversed-colour pills — active is ink-on-white, idle is
- * white-on-ink. Sticks to the left edge of the page-container so the
- * row reads like a section header, not a centered hero element.
+ * Visual: reversed-colour pills, anchored to the left edge of the
+ * page container, with a shared `<ViewAllLink>` pinned to the
+ * right — same right-aligned bridge `<ProductSection>` uses, so
+ * the affordance reads identically wherever it lives.
  *
  * The pill itself is shared with the search-page filter bar — both
  * pull from `pillClasses()` in `lib/styles.ts`. Change pill look
@@ -80,6 +82,26 @@ export function MainFeedTabs() {
     });
   };
 
+  /* "View all →" bridges from the homepage feed into the full
+   * search results for the active tab's sort. Same destination
+   * shape the search page already handles, so deep-linking it
+   * (bookmark / share) lands on a coherent grid.
+   *
+   * Tabs whose sort matches the search page's *implicit* default
+   * (`best_sellers:desc`) — and the homepage `feed` ordering,
+   * which search has no analogue for and so falls through to the
+   * same default — pass no `?sort` query at all. Keeps the
+   * canonical URL clean (`/search`) the same way the search
+   * dropdown encodes Best Sellers as the absence of `?sort`. */
+  const activeTab = MAIN_FEED_TABS.find((t) => t.id === active);
+  const passesThroughToDefault =
+    !activeTab ||
+    activeTab.id === DEFAULT_MAIN_FEED_TAB ||
+    activeTab.id === "best_sellers";
+  const viewAllHref = passesThroughToDefault
+    ? "/search"
+    : `/search?sort=${encodeURIComponent(activeTab.sort)}`;
+
   return (
     <div
       role="tablist"
@@ -106,6 +128,11 @@ export function MainFeedTabs() {
           </button>
         );
       })}
+      {/* `ml-auto` pins the link to the right edge of the row;
+       *  `flex-wrap` above lets it drop to a new line on narrow
+       *  viewports where the pills already wrap, and `ml-auto`
+       *  keeps it right-justified there too. */}
+      <ViewAllLink href={viewAllHref} className="ml-auto" />
     </div>
   );
 }

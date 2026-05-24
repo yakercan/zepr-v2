@@ -2,6 +2,7 @@
 
 import { type ReactNode } from "react";
 import { Price } from "@/components/ui/price";
+import { qualifiesForFreeShipping } from "@/lib/badges";
 import { tierPricingCents, type OfferTier } from "@/lib/offers";
 import { cn } from "@/lib/utils";
 import type { ProductVariant } from "@/types/product";
@@ -124,6 +125,17 @@ function OfferRow({
   );
   const showCompare = compareTotalCents > discountedTotalCents;
   const hasExpansion = isSelected && !!expansionContent;
+  /* The free-shipping threshold lives at the *cart-total* level
+   * upstream, and a tiered-offer add-to-cart commits the whole
+   * tier as a single line item — so the tier's discounted total
+   * is the right number to gate against. Higher tiers ($35+
+   * post-discount) light up; the Buy-1 tier on a sub-threshold
+   * product stays quiet. Same threshold + same green pill the
+   * product card uses, so the perk reads identically wherever
+   * the shopper sees it. */
+  const tierUnlocksFreeShipping = qualifiesForFreeShipping(
+    discountedTotalCents,
+  );
 
   return (
     /* Outer wrapper owns the border, selection state, and floating
@@ -193,23 +205,61 @@ function OfferRow({
         </div>
       )}
 
-      {tier.badge && (
-        <span
-          /* `pointer-events-none` so the badge never intercepts
-             clicks meant for the tile itself. `-translate-y-1/2`
-             centres it on the top border for the floating-chip
-             look. */
+      {(tier.badge || tierUnlocksFreeShipping) && (
+        <div
+          /* Floating-chip cluster pinned to the top-right border
+             of the tile. `pointer-events-none` so the chips never
+             intercept clicks meant for the tile itself, and
+             `-translate-y-1/2` centres the row on the border for
+             the floating-chip look. Inner `gap-1.5` spaces the
+             two chips evenly when both render; when only one is
+             present the gap collapses naturally.
+             Order — `[+ FREE SHIPPING] [MOST POPULAR]` — puts the
+             durable perk on the left and the merchandising tag on
+             the right, closest to the top-right corner that the
+             eye returns to. */
           className={cn(
             "pointer-events-none absolute right-3 top-0 -translate-y-1/2",
-            "whitespace-nowrap rounded-full px-2 py-0.5",
-            "text-[10px] font-bold uppercase tracking-wide text-white",
-            isSelected
-              ? "bg-[color:var(--color-brand)]"
-              : "bg-[color:var(--color-ink)]",
+            "flex items-center gap-1.5",
           )}
         >
-          {tier.badge}
-        </span>
+          {tierUnlocksFreeShipping && (
+            <span
+              /* Green stays solid regardless of selection — the
+                 perk doesn't change when the shopper picks this
+                 tier, and a brand-orange flip would read as a
+                 second CTA competing with the headline accent. */
+              className={cn(
+                "whitespace-nowrap rounded-full px-2 py-0.5",
+                "text-[10px] font-bold uppercase tracking-wide text-white",
+                "bg-[color:var(--color-success)]",
+              )}
+            >
+              {/* The `+` glyph in Inter sits noticeably below the
+                  cap height of the surrounding uppercase letters
+                  because it's centred on the math axis, not the
+                  cap line. Nudging it up 1px with
+                  `relative -top-px` lands it on the same visual
+                  midline as `FREE SHIPPING` so the chip reads as
+                  one continuous label rather than a symbol
+                  drooping below the text. */}
+              <span className="relative -top-px">+</span> Free Shipping
+            </span>
+          )}
+          {tier.badge && (
+            <span
+              className={cn(
+                "whitespace-nowrap rounded-full px-2 py-0.5",
+                "text-[10px] font-bold uppercase tracking-wide text-white",
+                isSelected
+                  ? "bg-[color:var(--color-brand)]"
+                  : "bg-[color:var(--color-ink)]",
+              )}
+            >
+              {tier.badge}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

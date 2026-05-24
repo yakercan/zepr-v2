@@ -56,10 +56,17 @@ interface SortOption {
   label: string;
 }
 
+/* Order mirrors the merchandising hierarchy the storefront uses
+ * elsewhere — Best Sellers and Hot Deals (the two homepage tabs
+ * that drive the most traffic) sit at the top, followed by the
+ * quality / recency sorts, then price low→high and high→low. Any
+ * sort tweak should keep this ordering so the dropdown reads the
+ * same way as the homepage feed tabs. */
 const SORT_OPTIONS: readonly SortOption[] = [
   { value: "", label: "Best Sellers" },
-  { value: "newest:desc", label: "Newest" },
+  { value: "hot_deals:desc", label: "Hot Deals" },
   { value: "best_rated:desc", label: "Top Rated" },
+  { value: "newest:desc", label: "Newest" },
   { value: "price:asc", label: "Price: Low to High" },
   { value: "price:desc", label: "Price: High to Low" },
 ] as const;
