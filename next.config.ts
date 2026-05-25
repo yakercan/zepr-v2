@@ -78,10 +78,12 @@ const nextConfig: NextConfig = {
      *
      *   - `serverActions.bodySizeLimit` — the cap the action itself
      *     enforces. Default 1 MB.
-     *   - `middlewareClientMaxBodySize` — how much of the request
-     *     body the middleware pipeline (proxy.ts) buffers before
-     *     truncating. Default 10 MB; truncation here surfaces as a
-     *     misleading "Unexpected end of form" at the action.
+     *   - `proxyClientMaxBodySize` — how much of the request body
+     *     the proxy pipeline (proxy.ts) buffers before truncating.
+     *     Default 10 MB; truncation here surfaces as a misleading
+     *     "Unexpected end of form" at the action. Renamed from
+     *     `middlewareClientMaxBodySize` in Next.js 16 — the old
+     *     name still works but logs a deprecation warning.
      *
      * Both ceilings are sized to the worst-case payload (5 × 50 MB
      * = 250 MB) with a small headroom for FormData encoding. Per-
@@ -91,7 +93,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "260mb",
     },
-    middlewareClientMaxBodySize: "260mb",
+    proxyClientMaxBodySize: "260mb",
   },
 
   /**
