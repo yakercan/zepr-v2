@@ -54,17 +54,9 @@ export default async function FavoritesPage() {
   return (
     <main className="page-container pt-6 pb-12 md:pt-10 md:pb-16">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4 md:mb-10">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold leading-tight md:text-3xl">
-            Favorites
-          </h1>
-          {wishlist && wishlist.length > 0 && (
-            <p className="text-sm text-[color:var(--color-ink-muted)]">
-              {wishlist.length}{" "}
-              {wishlist.length === 1 ? "item" : "items"} saved
-            </p>
-          )}
-        </div>
+        <h1 className="text-2xl font-semibold leading-tight md:text-3xl">
+          Favorites
+        </h1>
       </header>
 
       {wishlist === null ? (
