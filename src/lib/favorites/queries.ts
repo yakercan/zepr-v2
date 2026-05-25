@@ -47,7 +47,10 @@ export const getCurrentWishlist = cache(
 );
 
 /**
- * Set of product GIDs the current shopper has favorited.
+ * Set of numeric Shopify product ids the current shopper has
+ * favorited. Numeric (not GID) so the lookup keys match what
+ * `SearchProduct.id` carries on product cards across the
+ * storefront — no per-card normalization needed.
  *
  * `.has(productId)` lookups inline next to each `<ProductCard>`
  * keep the per-card render branchless:

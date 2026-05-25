@@ -2,25 +2,35 @@
 
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
+
 import { CategoryLineIcon } from "@/components/layout/category-line-icon";
 import { SubcategoryGrid } from "@/components/layout/subcategory-grid";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
-import { CategoriesIcon } from "@/components/ui/icons";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
 /**
  * Categories trigger + dropdown for the header.
  *
- * Trigger chrome depends on the *route*, not on hover state:
+ * Trigger chrome depends on the *route*:
  *
  *   - `/categories/<handle>` → `[LineIcon] {Name}` (truncated) so
  *     the header reflects where the user actually is.
- *   - Anything else → generic `[CategoriesIcon] Categories`.
+ *   - Anything else → bare `Categories` text. The generic four-
+ *     square glyph that used to sit here was dropped because it
+ *     competed with the wordmark + Favorites label for the eye's
+ *     first pass; the dropdown's chevron alone is enough trigger
+ *     affordance.
  *
- * Client component because we read `usePathname()` and pre-build
- * a per-handle lookup for the trigger. Owning `<SiteHeader>` is a
- * server component that fetches the taxonomy and passes the list
- * down as plain data.
+ * Intentionally static: the trigger swaps between the two states
+ * on navigation without any width / opacity transition. The
+ * earlier animated version added complexity (sticky handles, slot
+ * animators, custom `<img>` fade-ins) without delivering a clean
+ * slide — the navigation itself is the transition.
+ *
+ * Client component because we read `usePathname()` to derive the
+ * active category. Owning `<SiteHeader>` is a server component
+ * that fetches the taxonomy and passes the list down as plain
+ * data.
  */
 export function CategoriesDropdown({
   categories,
@@ -30,9 +40,8 @@ export function CategoriesDropdown({
   const pathname = usePathname();
 
   // Match `/categories/<handle>` (with optional trailing segments /
-  // query — keeps the trigger active on hypothetical future child
-  // routes too). Stops at the next `/` so `?` and trailing slashes
-  // resolve to the bare handle.
+  // query). Stops at the next `/` so trailing slashes resolve to
+  // the bare handle.
   const activeHandle = useMemo(() => {
     const m = pathname.match(/^\/categories\/([^/?#]+)/);
     return m ? decodeURIComponent(m[1]) : null;
@@ -49,11 +58,6 @@ export function CategoriesDropdown({
   return (
     <Dropdown
       sideMode
-      // 48rem total → left column (locked at 16rem inside the
-      // Dropdown) + 32rem of right-column space for the list.
-      // Right-column padding lives inside `<SubcategoryGrid>` so
-      // the sticky title and the scrollable list can pad
-      // independently.
       panelClassName="w-[48rem]"
       trigger={
         activeCategory ? (
@@ -64,10 +68,7 @@ export function CategoriesDropdown({
             </span>
           </>
         ) : (
-          <>
-            <CategoriesIcon className="text-[color:var(--color-ink)]" />
-            <span className="text-[15px] font-semibold">Categories</span>
-          </>
+          <span className="text-[15px] font-semibold">Categories</span>
         )
       }
     >

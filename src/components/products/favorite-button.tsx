@@ -1,10 +1,16 @@
 "use client";
 
-import { type MouseEvent, useOptimistic, useState, useTransition } from "react";
+import { type MouseEvent, useState } from "react";
 
 import { toggleFavoriteAction } from "@/app/favorites/actions";
 import { HeartIcon } from "@/components/ui/icons";
 import { SignInPromptModal } from "@/components/ui/sign-in-prompt-modal";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
+import {
+  markFavorited,
+  markUnfavorited,
+  useIsFavorited,
+} from "@/lib/favorites/store";
 import { MEDIA_OVERLAY_BUBBLE_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
@@ -14,33 +20,34 @@ import { cn } from "@/lib/utils";
  *
  * State + persistence model — v2 redesign:
  *
- *   - **Logged-in shoppers** own the canonical state on
- *     Salespace's wishlist endpoint — the same backend the
- *     legacy storefront used, kept as the single source of
- *     truth (cross-device sync, like-count aggregation, future
- *     analytics all live there). The card renders with the
- *     saved state on first paint (server-fetched per grid),
- *     clicks fire `toggleFavoriteAction` to persist, and
- *     `useOptimistic` flips the heart immediately so the UI
- *     feels instant even on slow connections. On failure the
- *     optimistic flip rolls back and the heart returns to its
- *     persisted state.
+ *   - **Logged-in shoppers** own the canonical state on Salespace's
+ *     wishlist endpoint. The card mounts with the server-rendered
+ *     `initiallyFavorited` flag (matches the SSR HTML), then
+ *     switches to reading the shared favorites store so every
+ *     surface (header badge, twin cards, `/favorites` grid) stays
+ *     in sync after a click. The click handler flips the store
+ *     synchronously and fires the server action without an
+ *     `await` — the UI is fully decoupled from the network
+ *     round-trip, exactly like the salespace storefront's
+ *     optimistic watchlist toggle. On failure we roll back the
+ *     store; every consumer rolls back with it.
  *   - **Guests** never persist. Clicking the heart opens
- *     `<SignInPromptModal>` so the affordance is still there
- *     but acts as a friendly conversion nudge instead of a
- *     silently-local toggle. The intent is conversion-driven,
- *     not just "we deleted features": with a real account the
- *     wishlist travels across devices, syncs across sessions,
- *     and powers everything we layer on top later.
+ *     `<SignInPromptModal>` so the affordance is still there but
+ *     acts as a friendly conversion nudge.
  *
- * The legacy v1 storefront tried to bridge both worlds with a
- * device-id wishlist + a `/wishlist/link` merge on login. That
- * pipeline had real bugs (dual-state desync on the wishlist
- * page, race conditions, never-called migration paths). Forcing
- * sign-in collapses every one of those problems and unlocks
- * cross-device persistence by default.
+ * Why read favorited state from the shared store (instead of
+ * local `useState`)?
  *
- * Visibility rules (unchanged from v1):
+ *   The previous design tracked `favorited` per-button. That made
+ *   the heart instant on click but left every other consumer
+ *   (header badge, twin card on another rail, the `/favorites`
+ *   grid) blind to the mutation until the next server render. The
+ *   store inverts that — one mutation, every subscriber re-renders
+ *   the slice they care about. Per-button perf is identical because
+ *   `useIsFavorited` selects a primitive boolean; the card only
+ *   re-renders when *this* product's status flips.
+ *
+ * Visibility rules:
  *
  *   - Idle, not favorited → hidden (`opacity-0`); revealed on
  *     card hover via the parent `<Link>`'s `group`.
@@ -53,20 +60,20 @@ import { cn } from "@/lib/utils";
  */
 
 export interface FavoriteButtonProps {
-  /** Shopify product id. Salespace search returns numeric ids
-   *  on `SearchProduct.id` (the form cards have on hand) and
-   *  the Shopify Storefront returns GIDs on `ProductDetail.id`.
+  /** Shopify product id. Salespace search returns numeric ids on
+   *  `SearchProduct.id` (the form cards have on hand) and the
+   *  Shopify Storefront returns GIDs on `ProductDetail.id`.
    *  Either form is accepted — the server action coerces to
    *  numeric at the Salespace boundary. */
   productId: string;
-  /** Server-fetched initial state. `false` for guests
-   *  (their set is always empty). */
+  /** Server-fetched initial state. `false` for guests (their set
+   *  is always empty). Matches the SSR HTML so the first paint
+   *  doesn't flicker, then we hand off to the store. */
   initiallyFavorited: boolean;
-  /** Drives the guest branch (open sign-in modal) vs the
-   *  logged-in branch (persist via server action). Passed down
-   *  from the server parent that already had to call
-   *  `getAuthState()`; no need to re-read the session on the
-   *  client. */
+  /** Drives the guest branch (open sign-in modal) vs the logged-
+   *  in branch (persist via server action). Passed down from the
+   *  server parent that already had to call `getAuthState()`;
+   *  no need to re-read the session on the client. */
   isLoggedIn: boolean;
 }
 
@@ -75,18 +82,13 @@ export function FavoriteButton({
   initiallyFavorited,
   isLoggedIn,
 }: FavoriteButtonProps) {
-  /* `useOptimistic` keeps the heart visually in sync with the
-   * shopper's intent before the action resolves. The "real"
-   * value is `initiallyFavorited` for guests (always the
-   * server-rendered state) and a `useState`-tracked value for
-   * logged-in shoppers (so toggles within the same page life
-   * persist across re-renders). */
-  const [persistedFavorited, setPersistedFavorited] =
-    useState(initiallyFavorited);
-  const [optimisticFavorited, setOptimisticFavorited] = useOptimistic(
-    persistedFavorited,
-  );
-  const [, startTransition] = useTransition();
+  /* First paint reads the server prop (matches SSR), then we
+   * hand off to the store. The store is seeded by the header's
+   * `FavoritesBadge` which runs on every navigation, so by the
+   * first post-hydration commit it already carries the truth. */
+  const hydrated = useHydrated();
+  const storeFavorited = useIsFavorited(productId);
+  const favorited = hydrated ? storeFavorited : initiallyFavorited;
   const [signInOpen, setSignInOpen] = useState(false);
 
   function handleClick(e: MouseEvent<HTMLButtonElement>) {
@@ -98,34 +100,41 @@ export function FavoriteButton({
       return;
     }
 
-    const next = !optimisticFavorited;
-    startTransition(async () => {
-      setOptimisticFavorited(next);
-      const result = await toggleFavoriteAction({
-        productId,
-        favorited: next,
+    const next = !favorited;
+
+    /* Synchronous flip — store mutation fans out to every
+     * subscriber (header badge, twin cards, favorites grid) on
+     * the very next commit. No transition queue, no awaited
+     * network. */
+    if (next) markFavorited(productId);
+    else markUnfavorited(productId);
+
+    /* Fire-and-forget. We only re-touch the store on rollback
+     * paths; the happy path's `revalidatePath("/favorites")`
+     * from the action runs server-side and doesn't need us to
+     * await. */
+    toggleFavoriteAction({ productId, favorited: next })
+      .then((result) => {
+        if (result.ok) return;
+        /* Roll back — every consumer rolls back with us. */
+        if (next) markUnfavorited(productId);
+        else markFavorited(productId);
+        if (result.error === "auth_required") {
+          /* Session expired between page load and click —
+           * surface the same modal a fresh-guest click would
+           * have. */
+          setSignInOpen(true);
+        }
+        /* `internal_error` falls through silently — favorites
+         * failing is a low-stakes miss and a noisy error UI on
+         * a hover-revealed icon would read as broken. */
+      })
+      .catch(() => {
+        /* Network blew up entirely (offline, server abort).
+         * Same rollback as a logical failure above. */
+        if (next) markUnfavorited(productId);
+        else markFavorited(productId);
       });
-      if (result.ok) {
-        /* Persist the new state to the local "real" value so
-         *  subsequent re-renders read from it. `useOptimistic`
-         *  auto-syncs back to the new base on the next render
-         *  after the transition completes. */
-        setPersistedFavorited(result.favorited);
-      } else if (result.error === "auth_required") {
-        /* Session expired between page load and click — surface
-         *  the same modal a fresh-guest click would have. The
-         *  `useOptimistic` rollback on transition end takes
-         *  care of returning the heart to its persisted (false)
-         *  state. */
-        setSignInOpen(true);
-      }
-      /* `internal_error` falls through silently — the optimistic
-       * value rolls back, the heart returns to its persisted
-       * state, and the shopper can retry. We deliberately don't
-       * pop a toast for this; favorites failing is a low-stakes
-       * miss and a noisy error UI on a hover-revealed icon would
-       * read as broken. */
-    });
   }
 
   return (
@@ -133,9 +142,9 @@ export function FavoriteButton({
       <button
         type="button"
         onClick={handleClick}
-        aria-pressed={optimisticFavorited}
+        aria-pressed={favorited}
         aria-label={
-          optimisticFavorited ? "Remove from favorites" : "Add to favorites"
+          favorited ? "Remove from favorites" : "Add to favorites"
         }
         className={cn(
           MEDIA_OVERLAY_BUBBLE_CLASSES,
@@ -151,12 +160,12 @@ export function FavoriteButton({
           /* Hidden by default, fades in on whole-card hover. */
           "opacity-0 group-hover:opacity-100",
           /* …unless already favorited — then always visible. */
-          optimisticFavorited && "opacity-100",
+          favorited && "opacity-100",
           /* Heart colour: white at rest, brand-secondary (pink)
            * on hover. When favorited the secondary tint is
            * permanent — hover stays steady so the toggle reads
            * as "stuck" rather than re-triggerable. */
-          optimisticFavorited
+          favorited
             ? "text-[color:var(--color-secondary)]"
             : "hover:text-[color:var(--color-secondary)]",
         )}
@@ -169,9 +178,9 @@ export function FavoriteButton({
             "h-[18px] w-[18px] transition-transform duration-150",
             /* Slight pop on hover so the affordance feels alive
              * without the bubble moving with it. Filled-state
-             * heart stays steady at its natural size — the
-             * toggle is "done", no need to invite more clicks. */
-            optimisticFavorited
+             * heart stays steady — the toggle is "done", no
+             * need to invite more clicks. */
+            favorited
               ? "fill-current"
               : "fill-none group-hover/heart:scale-110",
           )}

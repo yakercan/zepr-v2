@@ -3,10 +3,12 @@ import Link from "next/link";
 import { CartTrigger } from "@/components/cart/cart-trigger";
 import { AccountDropdown } from "@/components/layout/account-dropdown";
 import { CategoriesDropdown } from "@/components/layout/categories-dropdown";
+import { FavoritesBadge } from "@/components/layout/favorites-badge";
 import { SearchBar } from "@/components/layout/search-bar";
-import { BestSellersIcon, FireIcon, HeartIcon } from "@/components/ui/icons";
+import { BestSellersIcon, FireIcon } from "@/components/ui/icons";
 import { DEFAULT_CATEGORIES } from "@/config/categories";
 import { site } from "@/config/site";
+import { getCurrentFavoritedIds } from "@/lib/favorites/queries";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
@@ -26,7 +28,16 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  * a category row is hovered; Account uses the simple stacked layout.
  */
 export async function SiteHeader() {
-  const taxonomy = await getTaxonomy();
+  /* Fan-out the two server reads in parallel — taxonomy is the heavy
+   * one (Salespace category tree, cached an hour at the fetch
+   * boundary) and the favorites set is a small per-request lookup,
+   * already memoised via `cache()` for the rest of the render. Doing
+   * them sequentially would bill us the favorites round-trip on top
+   * of the taxonomy wait for no reason. */
+  const [taxonomy, favoritedIds] = await Promise.all([
+    getTaxonomy(),
+    getCurrentFavoritedIds(),
+  ]);
   const categories: readonly TaxonomyCategory[] =
     taxonomy?.categories?.length
       ? taxonomy.categories
@@ -70,8 +81,15 @@ export async function SiteHeader() {
          *  bottom edge so its panel sits flush. */}
         <div className="flex shrink-0 items-center gap-1 self-stretch">
           <Link href="/favorites" className="header-nav-link">
-            <HeartIcon className="text-[color:var(--color-ink)]" />
-            <span className="text-[15px] font-semibold">Favorites</span>
+            {/* Wrap the label + badge in their own flex so the
+             *  parent header-nav-link `gap-2` stays an icon-to-text
+             *  rule and doesn't push the badge away from the
+             *  word. With one direct child the parent gap has
+             *  nothing to space against. */}
+            <span className="inline-flex items-center">
+              <span className="text-[15px] font-semibold">Favorites</span>
+              <FavoritesBadge initialIds={favoritedIds} />
+            </span>
           </Link>
 
           <AccountDropdown />
