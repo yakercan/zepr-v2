@@ -216,6 +216,13 @@ export function Modal({
             onAnimationEnd={handlePanelAnimationEnd}
             className={cn(
               "pointer-events-auto relative flex w-full max-w-md flex-col overflow-hidden",
+              /* Height cap — matches the wrapper's `p-4` (1rem top
+               *  + 1rem bottom) so the panel never grows past the
+               *  viewport's safe area. `dvh` (dynamic viewport
+               *  height) tracks the visible area on mobile, so the
+               *  panel shrinks when iOS shows its address bar
+               *  instead of sliding beneath it. */
+              "max-h-[calc(100dvh_-_2rem)]",
               "rounded-2xl border border-[color:var(--color-border)]",
               "bg-[color:var(--color-surface)] shadow-2xl",
               open ? "animate-modal-in" : "animate-modal-out",
@@ -223,7 +230,7 @@ export function Modal({
             )}
           >
             {title ? (
-              <div className="flex items-center justify-between border-b border-[color:var(--color-border)] px-5 py-4">
+              <div className="flex shrink-0 items-center justify-between border-b border-[color:var(--color-border)] px-5 py-4">
                 <h2 className="text-base font-semibold text-[color:var(--color-ink)]">
                   {title}
                 </h2>
@@ -233,7 +240,7 @@ export function Modal({
               !hideClose && (
                 <ModalCloseButton
                   onClick={onClose}
-                  className="absolute right-3 top-3"
+                  className="absolute right-3 top-3 z-20"
                 />
               )
             )}

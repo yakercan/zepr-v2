@@ -4,9 +4,12 @@ import {
   type FormEvent,
   type ReactNode,
   useCallback,
+  useEffect,
+  useRef,
   useState,
   useTransition,
 } from "react";
+import { cn } from "@/lib/utils";
 import {
   LoadingOverlay,
   type LoadingOverlayState,
@@ -144,6 +147,38 @@ export function MediaFormModal({
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
 
+  /* Whether the body region is actually overflowing the panel
+   * right now. Drives the footer's top border — present only
+   * when there *is* content above the fold so the bar doesn't
+   * read as extra chrome on a short form. */
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [bodyOverflows, setBodyOverflows] = useState(false);
+
+  useEffect(() => {
+    const body = bodyRef.current;
+    const content = contentRef.current;
+    if (!body || !content) return;
+
+    /* +1 fudge factor avoids a sub-pixel false-positive when
+     * scrollHeight rounds up versus clientHeight on hi-dpi
+     * screens. */
+    const check = () => {
+      setBodyOverflows(content.scrollHeight > body.clientHeight + 1);
+    };
+    check();
+
+    /* Observe both the scroll container (sizes when the panel's
+     * `max-h` kicks in or the viewport changes) *and* the inner
+     * content wrapper (sizes when children add/remove rows, the
+     * media picker grows, an error pill appears, etc.). One
+     * observer for both keeps the wiring trivial. */
+    const ro = new ResizeObserver(check);
+    ro.observe(body);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [open]);
+
   const disabled = pending || success;
   const overlayState: LoadingOverlayState | null = success
     ? "success"
@@ -223,35 +258,73 @@ export function MediaFormModal({
     >
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col gap-5 p-5 md:p-6"
+        /* The form is the panel's internal layout column —
+         *  header (from `<Modal>`) above, scrollable body in
+         *  the middle, pinned action footer below. `flex-1
+         *  min-h-0` lets the form fill the remaining panel
+         *  height after the title bar; the body inside owns
+         *  the actual scroll. The `<LoadingOverlay>` is a
+         *  *sibling* of the form (still inside the panel)
+         *  so it covers everything — title, body, footer —
+         *  during the pending / success flash. */
+        className="flex min-h-0 flex-1 flex-col"
         noValidate
       >
-        {childContent}
-
-        {media && (
-          <MediaPicker
-            files={files}
-            onChange={setFiles}
-            onError={setError}
-            disabled={disabled}
-            maxAttachments={media.maxAttachments}
-            maxPhotoBytes={media.maxPhotoBytes}
-            maxVideoBytes={media.maxVideoBytes}
-            label={media.label}
-            required={media.required}
-          />
-        )}
-
-        {error && (
-          <p
-            role="alert"
-            className="rounded-md bg-[color:var(--color-danger-soft)] px-3 py-2 text-sm text-[color:var(--color-danger)]"
+        {/* Body — only this region scrolls. Padding + gap live on
+         *  the inner content wrapper, not the scroll container,
+         *  so the scrollbar (when present) sits flush against the
+         *  panel's right edge instead of inside the form padding.
+         *  The content wrapper also gives the overflow `ResizeObserver`
+         *  a stable element to track for content-size changes. */}
+        <div
+          ref={bodyRef}
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
+          <div
+            ref={contentRef}
+            className="flex flex-col gap-5 p-5 md:p-6"
           >
-            {error}
-          </p>
-        )}
+            {childContent}
 
-        <div className="mt-1 flex items-center justify-end gap-3">
+            {media && (
+              <MediaPicker
+                files={files}
+                onChange={setFiles}
+                onError={setError}
+                disabled={disabled}
+                maxAttachments={media.maxAttachments}
+                maxPhotoBytes={media.maxPhotoBytes}
+                maxVideoBytes={media.maxVideoBytes}
+                label={media.label}
+                required={media.required}
+              />
+            )}
+
+            {error && (
+              <p
+                role="alert"
+                className="rounded-md bg-[color:var(--color-danger-soft)] px-3 py-2 text-sm text-[color:var(--color-danger)]"
+              >
+                {error}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer — pinned at the bottom of the panel. Border
+         *  only renders when the body actually overflows so a
+         *  short form (e.g. a single-field review) doesn't pick
+         *  up an extra chrome line for no reason. When the
+         *  border is on, it mirrors the header's `border-b` so
+         *  the scrollable body reads as visually framed between
+         *  the two bars. */}
+        <div
+          className={cn(
+            "flex shrink-0 items-center justify-end gap-3 px-5 py-4",
+            bodyOverflows &&
+              "border-t border-[color:var(--color-border)]",
+          )}
+        >
           <button
             type="button"
             onClick={handleClose}
