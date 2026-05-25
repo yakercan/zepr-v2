@@ -106,7 +106,7 @@ export function ConfirmDialog({
             onClick={onClose}
             disabled={pending}
             aria-disabled={pending}
-            className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)] disabled:opacity-60"
           >
             {cancelLabel}
           </button>
@@ -125,8 +125,8 @@ export function ConfirmDialog({
              *  spelling it out. */
             className={
               tone === "danger"
-                ? "inline-flex items-center justify-center rounded-full bg-[color:var(--color-danger)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-danger-hover)] disabled:cursor-not-allowed disabled:bg-[color:var(--color-border-strong)]"
-                : "inline-flex items-center justify-center rounded-full bg-[color:var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-brand-hover)] disabled:cursor-not-allowed disabled:bg-[color:var(--color-border-strong)]"
+                ? "inline-flex items-center justify-center rounded-full bg-[color:var(--color-danger)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-danger-hover)] disabled:bg-[color:var(--color-border-strong)]"
+                : "inline-flex items-center justify-center rounded-full bg-[color:var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-brand-hover)] disabled:bg-[color:var(--color-border-strong)]"
             }
           >
             {pending ? pendingLabel : confirmLabel}

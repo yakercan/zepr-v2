@@ -14,6 +14,7 @@ import { RichText } from "@/components/ui/rich-text";
 import { env } from "@/env";
 import { getAuthState } from "@/lib/auth/session";
 import { getProductReviews } from "@/lib/reviews";
+import { hasPurchasedProduct } from "@/lib/shopify/customer-account-queries";
 import {
   getCompanionProducts,
   getProductByHandle,
@@ -77,31 +78,37 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const baseProduct = await getProductByHandle(handle);
   if (!baseProduct) notFound();
 
-  /* Tiered-offers bundle slots — if the `custom.offers` metafield
-   * called out companion product ids, fetch them in one extra
-   * Storefront round-trip alongside the anchor. We await here
-   * (instead of streaming via Suspense) because the buy-form
-   * needs companion data on first paint to render the right tier
-   * preselect + per-unit pickers without a layout shift.
+  /* Auth resolves first — it's a tiny in-process cookie decrypt
+   * (no network), and the reviews fetch needs `viewerEmail` to
+   * stamp `isOwn: true` on the matching row. After that, the
+   * network-bound reads run in parallel so the page pays the
+   * slowest of the bunch rather than the sum.
    *
-   * Reviews + auth state run in parallel with the companions
-   * because they're independent — bundle data, review summary,
-   * and session view all gate parts of the first paint, so we
-   * `Promise.all` them and pay the slowest of the three rather
-   * than the sum. */
-  const [bundleCompanions, reviewsSummary, authState] = await Promise.all([
+   * `hasPurchasedProduct` is skipped entirely for guests — no
+   * point asking the Customer Account API "did this anonymous
+   * visitor buy something?" — and the lookup is hard-falsed
+   * via a resolved-`false` promise so the `Promise.all` shape
+   * stays uniform. */
+  const authState = await getAuthState();
+  const [bundleCompanions, reviewsSummary, hasPurchased] = await Promise.all([
     getCompanionProducts(baseProduct.offers.bundleCompanionIds),
-    getProductReviews(baseProduct.id),
-    getAuthState(),
+    getProductReviews(baseProduct.id, authState.customerEmail),
+    authState.isLoggedIn
+      ? hasPurchasedProduct(baseProduct.id)
+      : Promise.resolve(false),
   ]);
   const product: ProductDetail = { ...baseProduct, bundleCompanions };
+  const canWriteReview = authState.isLoggedIn && hasPurchased;
 
   /* Section gate — only render the Reviews accordion when
-   * there's something for the shopper to see or do. Guests
-   * with no reviews to read get a quieter PDP; signed-in
-   * shoppers always see the section (so they can write one).
-   * Empty `null` summary and `totalCount: 0` are treated
-   * identically — see `getProductReviews`'s contract. */
+   * there's something for the shopper to see or do. Signed-in
+   * shoppers always see the section (the inner panel decides
+   * whether to show a write CTA, an eligibility hint, or just
+   * the "already reviewed" acknowledgement); guests only see it
+   * when reviews already exist to read, so a fresh product
+   * doesn't badger them to sign in for something they may not
+   * have bought. Empty `null` summary and `totalCount: 0` are
+   * treated identically — see `getProductReviews`'s contract. */
   const reviewsCount = reviewsSummary?.totalCount ?? 0;
   const showReviews = authState.isLoggedIn || reviewsCount > 0;
 
@@ -147,10 +154,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 }
               >
                 <ProductReviews
+                  productId={product.id}
                   productHandle={product.handle}
                   productTitle={product.title}
                   summary={reviewsSummary}
                   authState={authState}
+                  canWriteReview={canWriteReview}
                 />
               </ProductAccordionItem>
             )}

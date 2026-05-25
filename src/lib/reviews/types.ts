@@ -42,6 +42,36 @@ export interface ProductReview {
    *  never has to inspect URLs. Empty / absent = no media row
    *  rendered. */
   media?: ReadonlyArray<ReviewMedia>;
+  /** True when the dispatcher was given a `viewerEmail` and this
+   *  row's author email matches — drives the "Your review" badge
+   *  + delete affordance on the matching row. Email itself is
+   *  *not* exposed on this type; the match is computed at the
+   *  provider boundary and dropped from the public shape. */
+  isOwn?: boolean;
+}
+
+/**
+ * Payload for `submitProductReview` — everything the provider
+ * needs to persist a new row. URLs are pre-resolved (the server
+ * action uploads files to storage first, then hands the URLs in
+ * here), so this layer is purely a database concern.
+ */
+export interface SubmitReviewInput {
+  productId: string;
+  productHandle: string;
+  /** Stable shopper identity — used for duplicate-prevention and
+   *  for future "is this my review?" matching on display. */
+  customerEmail: string;
+  /** Display name on the resulting review row. */
+  customerName: string;
+  /** 1–5 integer. */
+  rating: number;
+  /** Optional headline. */
+  title?: string;
+  /** Required body text. */
+  body: string;
+  /** Pre-uploaded public URLs for any photo / video attachments. */
+  mediaUrls: ReadonlyArray<string>;
 }
 
 /** Aggregate stats + a page of reviews. */

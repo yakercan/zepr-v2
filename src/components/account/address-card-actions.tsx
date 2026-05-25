@@ -60,7 +60,7 @@ const INITIAL_STATE: AddressActionState = { status: "idle" };
  * constants so siblings stay byte-identical without a tiny
  * wrapper component. */
 const ROW_LINK_BASE =
-  "text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+  "text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors disabled:opacity-60";
 const ROW_LINK_NEUTRAL = `${ROW_LINK_BASE} hover:text-[color:var(--color-ink)]`;
 const ROW_LINK_DANGER = `${ROW_LINK_BASE} hover:text-[color:var(--color-danger)]`;
 

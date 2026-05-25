@@ -2,7 +2,11 @@ import "server-only";
 
 import { env } from "@/env";
 import { parseReviewMedia } from "@/lib/reviews/media";
-import type { ProductReview, ProductReviewSummary } from "@/lib/reviews/types";
+import type {
+  ProductReview,
+  ProductReviewSummary,
+  SubmitReviewInput,
+} from "@/lib/reviews/types";
 
 /* Worst-case cap on the page we pull per PDP render.
  *
@@ -59,15 +63,12 @@ interface SupabaseRow {
  */
 export async function fetchProductReviewsFromSupabase(
   productId: string,
+  viewerEmail?: string,
 ): Promise<ProductReviewSummary | null> {
-  const baseUrl = env.SUPABASE_URL;
-  /* Service-role key — required, NOT anon. The legacy RLS rules
-   * on `product_review` only allow server-context reads. This
-   * file is `server-only` so the key never reaches the browser. */
-  const apiKey = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!baseUrl || !apiKey) return null;
+  const deps = readDeps();
+  if (!deps) return null;
 
-  const url = new URL("/rest/v1/product_review", baseUrl);
+  const url = new URL("/rest/v1/product_review", deps.baseUrl);
   url.searchParams.set("productId", `eq.${productId}`);
   url.searchParams.set(
     "select",
@@ -79,11 +80,8 @@ export async function fetchProductReviewsFromSupabase(
   let rows: SupabaseRow[];
   try {
     const response = await fetch(url.toString(), {
-      headers: {
-        apikey: apiKey,
-        Authorization: `Bearer ${apiKey}`,
-      },
-      next: { revalidate: 3600 },
+      headers: authHeaders(deps),
+      next: { revalidate: 3600, tags: [reviewsTagFor(productId)] },
     });
     if (!response.ok) {
       console.warn(
@@ -97,8 +95,9 @@ export async function fetchProductReviewsFromSupabase(
     return null;
   }
 
+  const normaliseEmail = viewerEmail?.trim().toLowerCase() || null;
   const reviews: ProductReview[] = rows
-    .map(toReview)
+    .map((row) => toReview(row, normaliseEmail))
     .filter((r): r is ProductReview => r !== null);
 
   if (reviews.length === 0) {
@@ -116,11 +115,210 @@ export async function fetchProductReviewsFromSupabase(
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Write path — insert / delete / duplicate check                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Has this shopper already reviewed this product?
+ *
+ * One PostgREST round-trip; matches the legacy storefront's
+ * duplicate-check predicate exactly (`customer->>email` is the
+ * PostgREST syntax for "extract `email` from the JSONB `customer`
+ * column as text", which is how the legacy rows store the email).
+ */
+export async function hasShopperReviewedProduct(
+  productId: string,
+  email: string,
+): Promise<boolean> {
+  const deps = readDeps();
+  if (!deps) return false;
+
+  const url = new URL("/rest/v1/product_review", deps.baseUrl);
+  url.searchParams.set("productId", `eq.${productId}`);
+  url.searchParams.set("customer->>email", `eq.${email}`);
+  url.searchParams.set("select", "id");
+  url.searchParams.set("limit", "1");
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: authHeaders(deps),
+      cache: "no-store",
+    });
+    if (!res.ok) return false;
+    const rows = (await res.json()) as Array<{ id: unknown }>;
+    return rows.length > 0;
+  } catch (err) {
+    console.warn(`[reviews/supabase] duplicate-check failed`, err);
+    return false;
+  }
+}
+
+/**
+ * Insert a new review row. Returns the created row id on
+ * success, `null` on any failure path.
+ *
+ * The card-aggregate (`custom.review` + `custom.rating_count`
+ * metafield on the Shopify product) is owned by the backend —
+ * a Supabase-side trigger reflects insert / delete events into
+ * Shopify so the storefront never needs an Admin API key to
+ * keep those numbers fresh.
+ */
+export async function insertReviewIntoSupabase(
+  input: SubmitReviewInput,
+): Promise<string | null> {
+  const deps = readDeps();
+  if (!deps) return null;
+
+  const url = new URL("/rest/v1/product_review", deps.baseUrl);
+
+  try {
+    const res = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        ...authHeaders(deps),
+        "Content-Type": "application/json",
+        /* `return=representation` makes PostgREST echo the new
+         *  row back so we get its server-assigned id without a
+         *  second round-trip. */
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        productId: input.productId,
+        productHandle: input.productHandle,
+        rating: input.rating,
+        title: input.title ?? null,
+        description: input.body,
+        customer: {
+          name: input.customerName,
+          email: input.customerEmail.toLowerCase(),
+        },
+        createdAt: new Date().toISOString(),
+        images: [...input.mediaUrls],
+      }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.warn(
+        `[reviews/supabase] insert ${res.status}:`,
+        await res.text().catch(() => ""),
+      );
+      return null;
+    }
+
+    const rows = (await res.json()) as Array<{ id: number | string }>;
+    return rows[0] ? String(rows[0].id) : null;
+  } catch (err) {
+    console.warn("[reviews/supabase] insert failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Delete one review row scoped to its owning shopper.
+ *
+ * The `customer->>email` filter guarantees we can't accidentally
+ * (or maliciously) delete someone else's review even if the
+ * frontend sent the wrong id — the shopper's email is sourced
+ * from session, not from the request body.
+ *
+ * Returns the deleted row's media URLs so the caller can fan
+ * out a storage cleanup. Returns `null` when the row didn't
+ * exist or didn't belong to this shopper (= no-op success at
+ * the UI layer, no need to surface an error).
+ */
+export async function deleteReviewFromSupabase(
+  reviewId: string,
+  productId: string,
+  email: string,
+): Promise<ReadonlyArray<string> | null> {
+  const deps = readDeps();
+  if (!deps) return null;
+
+  const url = new URL("/rest/v1/product_review", deps.baseUrl);
+  url.searchParams.set("id", `eq.${reviewId}`);
+  url.searchParams.set("productId", `eq.${productId}`);
+  url.searchParams.set("customer->>email", `eq.${email.toLowerCase()}`);
+
+  try {
+    const res = await fetch(url.toString(), {
+      method: "DELETE",
+      headers: {
+        ...authHeaders(deps),
+        /* `return=representation` so we get the deleted row's
+         *  `images` column back and can clean up storage. The
+         *  legacy code did a SELECT-then-DELETE — one round-trip
+         *  fewer here. */
+        Prefer: "return=representation",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      console.warn(`[reviews/supabase] delete ${res.status}`);
+      return null;
+    }
+    const rows = (await res.json()) as Array<{
+      images: ReadonlyArray<string> | null;
+    }>;
+    if (rows.length === 0) return null;
+    return (rows[0].images ?? []).filter((u): u is string => typeof u === "string");
+  } catch (err) {
+    console.warn("[reviews/supabase] delete failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Cache tag for a product's review summary — pass into
+ * `revalidateTag` from server actions after insert/delete so
+ * the PDP reads the fresh page on its next render without
+ * waiting for the 1-hour `revalidate` window to expire.
+ */
+export function reviewsTagFor(productId: string): string {
+  return `reviews:${productId}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Internals                                                            */
+/* ------------------------------------------------------------------ */
+
+interface SupabaseDeps {
+  baseUrl: string;
+  apiKey: string;
+}
+
+function readDeps(): SupabaseDeps | null {
+  const baseUrl = env.SUPABASE_URL;
+  /* Service-role key — required, NOT anon. The legacy RLS rules
+   * on `product_review` only allow server-context reads/writes.
+   * This file is `server-only` so the key never reaches the
+   * browser. */
+  const apiKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!baseUrl || !apiKey) return null;
+  return { baseUrl, apiKey };
+}
+
+function authHeaders(deps: SupabaseDeps): Record<string, string> {
+  return {
+    apikey: deps.apiKey,
+    Authorization: `Bearer ${deps.apiKey}`,
+  };
+}
+
 /* Strict mapping from the loose wire row to the public review
  * shape. Drops malformed rows (no body, non-numeric rating)
  * rather than rendering broken UI — invariants enforced at the
- * provider boundary, never beyond. */
-function toReview(row: SupabaseRow): ProductReview | null {
+ * provider boundary, never beyond.
+ *
+ * `viewerEmail` (already trimmed + lowercased by the caller)
+ * lets us compute `isOwn` here and then DROP the row's email
+ * from the public projection — the strict "no PII past this
+ * boundary" invariant stays intact. */
+function toReview(
+  row: SupabaseRow,
+  viewerEmail: string | null,
+): ProductReview | null {
   const rating = Number(row.rating);
   if (!Number.isFinite(rating) || rating <= 0) return null;
 
@@ -133,6 +331,9 @@ function toReview(row: SupabaseRow): ProductReview | null {
    * UI never has to sniff URL extensions. */
   const media = parseReviewMedia(row.images ?? []);
 
+  const rowEmail = row.customer?.email?.trim().toLowerCase() || null;
+  const isOwn = !!viewerEmail && rowEmail === viewerEmail;
+
   return {
     id: String(row.id),
     rating,
@@ -141,6 +342,7 @@ function toReview(row: SupabaseRow): ProductReview | null {
     authorName: row.customer?.name?.trim() || "Anonymous",
     createdAt: row.createdAt ?? new Date(0).toISOString(),
     media: media.length > 0 ? media : undefined,
+    ...(isOwn ? { isOwn: true } : {}),
   };
 }
 

@@ -612,6 +612,80 @@ export async function fetchCustomerProfileWithToken(
 }
 
 /* ------------------------------------------------------------------ */
+/* Purchase verification                                               */
+/* ------------------------------------------------------------------ */
+
+interface PurchasedProductsResponse {
+  customer: {
+    orders: {
+      nodes: Array<{
+        lineItems: {
+          nodes: Array<{ productId: string | null }>;
+        };
+      }>;
+    };
+  };
+}
+
+const PURCHASED_PRODUCTS_QUERY = /* GraphQL */ `
+  query CustomerPurchasedProducts($first: Int!, $itemsPerOrder: Int!) {
+    customer {
+      orders(first: $first) {
+        nodes {
+          lineItems(first: $itemsPerOrder) {
+            nodes {
+              productId
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Has the currently-signed-in shopper purchased this product?
+ *
+ * One Customer Account API round-trip — pulls the (productId-only)
+ * line items off the customer's most-recent N orders and checks
+ * if any of them match the target GID. Replaces the legacy
+ * Admin-API-backed `orders(query: "email:...")` lookup with a
+ * scope-respecting variant: this query only sees the orders the
+ * signed-in shopper actually owns, so there's no email-forgery
+ * risk and no Admin token to provision.
+ *
+ * Caps:
+ *   - 250 orders. Covers virtually every account; super-heavy
+ *     shoppers beyond that get an honest `false` (rather than a
+ *     timeout from following 4× as many cursors), which the UI
+ *     surfaces as "we couldn't confirm the purchase".
+ *   - 100 line items per order. A real order rarely exceeds 10
+ *     lines; 100 is the connection's hard cap and covers every
+ *     practical case in one shot.
+ *
+ * Returns `false` on any error (network blip, GraphQL error,
+ * session missing) — the review gate stays *closed* on failure
+ * by design, so a transient fault doesn't open a write path.
+ */
+export async function hasPurchasedProduct(productId: string): Promise<boolean> {
+  try {
+    const data = await customerAccountFetch<PurchasedProductsResponse>(
+      PURCHASED_PRODUCTS_QUERY,
+      { first: 250, itemsPerOrder: 100 },
+    );
+    for (const order of data.customer.orders.nodes) {
+      for (const item of order.lineItems.nodes) {
+        if (item.productId === productId) return true;
+      }
+    }
+    return false;
+  } catch (err) {
+    console.warn("[customer-account] purchase check failed:", err);
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Address mutations                                                   */
 /* ------------------------------------------------------------------ */
 
