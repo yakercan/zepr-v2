@@ -243,8 +243,7 @@ export const MEDIA_OVERLAY_BUBBLE_CLASSES =
  *
  *   - **active** → ink fill, white text.
  *   - **idle**   → white fill, ink text, soft grey outline that
- *                  snaps to ink on hover (shares
- *                  `SURFACE_OUTLINE_CLASSES`).
+ *                  snaps to ink on hover.
  *
  * Shared by the homepage main-feed tabs and the search-page
  * filter pills. The two surfaces should look identical: pills
@@ -255,13 +254,13 @@ export const MEDIA_OVERLAY_BUBBLE_CLASSES =
  * `border-2 border-transparent` lives on the base — keeps the
  * footprint stable across active ↔ idle. The active variant
  * paints an ink border that disappears into its own background;
- * the idle variant gets `SURFACE_OUTLINE_CLASSES`, which also
- * carries `border-2`. Tailwind-merge dedupes either way.
+ * the idle variant declares its own `border-2` (no shared
+ * `SURFACE_OUTLINE_CLASSES` here because we don't want its color
+ * transition on a discrete selection state — see PILL_IDLE).
  */
 const PILL_BASE_CLASSES = cn(
   "shrink-0 rounded-full border-2 border-transparent px-5 py-2.5",
   "text-sm font-semibold leading-none",
-  "transition-colors duration-150",
   "focus-visible:outline-none focus-visible:ring-2",
   "focus-visible:ring-[color:var(--color-ink)] focus-visible:ring-offset-2",
   "focus-visible:ring-offset-[color:var(--color-page)]",
@@ -272,9 +271,17 @@ const PILL_ACTIVE_CLASSES = cn(
   "border-[color:var(--color-ink)]",
 );
 
+/* Pills intentionally do NOT carry `transition-colors` — selection
+ * is a discrete state change, not a hover affordance, and a 150 ms
+ * crossfade reads as "brief unselected → selected" right after a
+ * click. Snap on all state changes (idle ↔ active, hover) so the
+ * tap feedback is instant. `SURFACE_OUTLINE_CLASSES` (which carries
+ * its own transition) is inlined here without it for the same
+ * reason. */
 const PILL_IDLE_CLASSES = cn(
   "bg-[color:var(--color-surface)] text-[color:var(--color-ink)]",
-  SURFACE_OUTLINE_CLASSES,
+  "border-2 border-[color:var(--color-border-strong)]",
+  "hover:border-[color:var(--color-ink)]",
 );
 
 /**
