@@ -48,7 +48,15 @@ export interface ProductReview {
    *  *not* exposed on this type; the match is computed at the
    *  provider boundary and dropped from the public shape. */
   isOwn?: boolean;
+  /** Moderation state — populated only when `isOwn` is true so
+   *  the owner can see whether their review is live, pending, or
+   *  rejected. Other shoppers never see this value because non-
+   *  approved rows aren't returned to them in the first place. */
+  moderationState?: ReviewModerationState;
 }
+
+/** Three-state moderation flag the owner sees as a status badge. */
+export type ReviewModerationState = "approved" | "pending" | "rejected";
 
 /**
  * Payload for `submitProductReview` — everything the provider

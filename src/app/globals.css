@@ -119,6 +119,16 @@
   --color-warning-hover: #d97706;
   --color-warning-soft: #fffbeb;
 
+  /* Info / neutral-status accent — the blue shared by every
+   * "informational, awaiting action" affordance: pending review
+   * pills, future "in transit" / "processing" callouts, etc.
+   * Same shape as the success / warning / danger blocks: a main
+   * ink for text + outlines and a soft tint for the wash under
+   * flat surfaces. Matches Tailwind's blue-600 / blue-50 — the
+   * neutral cool blue that doesn't compete with the brand orange. */
+  --color-info: #2563eb;
+  --color-info-soft: #eff6ff;
+
   /* Danger / destructive accent — the red shared by every
    * "this action removes / signs out / deletes" affordance.
    * Mirrors the success block: a main ink colour for text +

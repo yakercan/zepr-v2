@@ -7,6 +7,7 @@ import type { AuthState } from "@/lib/auth/session";
 import type {
   ProductReview,
   ProductReviewSummary,
+  ReviewModerationState,
 } from "@/lib/reviews/types";
 import { cn } from "@/lib/utils";
 
@@ -187,9 +188,22 @@ function ReviewRow({
           </>
         )}
         {review.isOwn && (
-          <span className="inline-flex items-center rounded-full bg-[color:var(--color-brand-light)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-brand)]">
-            Your review
-          </span>
+          <>
+            <span className="inline-flex items-center rounded-full bg-[color:var(--color-brand-light)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-brand)]">
+              Your review
+            </span>
+            {review.moderationState && (
+              <>
+                <span
+                  aria-hidden
+                  className="text-[color:var(--color-ink-muted)]"
+                >
+                  ·
+                </span>
+                <ModerationBadge state={review.moderationState} />
+              </>
+            )}
+          </>
         )}
         {review.verifiedPurchase && (
           <span className="inline-flex items-center rounded-full bg-[color:var(--color-success-soft)] px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-success)]">
@@ -221,6 +235,53 @@ function ReviewRow({
         )}
       </div>
     </li>
+  );
+}
+
+/* ---------- Moderation badge ---------- */
+
+/**
+ * Three-state moderation pill — only ever rendered next to the
+ * "Your review" badge, so other shoppers never see it. Same shell
+ * as the brand "Your review" badge (rounded-full, uppercase 11 px)
+ * so the two read as a paired set on the row title line.
+ *
+ * Tokens:
+ *   - approved → `--color-success`     (Live)
+ *   - pending  → `--color-info`        (Pending — neutral blue)
+ *   - rejected → `--color-danger`      (Rejected)
+ */
+function ModerationBadge({ state }: { state: ReviewModerationState }) {
+  const variants: Record<
+    ReviewModerationState,
+    { label: string; className: string }
+  > = {
+    approved: {
+      label: "Live",
+      className:
+        "bg-[color:var(--color-success-soft)] text-[color:var(--color-success)]",
+    },
+    pending: {
+      label: "Pending",
+      className:
+        "bg-[color:var(--color-info-soft)] text-[color:var(--color-info)]",
+    },
+    rejected: {
+      label: "Rejected",
+      className:
+        "bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger)]",
+    },
+  };
+  const { label, className } = variants[state];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+        className,
+      )}
+    >
+      {label}
+    </span>
   );
 }
 

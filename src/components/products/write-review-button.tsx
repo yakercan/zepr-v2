@@ -50,6 +50,14 @@ import { cn } from "@/lib/utils";
 
 const MAX_ATTACHMENTS = 5;
 const MAX_BODY = 1500;
+/* Per-file size caps mirror `submitReviewAction` exactly — the
+ * server is the source of truth, but we surface the same limits
+ * here so oversized picks get caught locally (no upload round-
+ * trip, no 413). */
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+const MAX_PHOTO_MB = Math.round(MAX_PHOTO_BYTES / (1024 * 1024));
+const MAX_VIDEO_MB = Math.round(MAX_VIDEO_BYTES / (1024 * 1024));
 /* Headline-shape caps — match the conventions e-commerce review
  * systems converge on (Yotpo / Loox / Amazon all land in this
  * range). Long enough that no real shopper hits the limit
@@ -162,7 +170,35 @@ function ReviewFormModal({
   const handleFilesPicked = (event: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files ?? []);
     if (picked.length === 0) return;
-    setFiles((prev) => [...prev, ...picked].slice(0, MAX_ATTACHMENTS));
+
+    /* Two reasons we'd reject a pick: any file in the batch is over
+     * its per-type size cap, or the batch would push us past
+     * `MAX_ATTACHMENTS`. Either way we reject the whole pick rather
+     * than partially staging it — easier mental model for the
+     * shopper than guessing which files made it through. */
+    const oversize = picked.some((file) => {
+      const cap = file.type.startsWith("video/")
+        ? MAX_VIDEO_BYTES
+        : MAX_PHOTO_BYTES;
+      return file.size > cap;
+    });
+    const overflow = files.length + picked.length > MAX_ATTACHMENTS;
+
+    if (oversize || overflow) {
+      const issues: string[] = [];
+      if (oversize) {
+        issues.push(
+          `Photos must be under ${MAX_PHOTO_MB} MB, videos under ${MAX_VIDEO_MB} MB.`,
+        );
+      }
+      if (overflow) {
+        issues.push(`Only ${MAX_ATTACHMENTS} attachments allowed.`);
+      }
+      setError(issues.join(" "));
+    } else {
+      setFiles((prev) => [...prev, ...picked]);
+    }
+
     /* Clear the native input so picking the *same* file again
      * after removal triggers another change event. */
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -455,8 +491,8 @@ function MediaPicker({
         />
       </label>
       <p className="text-xs text-[color:var(--color-ink-muted)]">
-        Photos up to 10 MB · videos up to 50 MB · {MAX_ATTACHMENTS} attachments
-        max.
+        Photos up to {MAX_PHOTO_MB} MB · videos up to {MAX_VIDEO_MB} MB ·{" "}
+        {MAX_ATTACHMENTS} attachments max.
       </p>
     </div>
   );

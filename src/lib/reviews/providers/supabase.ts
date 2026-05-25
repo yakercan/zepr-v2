@@ -5,6 +5,7 @@ import { parseReviewMedia } from "@/lib/reviews/media";
 import type {
   ProductReview,
   ProductReviewSummary,
+  ReviewModerationState,
   SubmitReviewInput,
 } from "@/lib/reviews/types";
 
@@ -29,6 +30,12 @@ interface SupabaseRow {
   customer: { name?: string | null; email?: string | null } | null;
   createdAt: string | null;
   images: ReadonlyArray<string> | null;
+  /* Moderation flag.
+   *   `true`  — approved, visible to everyone.
+   *   `false` — rejected.
+   *   `null`  — pending review (default on insert).
+   * Anything that isn't `true` is owner-only. */
+  approved: boolean | null;
 }
 
 /**
@@ -68,11 +75,13 @@ export async function fetchProductReviewsFromSupabase(
   const deps = readDeps();
   if (!deps) return null;
 
+  const normaliseEmail = viewerEmail?.trim().toLowerCase() || null;
+
   const url = new URL("/rest/v1/product_review", deps.baseUrl);
   url.searchParams.set("productId", `eq.${productId}`);
   url.searchParams.set(
     "select",
-    "id,rating,title,description,customer,createdAt,images",
+    "id,rating,title,description,customer,createdAt,images,approved",
   );
   url.searchParams.set("order", "createdAt.desc");
   url.searchParams.set("limit", String(PAGE_LIMIT));
@@ -95,23 +104,43 @@ export async function fetchProductReviewsFromSupabase(
     return null;
   }
 
-  const normaliseEmail = viewerEmail?.trim().toLowerCase() || null;
-  const reviews: ProductReview[] = rows
-    .map((row) => toReview(row, normaliseEmail))
-    .filter((r): r is ProductReview => r !== null);
+  /* Approval gate runs in JS rather than as a PostgREST `or=`
+   * filter — the JSON-path-inside-or syntax (`customer->>email`)
+   * is finicky across PostgREST versions, and legacy rows can
+   * carry mixed-case emails that wouldn't match a lowercase
+   * `eq.` filter anyway. The page is bounded by `PAGE_LIMIT`
+   * (100), so the extra rows we transfer are cheap.
+   *
+   * Public traffic keeps only approved rows. A signed-in shopper
+   * also keeps their own pending/rejected rows so they can
+   * confirm + delete from the PDP without an admin surface.
+   * Aggregates further down still only count approved rows. */
+  const visible: { review: ProductReview; approved: boolean }[] = [];
+  for (const row of rows) {
+    const isApproved = row.approved === true;
+    const rowEmail = row.customer?.email?.trim().toLowerCase() || null;
+    const isOwn = !!normaliseEmail && rowEmail === normaliseEmail;
+    if (!isApproved && !isOwn) continue;
 
-  if (reviews.length === 0) {
+    const review = toReview(row, normaliseEmail);
+    if (review) visible.push({ review, approved: isApproved });
+  }
+
+  if (visible.length === 0) {
     return { averageRating: 0, totalCount: 0, reviews: [] };
   }
 
+  const approved = visible.filter((v) => v.approved).map((v) => v.review);
   const averageRating =
-    reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+    approved.length > 0
+      ? approved.reduce((sum, r) => sum + r.rating, 0) / approved.length
+      : 0;
 
   return {
     averageRating: Math.round(averageRating * 10) / 10,
-    totalCount: reviews.length,
-    ratingHistogram: buildHistogram(reviews),
-    reviews,
+    totalCount: approved.length,
+    ratingHistogram: buildHistogram(approved),
+    reviews: visible.map((v) => v.review),
   };
 }
 
@@ -334,6 +363,17 @@ function toReview(
   const rowEmail = row.customer?.email?.trim().toLowerCase() || null;
   const isOwn = !!viewerEmail && rowEmail === viewerEmail;
 
+  /* Surface the moderation flag only to the row's owner — public
+   * traffic never sees non-approved rows in the first place, so
+   * it would always be `"approved"` there anyway. Keeping it
+   * scoped to `isOwn` keeps the public projection unchanged. */
+  const moderationState: ReviewModerationState =
+    row.approved === true
+      ? "approved"
+      : row.approved === false
+        ? "rejected"
+        : "pending";
+
   return {
     id: String(row.id),
     rating,
@@ -342,7 +382,7 @@ function toReview(
     authorName: row.customer?.name?.trim() || "Anonymous",
     createdAt: row.createdAt ?? new Date(0).toISOString(),
     media: media.length > 0 ? media : undefined,
-    ...(isOwn ? { isOwn: true } : {}),
+    ...(isOwn ? { isOwn: true, moderationState } : {}),
   };
 }
 

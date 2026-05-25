@@ -69,6 +69,29 @@ const nextConfig: NextConfig = {
 
   experimental: {
     optimizePackageImports: ["clsx", "tailwind-merge"],
+
+    /**
+     * Review submission ships up to 5 attachments of mixed photos
+     * (10 MB cap each) and videos (50 MB cap each) through a Server
+     * Action. Default body limits chokes that on two layers, so we
+     * lift both:
+     *
+     *   - `serverActions.bodySizeLimit` — the cap the action itself
+     *     enforces. Default 1 MB.
+     *   - `middlewareClientMaxBodySize` — how much of the request
+     *     body the middleware pipeline (proxy.ts) buffers before
+     *     truncating. Default 10 MB; truncation here surfaces as a
+     *     misleading "Unexpected end of form" at the action.
+     *
+     * Both ceilings are sized to the worst-case payload (5 × 50 MB
+     * = 250 MB) with a small headroom for FormData encoding. Per-
+     * file size validation still happens in `submitReviewAction`,
+     * so these caps only widen the transport pipe — not the policy.
+     */
+    serverActions: {
+      bodySizeLimit: "260mb",
+    },
+    middlewareClientMaxBodySize: "260mb",
   },
 
   /**
