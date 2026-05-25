@@ -15,6 +15,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { submitReviewAction } from "@/app/products/[handle]/reviews/actions";
 import { PlayBadgeIcon } from "@/components/ui/icons";
+import {
+  LoadingOverlay,
+  type LoadingOverlayState,
+} from "@/components/ui/loading-overlay";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 
@@ -129,7 +133,18 @@ function ReviewFormModal({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* Overlay state derived from the two flags so the parent of the
+   * <LoadingOverlay> doesn't have to track its own copy. `success`
+   * is sticky for the brief "Posted!" flash after the action
+   * resolves; `pending` covers the action itself. */
+  const overlayState: LoadingOverlayState | null = success
+    ? "success"
+    : pending
+      ? "loading"
+      : null;
 
   /* Default to a five-star pick. Shoppers writing a review
    * skew positive — the average sits north of 4.5 across
@@ -151,6 +166,7 @@ function ReviewFormModal({
 
   const resetForm = useCallback(() => {
     setError(null);
+    setSuccess(false);
     setRating(5);
     setTitle("");
     setBody("");
@@ -159,13 +175,13 @@ function ReviewFormModal({
   }, [defaultNickname]);
 
   const handleClose = useCallback(() => {
-    if (pending) return;
+    if (pending || success) return;
     onClose();
     /* Wait for the close animation (~150 ms) before wiping the
      * form so the shopper doesn't see the fields blank out
      * mid-fade. */
     setTimeout(resetForm, 200);
-  }, [pending, onClose, resetForm]);
+  }, [pending, success, onClose, resetForm]);
 
   const handleFilesPicked = (event: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files ?? []);
@@ -242,13 +258,17 @@ function ReviewFormModal({
         formData,
       );
       if (result.ok) {
-        onClose();
-        /* `router.refresh()` re-runs the PDP server component
-         * tree; the cache tag invalidation in the action means
-         * the review fetch returns the new page (including the
-         * just-posted row). */
-        router.refresh();
-        setTimeout(resetForm, 200);
+        /* Flash the success state before closing so the shopper
+         * gets a clear confirmation. Modal close + form reset
+         * chain off the success flash; `router.refresh()` here
+         * also picks up the new row on the PDP via the cache
+         * tag the action invalidates. */
+        setSuccess(true);
+        setTimeout(() => {
+          onClose();
+          router.refresh();
+          setTimeout(resetForm, 200);
+        }, 900);
       } else {
         setError(result.error);
       }
@@ -346,16 +366,23 @@ function ReviewFormModal({
             type="submit"
             disabled={
               pending ||
+              success ||
               rating < 1 ||
               body.trim().length === 0 ||
               nickname.trim().length === 0
             }
             className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-brand-hover)] disabled:bg-[color:var(--color-border-strong)]"
           >
-            {pending ? "Posting…" : "Post review"}
+            Post review
           </button>
         </div>
       </form>
+
+      <LoadingOverlay
+        state={overlayState}
+        loadingLabel="Posting your review…"
+        successLabel="Review posted!"
+      />
     </Modal>
   );
 }

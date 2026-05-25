@@ -83,6 +83,17 @@
   --color-border: #e5e7eb;
   --color-border-strong: #d1d5db;
 
+  /* Brand orange family.
+   *   - `brand`        — the main accent ink (CTA fills, "selected"
+   *                       outlines, brand-on-light text accents).
+   *   - `brand-hover`  — darker step for hover on filled CTAs.
+   *   - `brand-light`  — soft tinted wash for "brand bubble"
+   *                       affordances (the "Your review" pill, the
+   *                       review submit success disc, etc.). Same
+   *                       role the success/info/danger -soft tokens
+   *                       play for their families.
+   *   - `brand-border` — the hairline that pairs with `brand-light`
+   *                       on outlined-bubble surfaces. */
   --color-brand: #f65f14;
   --color-brand-hover: #e65510;
   --color-brand-light: #fff4ed;
