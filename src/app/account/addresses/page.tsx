@@ -156,7 +156,7 @@ function AddressCard({
         {id && (
           <Link
             href={`/account/addresses/${extractGidId(id)}/edit`}
-            className="shrink-0 text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)]"
+            className="link-muted shrink-0"
           >
             Edit
           </Link>

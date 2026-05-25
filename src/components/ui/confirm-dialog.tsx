@@ -106,7 +106,7 @@ export function ConfirmDialog({
             onClick={onClose}
             disabled={pending}
             aria-disabled={pending}
-            className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)] disabled:opacity-60"
+            className="link-muted"
           >
             {cancelLabel}
           </button>

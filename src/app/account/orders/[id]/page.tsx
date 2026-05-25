@@ -3,6 +3,7 @@ import "server-only";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { ReturnRequestButton } from "@/components/account/return-request-button";
 import { BackLink } from "@/components/ui/back-link";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import { getSession } from "@/lib/auth/session";
@@ -172,11 +173,27 @@ async function TimelineWithDeliveryLookup({ order }: { order: OrderDetail }) {
 /* ------------------------------------------------------------------ */
 
 function PageHeader({ order }: { order: OrderDetail }) {
+  /* "Return request" lives on the same row as the order title,
+   * vertically centred against the `<h1>` only — the date drops
+   * below as a sibling so the button doesn't end up centred
+   * against the entire (h1 + date) column, which read as "above
+   * the title" before. Only renders when Shopify says the order
+   * has at least one line item still eligible for return. */
+  const canReturn = order.returnableLineItems.length > 0;
+
   return (
     <header className="mt-4 md:mt-6">
-      <h1 className="text-2xl font-semibold leading-tight md:text-3xl">
-        Order {order.name}
-      </h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold leading-tight md:text-3xl">
+          Order {order.name}
+        </h1>
+        {canReturn && (
+          <ReturnRequestButton
+            orderId={order.id}
+            items={order.returnableLineItems}
+          />
+        )}
+      </div>
       <p className="mt-1 text-sm text-[color:var(--color-ink-muted)]">
         Placed {formatOrderDate(order.processedAt)}
       </p>

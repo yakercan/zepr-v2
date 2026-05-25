@@ -168,7 +168,7 @@ function ProfileCard({ customer }: { customer: Customer }) {
       action={
         <Link
           href="/account/profile/edit"
-          className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)]"
+          className="link-muted"
         >
           Edit
         </Link>

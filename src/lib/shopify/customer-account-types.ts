@@ -114,6 +114,32 @@ export interface OrderReturnEvent {
   updatedAt: string | null;
 }
 
+/**
+ * One returnable item — flattened off
+ * `Order.returnInformation.returnableLineItems` so the UI loop
+ * is one-dimensional. Each entry already maps 1:1 to a single
+ * `LineItem` on the order; the `quantity` field is what's still
+ * eligible to be returned (i.e. ordered minus already-returned).
+ *
+ * `lineItemId` is the plain LineItem GID — that's what the
+ * `orderRequestReturn` mutation's `RequestedLineItemInput.lineItemId`
+ * field accepts in the Customer Account API.
+ */
+export interface ReturnableLineItem {
+  /** GID of the line item, e.g. `gid://shopify/LineItem/353882977`.
+   *  Passed verbatim as the `lineItemId` field on
+   *  `RequestedLineItemInput`. */
+  lineItemId: string;
+  title: string;
+  variantTitle: string | null;
+  imageUrl: string | null;
+  imageAlt: string | null;
+  /** Maximum quantity of this item still eligible for return.
+   *  Always ≥ 1 (zero-quantity entries are filtered out at the
+   *  query boundary so the UI never sees an un-actionable row). */
+  returnableQuantity: number;
+}
+
 export interface OrderDetail {
   id: string;
   /** Display name Shopify assigns to an order, e.g. `#1234`. */
@@ -151,6 +177,10 @@ export interface OrderDetail {
    *  the timeline builder skips the return milestones entirely
    *  in that case. */
   returns: OrderReturnEvent[];
+  /** Items still eligible for return, flattened across all
+   *  fulfilments. Empty array gates the "Return request" button
+   *  off the order page entirely. */
+  returnableLineItems: ReturnableLineItem[];
 }
 
 /* ------------------------------------------------------------------ */

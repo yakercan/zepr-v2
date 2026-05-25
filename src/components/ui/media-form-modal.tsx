@@ -103,10 +103,10 @@ export interface MediaFormModalProps {
    *  Caller wipes its own controlled field state here. */
   onReset?: () => void;
 
-  /* Media (optional) --------------------------------------------- */
+  /* Media --------------------------------------------------------- */
   /** Set to enable the photo + video picker. Pass `{}` for the
-   *  defaults; override per-cap or label when a surface needs
-   *  stricter limits. */
+   *  defaults; override per-cap, label, or set `required: true`
+   *  when a surface needs stricter limits or mandatory media. */
   media?: MediaPickerConfig & { fieldName?: string };
 
   /* Loading overlay copy ----------------------------------------- */
@@ -238,6 +238,7 @@ export function MediaFormModal({
             maxPhotoBytes={media.maxPhotoBytes}
             maxVideoBytes={media.maxVideoBytes}
             label={media.label}
+            required={media.required}
           />
         )}
 
@@ -255,13 +256,22 @@ export function MediaFormModal({
             type="button"
             onClick={handleClose}
             disabled={disabled}
-            className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)] disabled:opacity-60"
+            className="link-muted"
           >
             {cancelLabel}
           </button>
           <button
             type="submit"
-            disabled={disabled || disableSubmit}
+            /* Media-required is enforced internally: when the
+             *  picker is mandatory and empty, the submit button
+             *  stays disabled. Keeps the call site from having
+             *  to re-derive the same condition off file state
+             *  it doesn't own. */
+            disabled={
+              disabled ||
+              disableSubmit ||
+              (media?.required === true && files.length === 0)
+            }
             className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-brand-hover)] disabled:bg-[color:var(--color-border-strong)]"
           >
             {submitLabel}

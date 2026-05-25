@@ -105,7 +105,7 @@ export function ProfileForm({
         <div className="mt-2 flex items-center justify-end gap-3">
           <Link
             href="/account"
-            className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)]"
+            className="link-muted"
           >
             Cancel
           </Link>

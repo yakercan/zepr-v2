@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { RequiredMark } from "@/components/ui/form-field";
 import { PlayBadgeIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -40,9 +41,12 @@ export interface MediaPickerConfig {
   maxPhotoBytes?: number;
   /** Per-video byte cap. Default 50 MB. */
   maxVideoBytes?: number;
-  /** Label above the thumbnail row. Default
-   *  "Photos & videos (optional)". */
+  /** Label above the thumbnail row. Default "Photos & videos". */
   label?: string;
+  /** Mark the picker as mandatory — appends a red `*` to the
+   *  label. Server-side validation is still the policy authority;
+   *  this is purely the visual hint. */
+  required?: boolean;
 }
 
 export interface MediaPickerProps extends MediaPickerConfig {
@@ -58,7 +62,7 @@ export interface MediaPickerProps extends MediaPickerConfig {
 const DEFAULT_MAX_ATTACHMENTS = 5;
 const DEFAULT_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const DEFAULT_MAX_VIDEO_BYTES = 50 * 1024 * 1024;
-const DEFAULT_LABEL = "Photos & videos (optional)";
+const DEFAULT_LABEL = "Photos & videos";
 const FILE_ACCEPT = "image/*,video/*";
 
 export function MediaPicker({
@@ -70,6 +74,7 @@ export function MediaPicker({
   maxPhotoBytes = DEFAULT_MAX_PHOTO_BYTES,
   maxVideoBytes = DEFAULT_MAX_VIDEO_BYTES,
   label = DEFAULT_LABEL,
+  required = false,
 }: MediaPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const full = files.length >= maxAttachments;
@@ -117,6 +122,7 @@ export function MediaPicker({
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium text-[color:var(--color-ink)]">
         {label}
+        {required && <RequiredMark />}
       </p>
 
       {files.length > 0 && (

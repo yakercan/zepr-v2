@@ -33,6 +33,11 @@ export interface QuantityStepperProps {
   /** Smallest value the decrement button stays enabled at. At
    *  `quantity <= min`, decrement disables. Default `1`. */
   min?: number;
+  /** Largest value the increment button stays enabled at. At
+   *  `quantity >= max`, increment disables. Omit to leave
+   *  increment uncapped (PDP / cart use this; the return modal
+   *  passes the per-line `returnableQuantity`). */
+  max?: number;
   /** Larger / smaller variant — see file-level docstring. */
   size?: "sm" | "md";
   className?: string;
@@ -43,6 +48,7 @@ export function QuantityStepper({
   onIncrement,
   onDecrement,
   min = 1,
+  max,
   size = "sm",
   className,
 }: QuantityStepperProps) {
@@ -90,6 +96,7 @@ export function QuantityStepper({
       <button
         type="button"
         onClick={onIncrement}
+        disabled={max !== undefined && quantity >= max}
         aria-label="Increase quantity"
         className={btnClasses}
       >

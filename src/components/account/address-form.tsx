@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import type { AddressActionState } from "@/app/account/addresses/actions";
+import { RequiredMark } from "@/components/ui/form-field";
 import type { CustomerAddressInput } from "@/lib/shopify/customer-account-types";
 import { PANEL_SURFACE_THIN_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
@@ -116,7 +117,7 @@ export function AddressForm({
         <Field
           name="address2"
           label="Address line 2"
-          hint="Apartment, suite, unit (optional)"
+          hint="Apartment, suite, unit"
           defaultValue={initialValues?.address2}
           autoComplete="address-line2"
         />
@@ -192,7 +193,7 @@ export function AddressForm({
         <div className="mt-2 flex items-center justify-end gap-3">
           <Link
             href="/account/addresses"
-            className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-ink)]"
+            className="link-muted"
           >
             Cancel
           </Link>
@@ -268,6 +269,7 @@ function Field({
       <span className="flex items-baseline justify-between gap-2">
         <span className="font-medium text-[color:var(--color-ink)]">
           {label}
+          {required && <RequiredMark />}
         </span>
         {hint && (
           <span className="text-xs text-[color:var(--color-ink-muted)]">

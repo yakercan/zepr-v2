@@ -498,6 +498,44 @@
     }
   }
 
+  /*
+   * Muted action link — small, semibold, ink-secondary text that
+   * snaps to full ink on hover. The "second-tier" affordance
+   * sitting next to a primary CTA (`Cancel` in forms / modals,
+   * `Edit` on the dashboard cards, `Return request` on the
+   * order header).
+   *
+   * Works as both `<a>` and `<button>` — the `:disabled` /
+   * `[aria-disabled]` selector lets the modal cancel button
+   * fade out cleanly while the action is in flight, without
+   * the call sites having to layer `disabled:opacity-60` on
+   * top of the base class every time.
+   */
+  .link-muted {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    color: var(--color-ink-secondary);
+    transition: color 150ms ease;
+    text-decoration: none;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .link-muted:hover {
+      color: var(--color-ink);
+    }
+  }
+
+  .link-muted:disabled,
+  .link-muted[aria-disabled="true"] {
+    opacity: 0.6;
+    cursor: default;
+  }
+
   /* Note: the "selectable surface" outline (gray → ink on hover)
    * deliberately lives as a TypeScript constant in `lib/styles.ts`,
    * NOT as a CSS class here. Tailwind 4 puts `@layer utilities`

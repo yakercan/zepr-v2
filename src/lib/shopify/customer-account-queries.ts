@@ -10,6 +10,7 @@ import type {
   OrderDetail,
   OrderReturnStatus,
   OrdersPage,
+  ReturnableLineItem,
 } from "@/lib/shopify/customer-account-types";
 
 /**
@@ -47,6 +48,7 @@ export type {
   OrderSummary,
   OrdersPage,
   OrdersPageInfo,
+  ReturnableLineItem,
 } from "@/lib/shopify/customer-account-types";
 export { extractGidId } from "@/lib/shopify/customer-account-types";
 
@@ -260,6 +262,19 @@ interface OrderDetailResponse {
             updatedAt: string | null;
           }>;
         };
+        returnInformation: {
+          returnableLineItems: {
+            nodes: Array<{
+              quantity: number;
+              lineItem: {
+                id: string;
+                title: string;
+                variantTitle: string | null;
+                image: { url: string; altText: string | null } | null;
+              };
+            }>;
+          };
+        } | null;
       }>;
     };
   };
@@ -359,6 +374,22 @@ const ORDER_DETAIL_QUERY = /* GraphQL */ `
               updatedAt
             }
           }
+          returnInformation {
+            returnableLineItems(first: 50) {
+              nodes {
+                quantity
+                lineItem {
+                  id
+                  title
+                  variantTitle
+                  image {
+                    url
+                    altText
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -448,6 +479,25 @@ export async function fetchOrderDetail(
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     })),
+    /* Project `returnInformation.returnableLineItems` into the
+     * flat array the modal renders. Zero-quantity entries (fully
+     * returned in a prior request) are filtered out so the UI
+     * never sees an un-actionable row. The empty case naturally
+     * gates the "Return request" button off the order page.
+     * `returnInformation` itself is nullable on Shopify's schema
+     * for orders that haven't been fulfilled at all yet — treat
+     * that as "nothing returnable" by falling back to []. */
+    returnableLineItems:
+      raw.returnInformation?.returnableLineItems.nodes
+        .filter((node) => node.quantity > 0)
+        .map((node): ReturnableLineItem => ({
+          lineItemId: node.lineItem.id,
+          title: node.lineItem.title,
+          variantTitle: node.lineItem.variantTitle,
+          imageUrl: node.lineItem.image?.url ?? null,
+          imageAlt: node.lineItem.image?.altText ?? null,
+          returnableQuantity: node.quantity,
+        })) ?? [],
   };
 }
 
@@ -927,4 +977,105 @@ export async function updateCustomerProfile(
     firstName: data.customerUpdate.customer?.firstName ?? null,
     lastName: data.customerUpdate.customer?.lastName ?? null,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Return request                                                      */
+/* ------------------------------------------------------------------ */
+
+/** Input shape for `orderRequestReturn`. Mirrors Shopify's
+ *  `RequestedLineItemInput`. The `lineItemId` is the plain
+ *  `LineItem.id` (e.g. `gid://shopify/LineItem/353882977`) —
+ *  the same id `Order.returnInformation.returnableLineItems[]
+ *  .lineItem.id` returns. `returnReason: OTHER` is the only
+ *  value we ever send; our predefined reasons (from
+ *  `lib/returns/reasons.ts`) are encoded into the `customerNote`
+ *  so the merchant still sees what the shopper picked, without
+ *  us fighting Shopify's taxonomy. */
+export interface RequestedReturnLineItemInput {
+  lineItemId: string;
+  quantity: number;
+  /** Pre-formatted note: `"[Our reason]: [their note]"` (or just
+   *  the reason name when no note). Built by the caller. */
+  customerNote: string;
+}
+
+interface OrderRequestReturnPayload {
+  orderRequestReturn: {
+    return: {
+      id: string;
+      status: OrderReturnStatus;
+    } | null;
+    userErrors: MutationUserError[];
+  };
+}
+
+const ORDER_REQUEST_RETURN = /* GraphQL */ `
+  mutation OrderRequestReturn(
+    $orderId: ID!
+    $requestedLineItems: [RequestedLineItemInput!]!
+  ) {
+    orderRequestReturn(
+      orderId: $orderId
+      requestedLineItems: $requestedLineItems
+    ) {
+      return {
+        id
+        status
+      }
+      userErrors {
+        code
+        field
+        message
+      }
+    }
+  }
+`;
+
+/** Result envelope for `requestOrderReturn` — same `{ ok, error }`
+ *  shape as the address mutations, but also returns the newly-
+ *  created Return id when successful so the caller can name the
+ *  Supabase media folder after it. */
+export type OrderReturnRequestResult =
+  | { ok: true; returnId: string }
+  | { ok: false; error: string };
+
+/**
+ * Submit a return request on behalf of the signed-in customer.
+ *
+ * Shopify's `orderRequestReturn` mutation only models "the merchant
+ * will review this" — it doesn't directly create the Return; it
+ * queues it as `REQUESTED` for merchant approval. Photos / videos
+ * are NOT part of this mutation's input (the schema has no media
+ * field), so the storefront uploads them to our own Supabase bucket
+ * keyed by the freshly-returned `Return.id`.
+ */
+export async function requestOrderReturn(
+  orderId: string,
+  lineItems: RequestedReturnLineItemInput[],
+): Promise<OrderReturnRequestResult> {
+  const data = await customerAccountFetch<OrderRequestReturnPayload>(
+    ORDER_REQUEST_RETURN,
+    {
+      orderId,
+      requestedLineItems: lineItems.map((line) => ({
+        lineItemId: line.lineItemId,
+        quantity: line.quantity,
+        returnReason: "OTHER",
+        customerNote: line.customerNote,
+      })),
+    },
+  );
+
+  const error = firstErrorMessage(data.orderRequestReturn.userErrors);
+  if (error) return { ok: false, error };
+
+  const id = data.orderRequestReturn.return?.id;
+  if (!id) {
+    /* No userErrors and no return id is schema-illegal per
+     *  Shopify's contract, but we guard against it so the caller
+     *  never sees an `ok: true` without an id. */
+    return { ok: false, error: "Return request failed unexpectedly." };
+  }
+  return { ok: true, returnId: id };
 }

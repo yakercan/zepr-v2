@@ -7,6 +7,7 @@ import { submitReviewAction } from "@/app/products/[handle]/reviews/actions";
 import {
   CharCount,
   FormField,
+  RequiredMark,
   formInputClasses,
 } from "@/components/ui/form-field";
 import { MediaFormModal } from "@/components/ui/media-form-modal";
@@ -162,7 +163,7 @@ function ReviewFormModal({
            *  it up like any other field. */}
           <input type="hidden" name="rating" value={rating} />
 
-          <FormField label="Title (optional)">
+          <FormField label="Title">
             <input
               type="text"
               name="title"
@@ -178,7 +179,7 @@ function ReviewFormModal({
             <CharCount value={title.length} max={MAX_TITLE} />
           </FormField>
 
-          <FormField label="Your review">
+          <FormField label="Your review" required>
             <textarea
               name="body"
               value={body}
@@ -194,7 +195,7 @@ function ReviewFormModal({
             <CharCount value={body.length} max={MAX_BODY} />
           </FormField>
 
-          <FormField label="Display name">
+          <FormField label="Display name" required>
             <input
               type="text"
               name="nickname"
@@ -237,6 +238,7 @@ function StarPicker({
     >
       <legend className="text-sm font-medium text-[color:var(--color-ink)]">
         Rating
+        <RequiredMark />
       </legend>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => {
