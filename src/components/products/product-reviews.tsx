@@ -280,6 +280,19 @@ function ModerationBadge({ state }: { state: ReviewModerationState }) {
 
 /* ---------- Write-review CTA ---------- */
 
+/**
+ * The signed-in + eligible branches both render `<WriteReviewButton>`
+ * in the *same tree slot* so it stays mounted across the
+ * `ownReviewExists` flip the submit-success RSC payload triggers.
+ *
+ * If the button moved between slots (or unmounted entirely on
+ * the "already reviewed" branch), the submit modal would unmount
+ * with it — yanking the success flash out from under the shopper
+ * a fraction of a second after their submit lands. Keeping the
+ * client island mounted lets the modal play its full success
+ * confirmation; the button toggles its OWN visibility (and the
+ * "already reviewed" hint shows alongside it) based on the flag.
+ */
 function WriteReviewSection({
   authState,
   productId,
@@ -319,18 +332,6 @@ function WriteReviewSection({
     );
   }
 
-  /* Already reviewed — quiet acknowledgement. The delete
-   * affordance on the matching row is the only write surface
-   * they need, so we keep this to one short line and skip the
-   * paternalistic "delete to rewrite" instruction. */
-  if (ownReviewExists) {
-    return (
-      <HintBox withSeparator={withSeparator}>
-        You&rsquo;ve already reviewed this product.
-      </HintBox>
-    );
-  }
-
   /* Signed in but not a purchaser — surface the eligibility
    * hint instead of a button the submit gate would just reject.
    * Matches the wording the server action uses for the same
@@ -343,21 +344,26 @@ function WriteReviewSection({
     );
   }
 
-  /* Eligible + no own review: the real CTA. The submit action
-   * re-validates auth + purchase + duplicate as defence-in-depth;
-   * the gate here is just so the affordance only shows when the
-   * action would actually succeed. */
+  /* Eligible: `<WriteReviewButton>` always renders so its modal
+   * survives the `ownReviewExists` flip; the button + hint just
+   * swap visually around the stable client island. */
   return (
     <div
       className={cn(
-        withSeparator &&
-          "border-t border-[color:var(--color-border)] pt-4",
+        "flex flex-col gap-3",
+        withSeparator && "border-t border-[color:var(--color-border)] pt-4",
       )}
     >
+      {ownReviewExists && (
+        <p className="text-sm text-[color:var(--color-ink-muted)]">
+          You&rsquo;ve already reviewed this product.
+        </p>
+      )}
       <WriteReviewButton
         productId={productId}
         productHandle={productHandle}
         defaultNickname={authState.customerName ?? undefined}
+        hideTrigger={ownReviewExists}
       />
     </div>
   );

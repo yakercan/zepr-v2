@@ -212,7 +212,14 @@ export async function submitReviewAction(
    *    stale-while-revalidate now, which would briefly show the
    *    shopper a page that *doesn't* include the review they
    *    just posted. Immediate expiry matches the user's mental
-   *    model on a write they just performed. */
+   *    model on a write they just performed.
+   *
+   *    The submit modal survives this immediate re-render because
+   *    `<WriteReviewButton>` (which hosts the modal) stays mounted
+   *    across the `ownReviewExists` flip — the parent renders it
+   *    in the same tree slot regardless, and the button toggles
+   *    its OWN visibility based on the flag. See `WriteReviewSection`
+   *    for the why. */
   updateTag(reviewsTag(context.productId));
 
   return { ok: true };
