@@ -66,9 +66,27 @@ export interface ProductCardProps {
    *  (above-the-fold) and leave `false` for the rest so the browser
    *  lazy-loads naturally. */
   eager?: boolean;
+  /** Server-fetched: is this product in the current shopper's
+   *  favorites set? Defaults to `false` (guest + unfavorited). The
+   *  grid call site looks up `favoritedIds.has(product.id)` once
+   *  for the whole page and forwards the boolean per card so each
+   *  `<ProductCard>` is still a server component shipping no JS
+   *  for the lookup itself. */
+  favorited?: boolean;
+  /** Drives the heart's guest vs logged-in branch — opens the
+   *  sign-in modal for guests, persists via server action for
+   *  signed-in shoppers. Passed once from the page (which already
+   *  reads session for other reasons) and forwarded through the
+   *  grid. */
+  isLoggedIn?: boolean;
 }
 
-export function ProductCard({ product, eager = false }: ProductCardProps) {
+export function ProductCard({
+  product,
+  eager = false,
+  favorited = false,
+  isLoggedIn = false,
+}: ProductCardProps) {
   const hasDiscount =
     product.compare_at_min_cents !== undefined &&
     product.compare_at_min_cents > product.price_min_cents;
@@ -110,7 +128,11 @@ export function ProductCard({ product, eager = false }: ProductCardProps) {
             the info row. Once favorited it sticks at full opacity
             so the user can scan a grid and spot saved items at a
             glance. */}
-        <FavoriteButton productId={product.id} />
+        <FavoriteButton
+          productId={product.id}
+          initiallyFavorited={favorited}
+          isLoggedIn={isLoggedIn}
+        />
 
         {/* Free Shipping — full-width solid green banner pinned to
             the bottom edge of the media. Lives on the image (not

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 import { LoadMoreButton } from "@/components/products/load-more-button";
 import { ProductCard } from "@/components/products/product-card";
 import { ProductGrid } from "@/components/products/product-grid";
@@ -53,6 +53,14 @@ export interface RelatedProductsLoaderProps {
   /** Whether there's at least one more batch to fetch. Drives
    *  the visibility of the See more button. */
   initialHasMore: boolean;
+  /** Snapshot of the shopper's favorited product GIDs, captured
+   *  on the server at render time. Threaded through so any
+   *  appended cards from "See more" clicks can paint hearts in
+   *  the right state without a fresh server call. Empty array
+   *  for guests; the heart button still works as a sign-in
+   *  prompt either way. */
+  favoritedIds: ReadonlyArray<string>;
+  isLoggedIn: boolean;
 }
 
 export function RelatedProductsLoader({
@@ -62,7 +70,18 @@ export function RelatedProductsLoader({
   initialShownHandles,
   initialCursor,
   initialHasMore,
+  favoritedIds,
+  isLoggedIn,
 }: RelatedProductsLoaderProps) {
+  /* Cheap hash lookup for "is this appended product favorited?".
+   * Memoised because the array reference is otherwise stable
+   * across re-renders but constructing the Set each render is
+   * still wasted work. */
+  const favoritedSet = useMemo(
+    () => new Set(favoritedIds),
+    [favoritedIds],
+  );
+
   /* Loader state — kept flat so each transition only touches
    * what changed:
    *   - `appended` is the running list of *new* cards added by
@@ -118,7 +137,12 @@ export function RelatedProductsLoader({
            * below the fold by the time they mount (the shopper
            * had to scroll + click to reveal them). Let the
            * browser lazy-load. */
-          <ProductCard key={p.id} product={p} />
+          <ProductCard
+            key={p.id}
+            product={p}
+            favorited={favoritedSet.has(p.id)}
+            isLoggedIn={isLoggedIn}
+          />
         ))}
       </ProductGrid>
       {hasMore && (

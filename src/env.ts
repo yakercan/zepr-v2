@@ -69,7 +69,7 @@ export const env = createEnv({
     /* ----- Search ----- */
     SALESPACE_SEARCH_API_KEY: z.string().optional(),
 
-    /* ----- Supabase (reviews / wishlist / etc.) ----- */
+    /* ----- Supabase (reviews / returns media) ----- */
     SUPABASE_URL: z.string().url().optional(),
     SUPABASE_ANON_KEY: z.string().optional(),
     SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),

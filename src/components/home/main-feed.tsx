@@ -11,6 +11,8 @@ import {
   parseMainFeedTab,
   type MainFeedTabId,
 } from "@/config/main-feed-tabs";
+import { getAuthState } from "@/lib/auth/session";
+import { getCurrentFavoritedIds } from "@/lib/favorites/queries";
 import { PRODUCTS_PAGE_SIZE, parsePageParam } from "@/lib/pagination";
 import { searchProducts } from "@/lib/salespace/search";
 
@@ -72,12 +74,21 @@ async function MainFeedContent({
   // One request per render keeps the network surface flat — no
   // N-way fan-out as the user clicks deeper.
   const limit = page * PRODUCTS_PAGE_SIZE;
-  const result = await searchProducts(
-    { sort: tabConfig?.sort, limit },
-    // Per-tab cache tag so a future webhook can revalidate one
-    // tab without nuking the others.
-    { tags: [`products:${tab}`] },
-  );
+  // Auth + favorites set fetched in parallel with the product
+  // catalog so the heart on each card paints in the right state
+  // on first frame. `getCurrentFavoritedIds()` short-circuits to
+  // an empty set for guests, so the cost is zero when there's no
+  // session.
+  const [result, authState, favoritedIds] = await Promise.all([
+    searchProducts(
+      { sort: tabConfig?.sort, limit },
+      // Per-tab cache tag so a future webhook can revalidate one
+      // tab without nuking the others.
+      { tags: [`products:${tab}`] },
+    ),
+    getAuthState(),
+    getCurrentFavoritedIds(),
+  ]);
 
   if (result.hits.length === 0) {
     return (
@@ -106,6 +117,8 @@ async function MainFeedContent({
             key={product.id}
             product={product}
             eager={i < ABOVE_FOLD_TILES}
+            favorited={favoritedIds.has(product.id)}
+            isLoggedIn={authState.isLoggedIn}
           />
         ))}
       </ProductGrid>

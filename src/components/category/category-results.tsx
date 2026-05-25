@@ -6,6 +6,8 @@ import {
 import { ViewMoreButton } from "@/components/products/view-more-button";
 import { SearchFilters } from "@/components/search/search-filters";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAuthState } from "@/lib/auth/session";
+import { getCurrentFavoritedIds } from "@/lib/favorites/queries";
 import { PRODUCTS_PAGE_SIZE, parsePageParam } from "@/lib/pagination";
 import { searchProducts } from "@/lib/salespace/search";
 import type { TaxonomyCategory } from "@/types/taxonomy";
@@ -51,20 +53,27 @@ export async function CategoryResults({
   const page = parsePageParam(pageParam);
   const limit = page * PRODUCTS_PAGE_SIZE;
 
-  const result = await searchProducts(
-    {
-      collection: handle,
-      limit,
-      sort: sort || DEFAULT_SORT,
-      subcategory: subcategory?.length ? subcategory : undefined,
-      price_min: priceMin,
-      price_max: priceMax,
-      size: size?.length ? size : undefined,
-    },
-    // Per-handle cache tag so a future webhook can revalidate
-    // one category without touching others.
-    { tags: [`category:${handle}`] },
-  );
+  // Auth + favorites set fetched in parallel with the category
+  // call so the heart on each card paints in the right state on
+  // first frame.
+  const [result, authState, favoritedIds] = await Promise.all([
+    searchProducts(
+      {
+        collection: handle,
+        limit,
+        sort: sort || DEFAULT_SORT,
+        subcategory: subcategory?.length ? subcategory : undefined,
+        price_min: priceMin,
+        price_max: priceMax,
+        size: size?.length ? size : undefined,
+      },
+      // Per-handle cache tag so a future webhook can revalidate
+      // one category without touching others.
+      { tags: [`category:${handle}`] },
+    ),
+    getAuthState(),
+    getCurrentFavoritedIds(),
+  ]);
 
   const hasResults = result.hits.length > 0;
   const hasMore = hasResults && result.hits.length < result.total;
@@ -84,6 +93,8 @@ export async function CategoryResults({
                 key={product.id}
                 product={product}
                 eager={i < 10}
+                favorited={favoritedIds.has(product.id)}
+                isLoggedIn={authState.isLoggedIn}
               />
             ))}
           </ProductGrid>

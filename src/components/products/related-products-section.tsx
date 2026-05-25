@@ -5,6 +5,8 @@ import { ProductSection } from "@/components/products/product-section";
 import { loadRelatedProducts } from "@/components/products/related-products-actions";
 import { RelatedProductsLoader } from "@/components/products/related-products-loader";
 import { INITIAL_RELATED_CURSOR } from "@/components/products/related-products-types";
+import { getAuthState } from "@/lib/auth/session";
+import { getCurrentFavoritedIds } from "@/lib/favorites/queries";
 import { RELATED_PRODUCTS_PAGE_SIZE } from "@/lib/pagination";
 import type { ProductDetail } from "@/types/product";
 
@@ -57,12 +59,24 @@ export async function RelatedProductsSection({
   const collection = product.primaryCollection.handle;
   const subcategory = product.subcategory ?? null;
 
-  const initial = await loadRelatedProducts({
-    collection,
-    subcategory,
-    shownHandles: [product.handle],
-    cursor: INITIAL_RELATED_CURSOR,
-  });
+  /* Related catalog + auth + favorites set in parallel. The
+   * `<RelatedProductsLoader>` is a client component and can't
+   * call `getCurrentFavoritedIds` itself; we hand it the
+   * serialised set so any "See more" batch it loads later can
+   * paint hearts in the right state with no follow-up server
+   * call. The trade-off is that favorites toggled in *another
+   * tab* between initial render and a "See more" click won't
+   * reflect on the newly-loaded cards — acceptable for v1. */
+  const [initial, authState, favoritedIds] = await Promise.all([
+    loadRelatedProducts({
+      collection,
+      subcategory,
+      shownHandles: [product.handle],
+      cursor: INITIAL_RELATED_CURSOR,
+    }),
+    getAuthState(),
+    getCurrentFavoritedIds(),
+  ]);
 
   if (initial.products.length === 0) return null;
 
@@ -98,6 +112,8 @@ export async function RelatedProductsSection({
         initialShownHandles={initialShownHandles}
         initialCursor={initial.cursor}
         initialHasMore={initial.hasMore}
+        favoritedIds={Array.from(favoritedIds)}
+        isLoggedIn={authState.isLoggedIn}
       >
         {initial.products.map((p, i) => (
           /* First row eager-loads — matches the convention every
@@ -106,7 +122,13 @@ export async function RelatedProductsSection({
            * the `xl:` column count; narrower layouts treat the
            * same threshold as "well into the visible band",
            * which is good enough. */
-          <ProductCard key={p.id} product={p} eager={i < 5} />
+          <ProductCard
+            key={p.id}
+            product={p}
+            eager={i < 5}
+            favorited={favoritedIds.has(p.id)}
+            isLoggedIn={authState.isLoggedIn}
+          />
         ))}
       </RelatedProductsLoader>
     </ProductSection>
