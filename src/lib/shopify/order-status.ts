@@ -302,15 +302,23 @@ export function buildOrderTimeline(
 }
 
 /**
- * Per-return rows. Each return emits two milestones:
+ * Per-return rows.
  *
- *   1. "Return requested" — always complete, dated by `createdAt`.
- *   2. The decision row, shaped by `status`:
+ *   1. "Return requested" — always present, dated by `createdAt`,
+ *      complete (green ✓). Every return passes through this state
+ *      so the row is unconditional.
+ *   2. A decision row — appended *only* once the merchant has
+ *      actually decided. While the return is still `REQUESTED` we
+ *      omit the row entirely instead of rendering a muted
+ *      "Return approved · Pending" placeholder, because that
+ *      placeholder reads as "approval is the expected outcome" —
+ *      it isn't, and seeing it for a freshly-submitted request
+ *      sets the wrong expectation. The decision row only shows
+ *      its hand once Shopify has flipped the status:
  *
- *        REQUESTED            → "Return approved" pending (empty)
- *        OPEN / CLOSED        → "Return approved" complete (green ✓)
- *        DECLINED             → "Return declined" declined (red ✕)
- *        CANCELED             → "Return cancelled" cancelled (amber ❕)
+ *        OPEN / CLOSED  → "Return approved"  complete (green ✓)
+ *        DECLINED       → "Return declined"  declined (red ✕)
+ *        CANCELED       → "Return cancelled" cancelled (amber ❕)
  *
  * The `key` field encodes the return id so React doesn't reconcile
  * across distinct returns when there's more than one.
@@ -323,15 +331,13 @@ function returnEvents(ret: OrderReturnEvent): TimelineEvent[] {
     status: "complete",
   };
 
-  let decision: TimelineEvent;
+  let decision: TimelineEvent | null;
   switch (ret.status) {
     case "REQUESTED":
-      decision = {
-        key: `return:${ret.id}:decision`,
-        label: "Return approved",
-        date: null,
-        status: "pending",
-      };
+      /* Pending merchant decision — no decision row yet. The
+       * "Return requested" row above is enough on its own to
+       * communicate "we've received this, nothing to do yet". */
+      decision = null;
       break;
     case "OPEN":
     case "CLOSED":
@@ -366,7 +372,7 @@ function returnEvents(ret: OrderReturnEvent): TimelineEvent[] {
       break;
   }
 
-  return [requested, decision];
+  return decision ? [requested, decision] : [requested];
 }
 
 /* Earliest of a list of ISO timestamps. Lexicographic sort works

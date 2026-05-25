@@ -286,7 +286,18 @@ interface OrderDetailResponse {
  * the connection-with-filter pattern is the documented way to
  * fetch one order, and conveniently re-uses the same connection
  * the dashboard already runs against (so we never end up with two
- * versions of "what fields exist on Order"). */
+ * versions of "what fields exist on Order").
+ *
+ * Returns connection — explicitly newest-first
+ * (`sortKey: ID, reverse: true`) and capped at 50. Shopify's
+ * default sort on `Order.returns` is ID-ascending, which during
+ * internal testing started clipping the latest return off the
+ * tail once a single order accumulated more than 10 records:
+ * the timeline showed old returns but not the freshly-submitted
+ * one. Flipping the sort + raising the cap means the user's
+ * latest activity is always inside the page, and 50 stays
+ * comfortably ahead of even heavy real-world usage (most orders
+ * carry 0–2 returns). */
 const ORDER_DETAIL_QUERY = /* GraphQL */ `
   query OrderDetail($query: String!) {
     customer {
@@ -365,7 +376,9 @@ const ORDER_DETAIL_QUERY = /* GraphQL */ `
               }
             }
           }
-          returns(first: 10) {
+          # Newest-first, capped at 50 — see the JS comment above
+          # the query for the rationale.
+          returns(first: 50, sortKey: ID, reverse: true) {
             nodes {
               id
               name
