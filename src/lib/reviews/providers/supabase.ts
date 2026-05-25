@@ -9,14 +9,15 @@ import type {
   SubmitReviewInput,
 } from "@/lib/reviews/types";
 
-/* Worst-case cap on the page we pull per PDP render.
- *
- * Most products have <50 reviews — fetching them all in one
- * PostgREST round-trip is cheap and lets us compute an honest
- * average + count without a second aggregate query. If a product
- * ever pushes past this cap we ship "100+" semantics in the UI;
- * a real pagination cursor lives in a later round. */
-const PAGE_LIMIT = 100;
+/* Cap on approved reviews rendered per PDP. Most products sit
+ * well under this; if a product ever exceeds it the footer can
+ * ship "50+" semantics in a later round. */
+const DISPLAY_LIMIT = 50;
+
+/* Columns the PDP renders — shared by both reads so we never
+ * drift the public list and the own-row fetch out of sync. */
+const REVIEW_SELECT =
+  "id,rating,title,description,customer,createdAt,images,approved";
 
 /* Wire shape — exactly what Supabase returns from the
  * `product_review` table the legacy Hydrogen storefront writes
@@ -42,31 +43,37 @@ interface SupabaseRow {
  * Supabase-backed review provider.
  *
  * Reads the same `product_review` table the legacy storefront
- * already writes to — keyed by Shopify GID — so every review
- * captured before the cutover surfaces here unchanged.
+ * writes to — keyed by Shopify GID — so every review captured
+ * before the cutover surfaces here unchanged.
  *
- * One PostgREST round-trip per PDP. Service-role key — this
- * provider is `server-only`, the key never reaches the client,
- * and the legacy storefront restricts review reads to a server
- * context via RLS (the anon role can't `select` the table).
- * `select` is pruned to only the columns the UI reads,
- * `order=createdAt.desc` + `limit=100` so a runaway product
- * can't balloon the payload. The fetch participates in Next's
- * data cache with a 1-hour revalidate window — same TTL as the
- * PDP shell itself, so the review pane never drifts out of step
- * with the rest of the page.
+ * Two PostgREST round-trips per PDP, in parallel:
  *
- * Returns `null` on the failure paths so the UI just hides /
- * empty-states gracefully:
+ *   1. Approved page — public list (oldest tail dropped at
+ *      `DISPLAY_LIMIT`) + `count=exact` so the aggregate
+ *      ★ chip shows the real total even when the list is
+ *      paginated.
+ *   2. Viewer's own row — only fetched for signed-in shoppers,
+ *      so the owner sees their pending/rejected review on the
+ *      PDP without an admin surface. Skipped for guests.
  *
- *   - Missing `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` (CI /
- *     preview builds without secrets).
+ * Service-role key — this provider is `server-only`, the key
+ * never reaches the client, and the legacy RLS rules already
+ * restrict the table to server-context callers. Fetches
+ * participate in Next's data cache with a 1-hour revalidate
+ * window + a per-product cache tag; the submit/delete actions
+ * call `updateTag(reviewsTag(productId))` to invalidate
+ * immediately on write.
+ *
+ * Failure paths return `null` so the UI just hides / empty-
+ * states gracefully:
+ *
+ *   - Missing `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`.
  *   - Non-2xx PostgREST response (RLS denied, schema drift, …).
  *   - Network failure.
  *
- * A non-null `{ totalCount: 0, reviews: [] }` is returned for
- * products with no reviews yet — distinguishing "no data system
- * wired" from "system wired, this product has no reviews".
+ * `{ totalCount: 0, reviews: [] }` is returned for products
+ * with no reviews yet — distinguishes "no data system wired"
+ * from "system wired, this product has no reviews".
  */
 export async function fetchProductReviewsFromSupabase(
   productId: string,
@@ -76,72 +83,115 @@ export async function fetchProductReviewsFromSupabase(
   if (!deps) return null;
 
   const normaliseEmail = viewerEmail?.trim().toLowerCase() || null;
+  const tag = reviewsTagFor(productId);
 
-  const url = new URL("/rest/v1/product_review", deps.baseUrl);
-  url.searchParams.set("productId", `eq.${productId}`);
-  url.searchParams.set(
-    "select",
-    "id,rating,title,description,customer,createdAt,images,approved",
-  );
-  url.searchParams.set("order", "createdAt.desc");
-  url.searchParams.set("limit", String(PAGE_LIMIT));
-
-  let rows: SupabaseRow[];
   try {
-    const response = await fetch(url.toString(), {
-      headers: authHeaders(deps),
-      next: { revalidate: 3600, tags: [reviewsTagFor(productId)] },
-    });
-    if (!response.ok) {
-      console.warn(
-        `[reviews/supabase] PostgREST ${response.status} for ${productId}`,
-      );
-      return null;
+    const [approvedResult, ownRow] = await Promise.all([
+      fetchApprovedReviews(deps, productId, tag),
+      normaliseEmail
+        ? fetchOwnReview(deps, productId, normaliseEmail, tag)
+        : Promise.resolve(null),
+    ]);
+
+    const approvedReviews = approvedResult.rows
+      .map((row) => toReview(row, normaliseEmail))
+      .filter((r): r is ProductReview => r !== null);
+
+    /* Splice the viewer's row in only when it's NOT already in
+     * the approved list (the two queries overlap when the row
+     * is live). Newest-first sort puts a pending row at the top
+     * naturally, which is the right place for it. */
+    const ownReview = ownRow ? toReview(ownRow, normaliseEmail) : null;
+    const reviews =
+      ownReview && !approvedReviews.some((r) => r.id === ownReview.id)
+        ? [ownReview, ...approvedReviews]
+        : approvedReviews;
+
+    if (reviews.length === 0) {
+      return { averageRating: 0, totalCount: 0, reviews: [] };
     }
-    rows = (await response.json()) as SupabaseRow[];
+
+    /* Aggregates count approved rows only — the ★ chip mirrors
+     * what the public sees, never tilted by a viewer's pending
+     * row. */
+    const averageRating =
+      approvedReviews.length > 0
+        ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) /
+          approvedReviews.length
+        : 0;
+
+    return {
+      averageRating: Math.round(averageRating * 10) / 10,
+      totalCount: approvedResult.total,
+      ratingHistogram: buildHistogram(approvedReviews),
+      reviews,
+    };
   } catch (err) {
     console.warn(`[reviews/supabase] fetch failed for ${productId}`, err);
     return null;
   }
+}
 
-  /* Approval gate runs in JS rather than as a PostgREST `or=`
-   * filter — the JSON-path-inside-or syntax (`customer->>email`)
-   * is finicky across PostgREST versions, and legacy rows can
-   * carry mixed-case emails that wouldn't match a lowercase
-   * `eq.` filter anyway. The page is bounded by `PAGE_LIMIT`
-   * (100), so the extra rows we transfer are cheap.
-   *
-   * Public traffic keeps only approved rows. A signed-in shopper
-   * also keeps their own pending/rejected rows so they can
-   * confirm + delete from the PDP without an admin surface.
-   * Aggregates further down still only count approved rows. */
-  const visible: { review: ProductReview; approved: boolean }[] = [];
-  for (const row of rows) {
-    const isApproved = row.approved === true;
-    const rowEmail = row.customer?.email?.trim().toLowerCase() || null;
-    const isOwn = !!normaliseEmail && rowEmail === normaliseEmail;
-    if (!isApproved && !isOwn) continue;
+async function fetchApprovedReviews(
+  deps: SupabaseDeps,
+  productId: string,
+  tag: string,
+): Promise<{ rows: SupabaseRow[]; total: number }> {
+  const url = new URL("/rest/v1/product_review", deps.baseUrl);
+  url.searchParams.set("productId", `eq.${productId}`);
+  url.searchParams.set("approved", "eq.true");
+  url.searchParams.set("select", REVIEW_SELECT);
+  url.searchParams.set("order", "createdAt.desc");
+  url.searchParams.set("limit", String(DISPLAY_LIMIT));
 
-    const review = toReview(row, normaliseEmail);
-    if (review) visible.push({ review, approved: isApproved });
+  const response = await fetch(url.toString(), {
+    headers: { ...authHeaders(deps), Prefer: "count=exact" },
+    next: { revalidate: 3600, tags: [tag] },
+  });
+  if (!response.ok) {
+    throw new Error(`PostgREST ${response.status} approved fetch`);
   }
 
-  if (visible.length === 0) {
-    return { averageRating: 0, totalCount: 0, reviews: [] };
+  const rows = (await response.json()) as SupabaseRow[];
+  const total = parseContentRangeTotal(response.headers.get("content-range"));
+  return { rows, total: total ?? rows.length };
+}
+
+async function fetchOwnReview(
+  deps: SupabaseDeps,
+  productId: string,
+  email: string,
+  tag: string,
+): Promise<SupabaseRow | null> {
+  const url = new URL("/rest/v1/product_review", deps.baseUrl);
+  url.searchParams.set("productId", `eq.${productId}`);
+  url.searchParams.set("customer->>email", `eq.${email}`);
+  url.searchParams.set("select", REVIEW_SELECT);
+  url.searchParams.set("limit", "1");
+
+  const response = await fetch(url.toString(), {
+    headers: authHeaders(deps),
+    next: { revalidate: 3600, tags: [tag] },
+  });
+  if (!response.ok) {
+    throw new Error(`PostgREST ${response.status} own-review fetch`);
   }
 
-  const approved = visible.filter((v) => v.approved).map((v) => v.review);
-  const averageRating =
-    approved.length > 0
-      ? approved.reduce((sum, r) => sum + r.rating, 0) / approved.length
-      : 0;
+  const rows = (await response.json()) as SupabaseRow[];
+  return rows[0] ?? null;
+}
 
-  return {
-    averageRating: Math.round(averageRating * 10) / 10,
-    totalCount: approved.length,
-    ratingHistogram: buildHistogram(approved),
-    reviews: visible.map((v) => v.review),
-  };
+/* PostgREST returns the `count=exact` total in the
+ * `Content-Range: 0-9/42` header. We only need the trailing
+ * number; `"*"` means "exact count unavailable". */
+function parseContentRangeTotal(
+  contentRange: string | null,
+): number | null {
+  if (!contentRange) return null;
+  const total = contentRange.split("/")[1];
+  if (!total || total === "*") return null;
+  const n = Number(total);
+  return Number.isFinite(n) ? n : null;
 }
 
 /* ------------------------------------------------------------------ */

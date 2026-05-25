@@ -74,18 +74,16 @@ export function ProductReviews({
   authState,
   canWriteReview,
 }: ProductReviewsProps) {
-  const hasReviews = !!summary && summary.totalCount > 0;
-  /* Shopper has already reviewed this product — provider stamps
-   * `isOwn: true` on the matching row when we hand it the
-   * viewer email. We use that flag to suppress the "Write a
-   * review" CTA (the duplicate-check would just bounce them)
-   * and to reveal the delete affordance on the matching row. */
+  /* `totalCount` is approved-only (drives the public ★ chip).
+   * `reviews` can also include the viewer's own pending/rejected
+   * row — gate list visibility on the array, not the aggregate. */
+  const hasVisibleReviews = !!summary && summary.reviews.length > 0;
   const ownReviewExists =
-    hasReviews && summary.reviews.some((r) => r.isOwn);
+    !!summary && summary.reviews.some((r) => r.isOwn);
 
   return (
     <div className="flex flex-col gap-6">
-      {hasReviews ? (
+      {hasVisibleReviews ? (
         <ReviewList
           reviews={summary.reviews}
           totalCount={summary.totalCount}
@@ -116,7 +114,7 @@ export function ProductReviews({
          *  or the "Be the first to share" empty-state copy
          *  (`canWriteReview && !hasReviews`, which collapses
          *  to `canWriteReview` once we factor in the other arm). */
-        withSeparator={hasReviews || canWriteReview}
+        withSeparator={hasVisibleReviews || canWriteReview}
       />
     </div>
   );
@@ -193,15 +191,7 @@ function ReviewRow({
               Your review
             </span>
             {review.moderationState && (
-              <>
-                <span
-                  aria-hidden
-                  className="text-[color:var(--color-ink-muted)]"
-                >
-                  ·
-                </span>
-                <ModerationBadge state={review.moderationState} />
-              </>
+              <ModerationBadge state={review.moderationState} />
             )}
           </>
         )}
@@ -244,7 +234,10 @@ function ReviewRow({
  * Three-state moderation pill — only ever rendered next to the
  * "Your review" badge, so other shoppers never see it. Same shell
  * as the brand "Your review" badge (rounded-full, uppercase 11 px)
- * so the two read as a paired set on the row title line.
+ * so the two read as a paired set on the row title line. Leads
+ * with a middle-dot glyph so it visually attaches to the "Your
+ * review" pill it follows, like a continuation rather than a
+ * separate badge.
  *
  * Tokens:
  *   - approved → `--color-success`     (Live)
