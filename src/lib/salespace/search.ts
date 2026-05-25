@@ -13,9 +13,17 @@ import type {
  * Salespace search client — server-only.
  *
  * Wraps the `/search` endpoint, projects the upstream response onto
- * our `SearchProduct` shape (so the metafield string-parsing for
- * ratings happens once at the API boundary), and leans on Next's
- * built-in fetch cache for revalidation.
+ * our `SearchProduct` shape, and leans on Next's built-in fetch
+ * cache for revalidation.
+ *
+ * Ratings note: the upstream used to carry the average rating and
+ * count inside the product's Shopify metafields (`custom.review`
+ * as a JSON-encoded `rating` object + `custom.rating_count` as
+ * `number_integer`). The Salespace pipeline now reads both directly
+ * from Supabase and exposes them as first-class fields (`rating`,
+ * `rating_count`) on every hit — so the storefront no longer parses
+ * metafield strings and the Shopify metafield is no longer the
+ * source of truth.
  *
  * On any error (missing key, non-200, network blip) we return an
  * empty `SearchResult` so the calling RSC tree can render a normal
@@ -165,6 +173,11 @@ interface RawSearchProduct {
   available?: boolean;
   badges?: string[];
   metafields?: Record<string, string | number | undefined>;
+  /** Average rating (1–5) computed backend-side from approved
+   *  Supabase rows. `undefined` / `0` means no reviews yet. */
+  rating?: number;
+  /** Count of approved reviews backing the `rating` average. */
+  rating_count?: number;
   /** Option groups keyed by option name — see `SearchProduct.options`.
    *  The sync pipeline strips "Default Title" single-variant products,
    *  so an empty object (or missing field) means no picker needed. */
@@ -298,8 +311,8 @@ function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
     currency: raw.currency,
     available: raw.available !== false,
     badges: raw.badges,
-    rating: parseReview(raw.metafields?.["custom.review"]),
-    rating_count: parseRatingCount(raw.metafields?.["custom.rating_count"]),
+    rating: parseRating(raw.rating),
+    rating_count: parseRatingCount(raw.rating_count),
     options: parseOptions(raw.options),
   };
 }
@@ -338,28 +351,24 @@ function parseOptions(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function parseReview(raw: string | number | undefined): SearchProductReview | undefined {
-  if (typeof raw !== "string") return undefined;
-  try {
-    const obj = JSON.parse(raw) as {
-      value?: string | number;
-      scale_min?: string | number;
-      scale_max?: string | number;
-    };
-    const value = Number(obj.value);
-    if (!Number.isFinite(value) || value <= 0) return undefined;
-    return {
-      value,
-      scale_min: Number(obj.scale_min ?? 1),
-      scale_max: Number(obj.scale_max ?? 5),
-    };
-  } catch {
+/**
+ * Wrap the upstream's plain numeric `rating` into our internal
+ * `SearchProductReview` shape. Keeping the wrapper means the
+ * consuming components stay untouched after the metafield → first-
+ * class-field migration — they still read `product.rating.value`.
+ * The scale is fixed at 1–5 (matches the Supabase write path and
+ * the legacy metafield shape).
+ */
+function parseRating(raw: number | undefined): SearchProductReview | undefined {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) {
     return undefined;
   }
+  return { value: raw, scale_min: 1, scale_max: 5 };
 }
 
-function parseRatingCount(raw: string | number | undefined): number | undefined {
-  if (raw === undefined) return undefined;
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : undefined;
+function parseRatingCount(raw: number | undefined): number | undefined {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) {
+    return undefined;
+  }
+  return raw;
 }

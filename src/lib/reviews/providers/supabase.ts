@@ -237,11 +237,20 @@ export async function hasShopperReviewedProduct(
  * Insert a new review row. Returns the created row id on
  * success, `null` on any failure path.
  *
- * The card-aggregate (`custom.review` + `custom.rating_count`
- * metafield on the Shopify product) is owned by the backend —
- * a Supabase-side trigger reflects insert / delete events into
- * Shopify so the storefront never needs an Admin API key to
- * keep those numbers fresh.
+ * Card-aggregate sync — TODO (backend dependency):
+ * The product card across the rest of the site reads the
+ * average rating + count from Shopify metafields (`custom.review`
+ * + `custom.rating_count`), which legacy zepr kept in sync by
+ * issuing a Shopify Admin API `metafieldsSet` mutation from the
+ * storefront on every submit / delete. v2 deliberately dropped
+ * the Admin API path so the storefront never holds an admin
+ * token, which means the metafield is currently NOT updated
+ * when a review is posted here. The intended replacement is a
+ * Supabase-side trigger on `product_review` (AFTER INSERT /
+ * DELETE) that owns the Admin call backend-side. Until that
+ * trigger ships, the PDP shows the new review (it reads
+ * Supabase directly) but cards keep showing the previous
+ * average until something else updates the metafield.
  */
 export async function insertReviewIntoSupabase(
   input: SubmitReviewInput,
