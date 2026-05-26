@@ -53,10 +53,22 @@ import { hydrateShopifyAnalyticsConfig } from "@/lib/analytics/providers/shopify
  */
 export function ShopifyAnalytics({
   shopId,
+  cookieDomain,
+  checkoutDomain,
   currency = "USD",
   acceptedLanguage = "en",
 }: {
   shopId: string;
+  /** Apex domain (e.g. `"zepr.com"`) the visitor/session cookies
+   *  are scoped to. Required for Admin Analytics to attribute
+   *  events to a session — without it the cookies default to
+   *  host-only scope and don't bridge to `checkout.<apex>`,
+   *  breaking conversion attribution. */
+  cookieDomain?: string;
+  /** Checkout host (e.g. `"checkout.zepr.com"`). Passed through
+   *  to `useShopifyCookies` so it can validate the cookie domain
+   *  can actually be read by the checkout origin. */
+  checkoutDomain?: string;
   currency?: string;
   acceptedLanguage?: string;
 }) {
@@ -74,7 +86,18 @@ export function ShopifyAnalytics({
   }
 
   const hasUserConsent = useAnalyticsConsent();
-  useShopifyCookies({ hasUserConsent });
+  useShopifyCookies({
+    hasUserConsent,
+    /* Apex-scoped cookies so the same `_shopify_y` /
+     * `_shopify_s` pair is sent on requests to both the
+     * storefront (`zepr.com` / `dev.zepr.com`) and the
+     * Shopify-hosted checkout (`checkout.zepr.com`). Without
+     * apex scoping, the cookies are host-only on the
+     * storefront origin and Admin Analytics can't link
+     * pre-checkout sessions to conversions. */
+    domain: cookieDomain,
+    checkoutDomain,
+  });
 
   const pathname = usePathname();
   const searchParams = useSearchParams();
