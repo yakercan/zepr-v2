@@ -202,10 +202,19 @@ export function ProductModal({
               {detail?.title ?? product.title}
             </h3>
             <div className="mt-1 flex items-baseline gap-1.5">
-              <Price cents={priceMinCents} currency={currency} />
+              <Price
+                cents={priceMinCents}
+                currency={currency}
+                discounted={hasCompareAt}
+              />
               {hasRange && (
                 <span className="text-xs text-[color:var(--color-ink-muted)]">
-                  – <Price cents={priceMaxCents} currency={currency} />
+                  –{" "}
+                  <Price
+                    cents={priceMaxCents}
+                    currency={currency}
+                    discounted={hasCompareAt}
+                  />
                 </span>
               )}
               {hasCompareAt && compareAtCents !== undefined && (

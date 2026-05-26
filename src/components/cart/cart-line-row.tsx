@@ -87,6 +87,13 @@ export function CartLineRow({ line }: { line: CartLine }) {
           </Link>
 
           <div className="absolute right-0 top-0 flex flex-col items-end gap-0.5 leading-tight">
+            {/* Active line total stays in default ink even when
+             *  discounted — the cart drawer is a transaction
+             *  summary, and the brand-orange "this is on sale"
+             *  accent we use on PDP / quick-add reads as
+             *  conversion-funnel marketing once the shopper is
+             *  here. The compare-at strikethrough below already
+             *  carries the "this was discounted" signal. */}
             <Price
               cents={totalCents}
               currency={line.currency}

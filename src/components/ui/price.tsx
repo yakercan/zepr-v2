@@ -49,6 +49,13 @@ function splitPrice(cents: number, currency: string): PriceParts | null {
 
 export type PriceVariant = "regular" | "compare";
 
+/** The storefront-wide tint for a current price that's been
+ *  marked down from a compare-at. Centralised here so PDP /
+ *  product modal / cart drawer / order detail all read from one
+ *  source — change this once and every "this is on sale" price
+ *  in the app follows. */
+export const DISCOUNT_PRICE_ACCENT = "var(--color-brand)";
+
 export interface PriceProps {
   /** Amount in integer cents (Salespace's storage format). */
   cents: number;
@@ -56,8 +63,20 @@ export interface PriceProps {
   variant?: PriceVariant;
   /** Inline color override for the current price — used by the
    *  product card to tint the price with the headline badge
-   *  accent. Ignored on `compare` variants (they stay muted). */
+   *  accent. Ignored on `compare` variants (they stay muted).
+   *  Takes precedence over `discounted` when both are set, so a
+   *  badge-tinted card price isn't silently re-coloured when the
+   *  product is also on sale. */
   accent?: string;
+  /** When `true`, paints the current price in the brand-orange
+   *  "discounted" accent (`DISCOUNT_PRICE_ACCENT`). The semantic
+   *  way for the PDP, the quick-add modal, the cart drawer, and
+   *  the order detail page to flag "this price is the marked-
+   *  down one" without each caller repeating the CSS variable.
+   *  Ignored on `compare` variants (they stay muted). Ignored
+   *  when an explicit `accent` is provided (the card's badge
+   *  tint wins, see `accent` above). */
+  discounted?: boolean;
   className?: string;
 }
 
@@ -66,6 +85,7 @@ export function Price({
   currency,
   variant = "regular",
   accent,
+  discounted = false,
   className,
 }: PriceProps) {
   const parts = splitPrice(cents, currency);
@@ -96,9 +116,16 @@ export function Price({
     );
   }
 
+  /* Resolution order: explicit `accent` (badge tint on cards) →
+   * `discounted` (semantic flag for marked-down prices) → none
+   * (default ink). Keeps the brand-orange decision in one place
+   * while leaving the card's badge accent free to override. */
+  const effectiveAccent =
+    accent ?? (discounted ? DISCOUNT_PRICE_ACCENT : undefined);
+
   return (
     <span
-      style={accent ? { color: accent } : undefined}
+      style={effectiveAccent ? { color: effectiveAccent } : undefined}
       className={cn(
         // Wrapper font-size is the *dollars* size. Symbol + cents
         // scale off it (see the `em`-relative spans below) so a

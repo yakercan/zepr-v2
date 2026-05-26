@@ -126,7 +126,6 @@ export function BuyForm({
       ? Math.round(((compareAtCents - priceMinCents) / compareAtCents) * 100)
       : 0;
   const isDiscounted = discountPct > 0;
-  const priceAccent = isDiscounted ? "var(--color-brand)" : undefined;
 
   const handleSelect = (optionName: string, value: string) => {
     setSelection((prev) =>
@@ -406,7 +405,7 @@ export function BuyForm({
         <Price
           cents={priceMinCents}
           currency={product.currency}
-          accent={priceAccent}
+          discounted={isDiscounted}
           className="text-2xl"
         />
         {hasPriceRange && (
@@ -420,7 +419,7 @@ export function BuyForm({
             <Price
               cents={priceMaxCents}
               currency={product.currency}
-              accent={priceAccent}
+              discounted={isDiscounted}
               className="text-2xl"
             />
           </>
