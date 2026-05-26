@@ -8,6 +8,8 @@ import bundleAnalyzer from "@next/bundle-analyzer";
  */
 import "./src/env";
 
+import { SHORTCODE_REDIRECTS } from "./src/lib/shortcodes";
+
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
@@ -94,6 +96,28 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "260mb",
     },
     proxyClientMaxBodySize: "260mb",
+  },
+
+  /**
+   * Marketing short links: `/<code>` → the canonical page for
+   * that campaign (PDP, category, etc.). The map lives in
+   * `src/lib/shortcodes.ts` so adding / editing is a one-line
+   * data change; we expand it into Next's redirect table here.
+   *
+   * `permanent: true` emits a 308 (modern equivalent of 301).
+   * Next.js's redirect layer fires at the routing edge before
+   * any RSC, middleware, or page renders — zero JS per visit
+   * — and preserves the original query string on the
+   * destination, so attribution params like `?utm_source=ig`
+   * survive the hop. See `shortcodes.ts` for the "when not to
+   * use `permanent: true`" caveat.
+   */
+  async redirects() {
+    return Object.entries(SHORTCODE_REDIRECTS).map(([code, destination]) => ({
+      source: `/${code}`,
+      destination,
+      permanent: true,
+    }));
   },
 
   /**
