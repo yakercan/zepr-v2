@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import { AttributionHydrator } from "@/components/attribution/attribution-hydrator";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { CartLoginHandoff } from "@/components/cart/cart-login-handoff";
 import { SiteHeader } from "@/components/layout/site-header";
+import { getAttribution } from "@/lib/attribution/cookie";
 import { getCartHandoffPending } from "@/lib/cart/cookie";
 
 /**
@@ -23,9 +25,19 @@ import { getCartHandoffPending } from "@/lib/cart/cookie";
  *     boundary, no transient `?cart_handoff=1` flash in the URL.
  *     Renders nothing on the page; runs a side effect once after
  *     hydration when the flag is on.
+ *   - `<AttributionHydrator>` seeds the client attribution store
+ *     from the SSR-resolved cookie. The middleware writes the
+ *     cookie on UTM landings; this hydrator mirrors it into the
+ *     client store so Buy Now buttons and guest checkout URLs
+ *     attach the same `_utm_*` payload the server stamps on the
+ *     Shopify cart. Re-renders on every navigation pick up any
+ *     fresh capture without us touching the route.
  */
 export async function ShopLayout({ children }: { children: ReactNode }) {
-  const cartHandoffPending = await getCartHandoffPending();
+  const [cartHandoffPending, attribution] = await Promise.all([
+    getCartHandoffPending(),
+    getAttribution(),
+  ]);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -34,6 +46,7 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
       {/* <SiteFooter /> — TBD */}
       <CartDrawer />
       <CartLoginHandoff pending={cartHandoffPending} />
+      <AttributionHydrator attribution={attribution} />
     </div>
   );
 }

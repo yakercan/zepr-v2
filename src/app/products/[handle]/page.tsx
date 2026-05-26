@@ -11,7 +11,6 @@ import { RelatedProductsSection } from "@/components/products/related-products-s
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { RatingChip } from "@/components/ui/rating-chip";
 import { RichText } from "@/components/ui/rich-text";
-import { env } from "@/env";
 import { getAuthState } from "@/lib/auth/session";
 import { getProductReviews } from "@/lib/reviews";
 import { hasPurchasedProduct } from "@/lib/shopify/customer-account-queries";
@@ -114,14 +113,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const breadcrumbItems = buildBreadcrumb(product);
 
-  /* Buy Now hands off to Shopify's hosted checkout via a cart
-   * permalink. Prefer the dedicated checkout subdomain when set,
-   * otherwise fall back to the storefront's `.myshopify.com`
-   * hostname — Shopify accepts the same `/cart/<variant>:<qty>`
-   * shape on both, so the CTA keeps working in either env shape. */
-  const checkoutDomain =
-    env.SHOPIFY_CHECKOUT_DOMAIN ?? env.SHOPIFY_STOREFRONT_DOMAIN;
-
   return (
     <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
       <Breadcrumb items={breadcrumbItems} className="mb-4" />
@@ -133,7 +124,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
        *  list of conditional `&&` items. */}
       <ProductLayout
         product={product}
-        checkoutDomain={checkoutDomain}
         extraLeft={
           <ProductAccordion>
             {product.descriptionHtml && (

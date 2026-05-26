@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { ShopPayBadge } from "@/components/products/shop-pay-badge";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
-import { addCartLine } from "@/lib/cart/store";
-import { buildCartPermalink } from "@/lib/shopify/checkout";
+import { addCartLine, buyNow } from "@/lib/cart/store";
 import type { CartLine } from "@/types/cart";
 import type { ProductDetail, ProductVariant } from "@/types/product";
 
@@ -34,10 +33,14 @@ import type { ProductDetail, ProductVariant } from "@/types/product";
  *      `cartLineSeed`, so this component never has to know about
  *      `CompanionProduct`.
  *
- * Buy Now uses a Shopify hosted-checkout permalink — bypasses the
+   * Buy Now uses a Shopify hosted-checkout permalink — bypasses the
  * local cart entirely so the shopper goes from intent to paid
- * order in one click. Add to Cart loops `addCartLine`, suppressing
- * the drawer pop on every line but the first so the drawer opens
+ * order in one click. The permalink construction lives in the
+ * cart store's `buyNow()` so the same code path attaches the
+ * current UTM attribution (`attributes[_utm_*]=…`) on the way
+ * out, regardless of whether this CTA or a card / modal CTA
+ * fires it. Add to Cart loops `addCartLine`, suppressing the
+ * drawer pop on every line but the first so the drawer opens
  * exactly once as the confirmation signal.
  *
  * Disabled / label states:
@@ -74,17 +77,12 @@ export interface BuyActionsProps {
    *  this list. Pass `undefined` for the uncontrolled single-
    *  variant path (stepper visible, qty defaults to 1). */
   units?: ReadonlyArray<BuyUnit>;
-  /** Shopify checkout hostname for the Buy Now permalink. The
-   *  PDP route resolves this from env once and passes it down so
-   *  this client island doesn't touch process.env. */
-  checkoutDomain: string;
 }
 
 export function BuyActions({
   product,
   selectedVariant,
   units: controlledUnits,
-  checkoutDomain,
 }: BuyActionsProps) {
   const [internalQuantity, setInternalQuantity] = useState(1);
 
@@ -106,15 +104,6 @@ export function BuyActions({
     !!selectedVariant?.availableForSale &&
     effectiveUnits.length > 0 &&
     effectiveUnits.every((u) => u.availableForSale);
-  const buyNowUrl = sellable
-    ? buildCartPermalink(
-        checkoutDomain,
-        effectiveUnits.map((u) => ({
-          variantGid: u.variantGid,
-          quantity: u.quantity,
-        })),
-      )
-    : null;
 
   const handleAddToCart = () => {
     if (!sellable) return;
@@ -126,8 +115,13 @@ export function BuyActions({
   };
 
   const handleBuyNow = () => {
-    if (!buyNowUrl) return;
-    window.location.href = buyNowUrl;
+    if (!sellable) return;
+    buyNow(
+      effectiveUnits.map((u) => ({
+        variantGid: u.variantGid,
+        quantity: u.quantity,
+      })),
+    );
   };
 
   const addLabel = !selectedVariant
@@ -161,7 +155,7 @@ export function BuyActions({
       <button
         type="button"
         onClick={handleBuyNow}
-        disabled={!buyNowUrl}
+        disabled={!sellable}
         className="btn-primary w-full"
       >
         Buy Now - Fast Checkout

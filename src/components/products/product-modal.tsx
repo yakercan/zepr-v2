@@ -7,7 +7,7 @@ import { VariantPicker } from "@/components/products/variant-picker";
 import { Modal } from "@/components/ui/modal";
 import { Price } from "@/components/ui/price";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
-import { addCartLine } from "@/lib/cart/store";
+import { addCartLine, buyNow } from "@/lib/cart/store";
 import {
   cascadeSelect,
   defaultSelection,
@@ -50,14 +50,18 @@ type FetchStatus = "idle" | "loading" | "success" | "error";
  * Add flow:
  *
  *   1. Selection landed on a real variant + the variant is in
- *      stock → enable the CTA.
- *   2. CTA click → `addCartLine` with the resolved
+ *      stock → enable both CTAs.
+ *   2. **Add to cart** → `addCartLine` with the resolved
  *      `merchandiseId`. The cart store routes by mode — guest
  *      writes localStorage, logged-in fires `addToCartAction`
- *      and reconciles against Shopify.
- *   3. `addCartLine` pops the drawer; we close the modal so the
- *      drawer's "added to cart" feedback is the user's next
- *      visible event.
+ *      and reconciles against Shopify. Modal closes so the
+ *      drawer pop is the user's next visible event.
+ *   3. **Buy now** → `buyNow()` from the same store, which
+ *      builds a Shopify cart permalink (with the current UTM
+ *      attribution attached) and navigates. Bypasses the local
+ *      cart entirely — same fast-checkout path the PDP CTA uses,
+ *      so attribution / cart-permalink construction stays one
+ *      code path regardless of where Buy Now is initiated.
  *
  * Stays mounted (even when closed) so the option state survives
  * a reopen without re-fetching. The `<Modal>` shell owns
@@ -140,6 +144,11 @@ export function ProductModal({
     if (!detail || !selectedVariant) return;
     addCartLine(buildCartLineFromVariant(detail, selectedVariant));
     onClose();
+  };
+
+  const handleBuyNow = () => {
+    if (!selectedVariant) return;
+    buyNow([{ variantGid: selectedVariant.id, quantity: 1 }]);
   };
 
   /* Pricing — prefer the resolved variant's price (we have it the
@@ -226,15 +235,28 @@ export function ProductModal({
           />
         )}
 
-        <div className="flex items-center justify-end">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             onClick={handleAdd}
             disabled={!detail || !sellable}
-            className="btn-primary"
+            className="btn-secondary w-full"
           >
             {ctaLabel}
           </button>
+          {/* Buy Now mirrors the PDP CTA but only renders when we
+           *  have a real, sellable variant in hand — pre-load /
+           *  unavailable states would otherwise show a button
+           *  that's never enabled. */}
+          {detail && sellable && (
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              className="btn-primary w-full"
+            >
+              Buy Now - Fast Checkout
+            </button>
+          )}
         </div>
       </div>
     </Modal>

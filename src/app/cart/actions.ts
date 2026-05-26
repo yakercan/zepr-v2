@@ -2,6 +2,8 @@
 
 import { updateTag } from "next/cache";
 
+import { getAttribution } from "@/lib/attribution/cookie";
+import { attributionToCartAttributes } from "@/lib/attribution/format";
 import { getSession } from "@/lib/auth/session";
 import {
   clearCartHandoffPending,
@@ -9,6 +11,7 @@ import {
   setCartId,
 } from "@/lib/cart/cookie";
 import {
+  cartAttributesUpdate,
   cartCreate,
   cartLinesAdd,
   cartLinesRemove,
@@ -78,6 +81,13 @@ export interface AddToCartInput {
  * Creates the cart if there isn't one yet for this session
  * (cookie missing or pointing to an expired cart). Resolves the
  * variant from `handle` when only the handle is known.
+ *
+ * Stamps the current UTM attribution onto the cart on every
+ * call (fresh cart gets it baked into `cartCreate`; existing
+ * cart gets a follow-up `cartAttributesUpdate`). Last-touch
+ * wins: a shopper who clicked a Meta ad yesterday, browsed
+ * around today via an Instagram link, then added to cart now
+ * gets the *Instagram* attribution on the resulting order.
  */
 export async function addToCartAction(
   input: AddToCartInput,
@@ -94,15 +104,39 @@ export async function addToCartAction(
   if (!merchandiseId) return { ok: false, error: "resolve_failed" };
 
   const cartId = await getCartId();
-  const cart = await getOrCreateCart(cartId, session.tokens.accessToken);
+  const attribution = await getAttribution();
+  const attributionAttrs = attributionToCartAttributes(attribution);
+
+  /* Fresh-cart path bakes attribution into `cartCreate` (one
+   * round-trip); existing-cart path stamps via the separate
+   * `cartAttributesUpdate` call below (parallel with the line
+   * add). The `getOrCreateCart` attributes argument is only
+   * consulted on the create branch. */
+  const cart = await getOrCreateCart(
+    cartId,
+    session.tokens.accessToken,
+    attributionAttrs.length > 0 ? attributionAttrs : undefined,
+  );
   if (!cart) return { ok: false, error: "internal_error" };
+  const wasExisting = cart.id === cartId;
 
   const line: CartLineInput = {
     merchandiseId,
     quantity,
     attributes: input.attributes,
   };
-  const updated = await cartLinesAdd(cart.id, [line]);
+
+  /* Stamp attribution and add the line in parallel when the
+   * cart already existed — saves ~100ms vs sequential mutations.
+   * Both write to disjoint parts of the cart so the order
+   * doesn't matter. The fresh-cart branch skips the attribute
+   * call because `cartCreate` already attached them. */
+  const [updated] = await Promise.all([
+    cartLinesAdd(cart.id, [line]),
+    wasExisting && attributionAttrs.length > 0
+      ? cartAttributesUpdate(cart.id, attributionAttrs)
+      : Promise.resolve(null),
+  ]);
   if (!updated) return { ok: false, error: "internal_error" };
 
   /* Sync the cookie back — `cart.id` is stable across mutations
@@ -259,15 +293,27 @@ export async function mergeGuestCartAction(
   await clearCartHandoffPending();
 
   const accessToken = session.tokens.accessToken;
+  const attribution = await getAttribution();
+  const attributionAttrs = attributionToCartAttributes(attribution);
 
   /* Empty-guest path — keep whatever cart the customer already
    * has on Shopify (or create a fresh empty one), make sure it's
    * attached to them, and return. */
   if (input.lines.length === 0) {
     const existingId = await getCartId();
-    const cart = await getOrCreateCart(existingId, accessToken);
+    const cart = await getOrCreateCart(
+      existingId,
+      accessToken,
+      attributionAttrs.length > 0 ? attributionAttrs : undefined,
+    );
     if (!cart) return { ok: false, error: "internal_error" };
     if (cart.id !== existingId) await setCartId(cart.id);
+    /* Re-stamp on the existing-cart branch — `getOrCreateCart`'s
+     * `attributes` argument only fires on create, so an existing
+     * cart needs the follow-up to pick up the latest UTMs. */
+    if (cart.id === existingId && attributionAttrs.length > 0) {
+      await cartAttributesUpdate(cart.id, attributionAttrs);
+    }
     updateTag("cart");
     return { ok: true, cart };
   }
@@ -307,9 +353,16 @@ export async function mergeGuestCartAction(
      * guest path so the client still finishes the handoff
      * cleanly (and we don't strand a useless cookie). */
     const existingId = await getCartId();
-    const cart = await getOrCreateCart(existingId, accessToken);
+    const cart = await getOrCreateCart(
+      existingId,
+      accessToken,
+      attributionAttrs.length > 0 ? attributionAttrs : undefined,
+    );
     if (!cart) return { ok: false, error: "internal_error" };
     if (cart.id !== existingId) await setCartId(cart.id);
+    if (cart.id === existingId && attributionAttrs.length > 0) {
+      await cartAttributesUpdate(cart.id, attributionAttrs);
+    }
     updateTag("cart");
     return { ok: true, cart };
   }
@@ -317,6 +370,7 @@ export async function mergeGuestCartAction(
   const cart = await cartCreate({
     lines: inputLines,
     buyerIdentity: { customerAccessToken: accessToken },
+    attributes: attributionAttrs.length > 0 ? attributionAttrs : undefined,
   });
   if (!cart) return { ok: false, error: "internal_error" };
 

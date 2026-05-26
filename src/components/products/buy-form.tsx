@@ -77,10 +77,6 @@ import type {
 export interface BuyFormProps {
   product: ProductDetail;
   className?: string;
-  /** Shopify checkout hostname — passed through to `<BuyActions>`
-   *  so the Buy Now CTA can build its cart permalink. Pre-resolved
-   *  in the server route so this client island never reads env. */
-  checkoutDomain: string;
   /** Fires after the picker resolves a new variant (or fails to,
    *  in which case the argument is `undefined`). The PDP layout
    *  uses this to nudge the gallery to the variant's image. Skips
@@ -92,7 +88,6 @@ export interface BuyFormProps {
 export function BuyForm({
   product,
   className,
-  checkoutDomain,
   onVariantChange,
 }: BuyFormProps) {
   const [selection, setSelection] = useState<OptionSelection>(() =>
@@ -475,7 +470,6 @@ export function BuyForm({
         product={product}
         selectedVariant={selectedVariant}
         units={buyUnits}
-        checkoutDomain={checkoutDomain}
       />
 
       <TrustBadges />

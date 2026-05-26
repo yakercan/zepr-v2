@@ -199,6 +199,25 @@ const CART_BUYER_IDENTITY_UPDATE_MUTATION = /* GraphQL */ `
   ${CART_FRAGMENT}
 `;
 
+const CART_ATTRIBUTES_UPDATE_MUTATION = /* GraphQL */ `
+  mutation CartAttributesUpdate(
+    $cartId: ID!
+    $attributes: [AttributeInput!]!
+  ) {
+    cartAttributesUpdate(cartId: $cartId, attributes: $attributes) {
+      cart {
+        ...CartFields
+      }
+      userErrors {
+        field
+        message
+        code
+      }
+    }
+  }
+  ${CART_FRAGMENT}
+`;
+
 /* ------------------------------------------------------------------ */
 /* Wire shapes                                                          */
 /* ------------------------------------------------------------------ */
@@ -401,6 +420,11 @@ interface CartCreateInput {
     customerAccessToken?: string;
     email?: string;
   };
+  /** Cart-level attributes stamped at creation time — primarily
+   *  the UTM attribution payload so the merge / fresh-cart path
+   *  carries campaign tracking from the very first round-trip
+   *  (no follow-up `cartAttributesUpdate` needed). */
+  attributes?: ReadonlyArray<{ key: string; value: string }>;
 }
 
 /**
@@ -419,6 +443,9 @@ export async function cartCreate(input: CartCreateInput): Promise<Cart | null> {
         input: {
           lines: input.lines?.map(toLineInputForCreate),
           buyerIdentity: input.buyerIdentity,
+          ...(input.attributes && input.attributes.length > 0
+            ? { attributes: input.attributes }
+            : {}),
         },
       },
       { revalidate: false },
@@ -536,6 +563,51 @@ export async function cartBuyerIdentityUpdate(
 }
 
 /**
+ * Stamp cart-level attributes onto an existing Shopify cart.
+ *
+ * Used to attach UTM attribution (`_utm_source`, `_utm_campaign`,
+ * etc.) to the cart so the resulting order's `note_attributes`
+ * carry the campaign back to the merchant admin. Non-fatal on
+ * error — never block the add-to-cart flow if the attribution
+ * stamp 500s. The merchandise is on the cart either way; we'd
+ * rather lose one row in a marketing report than refuse a sale.
+ *
+ * Shopify's `cartAttributesUpdate` is *additive on key collision*:
+ * passing `{key: "_utm_source", value: "tiktok"}` overwrites
+ * whatever was there before for the same key, but leaves other
+ * cart attributes (line-level overrides, etc.) untouched. So
+ * calling this on every add re-stamps the latest attribution
+ * without clobbering anything else.
+ */
+export async function cartAttributesUpdate(
+  cartId: string,
+  attributes: ReadonlyArray<{ key: string; value: string }>,
+): Promise<Cart | null> {
+  if (attributes.length === 0) return null;
+  try {
+    const data = await shopifyFetch<{
+      cartAttributesUpdate: {
+        cart: RawCart | null;
+        userErrors: RawUserError[];
+      };
+    }>(
+      CART_ATTRIBUTES_UPDATE_MUTATION,
+      { cartId, attributes },
+      { revalidate: false },
+    );
+    logUserErrors(
+      "cartAttributesUpdate",
+      data.cartAttributesUpdate.userErrors,
+    );
+    if (!data.cartAttributesUpdate.cart) return null;
+    return rawCartToCart(data.cartAttributesUpdate.cart);
+  } catch (err) {
+    console.error("[shopify-cart] cartAttributesUpdate failed:", err);
+    return null;
+  }
+}
+
+/**
  * Resolve to a usable cart for the current shopper.
  *
  *   - Given a `cartId`, fetch it. If it's still alive, return it.
@@ -552,6 +624,7 @@ export async function cartBuyerIdentityUpdate(
 export async function getOrCreateCart(
   cartId: string | null,
   customerAccessToken?: string,
+  attributes?: ReadonlyArray<{ key: string; value: string }>,
 ): Promise<Cart | null> {
   if (cartId) {
     const existing = await fetchCart(cartId);
@@ -561,6 +634,7 @@ export async function getOrCreateCart(
     buyerIdentity: customerAccessToken
       ? { customerAccessToken }
       : undefined,
+    attributes,
   });
 }
 

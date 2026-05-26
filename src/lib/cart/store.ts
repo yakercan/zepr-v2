@@ -8,9 +8,14 @@ import {
   type CartActionResult,
 } from "@/app/cart/actions";
 import { resolveFirstVariantGidAction } from "@/app/products/actions";
+import { attributionToCartAttributes } from "@/lib/attribution/format";
+import {
+  getCurrentAttribution,
+  useAttribution,
+} from "@/lib/attribution/store";
 import { openCart } from "@/lib/cart/drawer-store";
 import { createStore } from "@/lib/external-store";
-import { buildCartPermalink } from "@/lib/shopify/checkout";
+import { buildCartPermalink, type CheckoutLine } from "@/lib/shopify/checkout";
 import type { Cart } from "@/lib/shopify/cart";
 import type { CartLine } from "@/types/cart";
 import type { SearchProduct } from "@/types/product";
@@ -557,6 +562,44 @@ export function clearCart(): void {
   void dispatchServerAction(() => clearCartAction());
 }
 
+/**
+ * Buy Now — send the shopper directly to Shopify's hosted
+ * checkout with the given lines, bypassing the local cart.
+ *
+ * Used by:
+ *
+ *   - PDP "Buy Now - Fast Checkout" CTA (`<BuyActions>`).
+ *   - Product modal Buy Now button — same single-variant flow
+ *     but launched from a card click rather than the PDP.
+ *   - Any future "express checkout" entry point that wants to
+ *     skip the cart drawer.
+ *
+ * Mode-agnostic by design: server-mode users get the same
+ * `cart/<variant>:<qty>` permalink as guests, with the current
+ * attribution attached as `attributes[_utm_*]` query params.
+ * Buy Now is intentionally NOT a "add to my cart then go" flow —
+ * the shopper picks one product and goes; their existing cart
+ * stays as-is for later.
+ *
+ * Returns nothing — synchronously navigates via
+ * `window.location.href` on success. A `null` permalink (no
+ * checkout domain configured, every line failed to parse) is a
+ * silent no-op; the caller's button should have been disabled
+ * before we got here.
+ */
+export function buyNow(lines: ReadonlyArray<CheckoutLine>): void {
+  if (typeof window === "undefined") return;
+  const meta = metaStore.get();
+  if (!meta.checkoutDomain || lines.length === 0) return;
+
+  const attribution = getCurrentAttribution();
+  const url = buildCartPermalink(meta.checkoutDomain, lines, {
+    attributes: attributionToCartAttributes(attribution),
+  });
+  if (!url) return;
+  window.location.href = url;
+}
+
 /* ------------------------------------------------------------------ */
 /* Hooks                                                                */
 /* ------------------------------------------------------------------ */
@@ -589,9 +632,15 @@ export function useCartSubtotalCents(): number {
  *
  *   - **Server** → the Shopify-issued `cart.checkoutUrl`. Routes
  *     to hosted checkout with buyer identity pre-filled.
+ *     Attribution rides as cart attributes (stamped via
+ *     `cartAttributesUpdate` at add-time), so no URL params are
+ *     needed.
  *   - **Guest** → a `cart/<variant>:<qty>,…` permalink built on
- *     demand from the current lines + checkout domain. Same
- *     pattern the PDP "Buy Now" CTA uses.
+ *     demand from the current lines + checkout domain, with the
+ *     current UTM attribution appended as `attributes[_utm_*]`
+ *     query params. Shopify reads them off the URL and stamps
+ *     them onto the resulting cart — same destination as the
+ *     server path, different transport.
  *
  * Returns `null` when neither path can produce a usable URL
  * (empty cart for guests, no checkout domain configured, lines
@@ -599,12 +648,13 @@ export function useCartSubtotalCents(): number {
  * the button in that case.
  */
 export function useCartCheckoutUrl(): string | null {
-  /* Subscribe to both stores — checkoutUrl can change as the
-   * server cart reconciles, and the guest permalink depends on
-   * the lines. The selector returns a primitive so the caller
-   * only re-renders on real URL changes. */
+  /* Subscribe to all three stores — checkoutUrl can change as
+   * the server cart reconciles, the guest permalink depends on
+   * the lines, and the attribution payload changes when a fresh
+   * UTM lands mid-session. */
   const meta = metaStore.use();
   const lines = linesStore.use();
+  const attribution = useAttribution();
   if (meta.mode === "server") return meta.checkoutUrl ?? null;
   if (!meta.checkoutDomain || lines.length === 0) return null;
   const permalink = buildCartPermalink(
@@ -614,6 +664,7 @@ export function useCartCheckoutUrl(): string | null {
         ? [{ variantGid: l.merchandiseId, quantity: l.quantity }]
         : [],
     ),
+    { attributes: attributionToCartAttributes(attribution) },
   );
   return permalink;
 }

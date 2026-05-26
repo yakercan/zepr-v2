@@ -1,6 +1,7 @@
 /**
  * Shopify "Buy Now" cart-permalink builder — the URL that powers
- * the PDP's "Buy Now - Fast Checkout" CTA.
+ * the PDP's "Buy Now - Fast Checkout" CTA and the guest-mode
+ * checkout button in the cart drawer.
  *
  * Pattern: `https://<checkout-domain>/cart/<v1>:<q1>,<v2>:<q2>,…`
  *
@@ -17,6 +18,13 @@
  * returns `null` so the caller can disable the CTA rather than
  * navigate to a broken url.
  *
+ * Optional `attributes` are appended as `attributes[<key>]=<v>`
+ * query params — Shopify natively reads them off the permalink
+ * URL and stamps them on the resulting cart (same path
+ * `cartAttributesUpdate` writes to). The Buy Now / guest
+ * checkout flows use this hook to carry UTM attribution into
+ * checkout even though they never touch the Cart API.
+ *
  * `checkoutDomain` is the bare hostname (no scheme, no path).
  * `https://` is prepended unconditionally.
  */
@@ -25,9 +33,15 @@ export interface CheckoutLine {
   quantity: number;
 }
 
+export interface CheckoutAttribute {
+  key: string;
+  value: string;
+}
+
 export function buildCartPermalink(
   checkoutDomain: string,
   lines: ReadonlyArray<CheckoutLine>,
+  options: { attributes?: ReadonlyArray<CheckoutAttribute> } = {},
 ): string | null {
   const segments: string[] = [];
   for (const line of lines) {
@@ -37,5 +51,18 @@ export function buildCartPermalink(
     segments.push(`${numericId}:${qty}`);
   }
   if (segments.length === 0) return null;
-  return `https://${checkoutDomain}/cart/${segments.join(",")}`;
+
+  const base = `https://${checkoutDomain}/cart/${segments.join(",")}`;
+  const attrs = options.attributes ?? [];
+  if (attrs.length === 0) return base;
+
+  /* `URLSearchParams` is the safest way to encode user-supplied
+   * values into the query string — handles spaces, ampersands,
+   * non-ASCII (Turkish campaign names, emoji UTMs, etc.) the
+   * same way Shopify's URL parser expects. */
+  const params = new URLSearchParams();
+  for (const { key, value } of attrs) {
+    params.append(`attributes[${key}]`, value);
+  }
+  return `${base}?${params.toString()}`;
 }
