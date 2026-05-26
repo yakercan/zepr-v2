@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { CartBadge } from "@/components/cart/cart-badge";
 import { CartEmpty } from "@/components/cart/cart-empty";
 import { CartFooter } from "@/components/cart/cart-footer";
@@ -12,6 +10,7 @@ import {
   useCartPending,
   useCartSubtotalCents,
 } from "@/lib/cart/store";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
 import type { Cart } from "@/lib/shopify/cart";
 import { PANEL_SURFACE_THIN_CLASSES } from "@/lib/styles";
 import type { CartLine } from "@/types/cart";
@@ -78,25 +77,11 @@ import { cn } from "@/lib/utils";
  *   2. Through SSR + the first client render we ignore the store
  *      and render `initialCart` directly — HTML matches, no
  *      flash, real lines on first paint for signed-in shoppers.
- *   3. A mount-only `useEffect` flips an internal `mounted`
- *      flag; from the next render on the store wins and the page
- *      tracks every mutation live.
- *
- * Why an effect-driven flag instead of `useHydrated()`: this
- * component sits inside Next.js's streamed per-segment Suspense
- * boundary (`<LoadingBoundary name="cart/" />`). React 19's
- * `useSyncExternalStore` doesn't reliably return its server
- * snapshot during a streamed sub-tree's hydration commit — by
- * the time the chunk lands the outer app is already past its
- * hydration phase, so the hook switches straight to its client
- * snapshot and the "pre-hydration vs post-hydration" handoff
- * collapses into one render with stale data, producing
- * mismatch warnings against the SSR HTML. `useState(false)` +
- * `useEffect(setMounted(true))` doesn't have that failure mode:
- * the initial render is honest about render-vs-mount no matter
- * where in the tree we are, and effects fire strictly after
- * every initial render + commit (including `<CartHydrator>`'s
- * render-time store seed in the header) has settled.
+ *   3. `useHydrated()` flips after mount; from the next render
+ *      on the store wins and the page tracks every mutation
+ *      live. The hook is streaming-safe (see its doc block) —
+ *      necessary here because the `/cart` page renders inside
+ *      Next.js's per-segment `<LoadingBoundary>`.
  *
  * Guests have no server cart (no session = `initialCart === null`).
  * Through the same window we render `<CartPageSkeleton>` — a
@@ -116,42 +101,21 @@ export interface CartPageBodyProps {
 }
 
 export function CartPageBody({ initialCart }: CartPageBodyProps) {
+  const hydrated = useHydrated();
   const storeLines = useCartLines();
   const storeSubtotal = useCartSubtotalCents();
   const pending = useCartPending();
-
-  /* `mounted` controls the SSR-vs-live handoff. See `<CartBadge>`'s
-   * doc block for the full reasoning — short version: the `/cart`
-   * page renders inside a streamed Next.js Suspense boundary, and
-   * `useSyncExternalStore` (which `useHydrated()` wraps) doesn't
-   * reliably return its server snapshot during the sub-tree's
-   * hydration commit. `useState(false)` + a mount-only `useEffect`
-   * is honest about render-vs-mount regardless of streaming, so
-   * the first render always emits the SSR-matching `initialCart`
-   * branch and the flip to the live store happens strictly after
-   * every initial render in the tree (including
-   * `<CartHydrator>`'s render-time seed in the header) has
-   * committed.
-   *
-   * `react-hooks/set-state-in-effect` flagged because the lint
-   * prefers `useSyncExternalStore`; that's the hook we're
-   * deliberately routing around here. */
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
 
   /* Pre-mount we render the server snapshot (or skeleton when
    * there isn't one); post-mount the store takes over. Using
    * `null` as the "no data" sentinel keeps the empty-cart branch
    * (`lines.length === 0`) cleanly distinct from the
    * skeleton branch (`lines === null`). */
-  const lines: readonly CartLine[] | null = mounted
+  const lines: readonly CartLine[] | null = hydrated
     ? storeLines
     : (initialCart?.lines ?? null);
 
-  const subtotalCents = mounted
+  const subtotalCents = hydrated
     ? storeSubtotal
     : (initialCart?.subtotalCents ?? 0);
 

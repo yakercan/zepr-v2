@@ -220,7 +220,15 @@ export function ProductModal({
    * the predicate. `+1` fudge avoids a sub-pixel false positive
    * on hi-dpi displays where `scrollHeight` can round a fraction
    * above `clientHeight` without the content actually
-   * overflowing. */
+   * overflowing.
+   *
+   * Deps: just `[open]`. The `ResizeObserver` already covers
+   * every content swap inside the body — the modal's panel
+   * unmounts on close (via `<Modal>`'s mount-toggle) so we
+   * re-attach observers each time the modal opens, but
+   * skeleton ↔ detail ↔ error transitions inside the same open
+   * session are handled by the observer firing on the content
+   * resize. */
   const bodyRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [bodyOverflows, setBodyOverflows] = useState(false);
@@ -239,7 +247,7 @@ export function ProductModal({
     ro.observe(body);
     ro.observe(content);
     return () => ro.disconnect();
-  }, [open, detail, status]);
+  }, [open]);
 
   /* Resolved-variant pricing wins over the product-level range
    * the moment we have one. When the picker lands on an invalid
