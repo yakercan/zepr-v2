@@ -5,6 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { OrderRow } from "@/components/account/order-row";
+import { AccountLogoutLink } from "@/components/layout/account-logout-link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ViewAllLink } from "@/components/ui/view-all-link";
 import { getSession, type Customer } from "@/lib/auth/session";
@@ -86,12 +87,9 @@ function DashboardHeader({ customer }: { customer: Customer }) {
       <h1 className="text-2xl font-semibold leading-tight md:text-3xl">
         {greeting}
       </h1>
-      <Link
-        href="/account/logout"
-        className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-danger)]"
-      >
+      <AccountLogoutLink className="text-sm font-semibold text-[color:var(--color-ink-secondary)] transition-colors hover:text-[color:var(--color-danger)]">
         Sign out
-      </Link>
+      </AccountLogoutLink>
     </header>
   );
 }

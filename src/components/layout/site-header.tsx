@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CartHydrator } from "@/components/cart/cart-hydrator";
 import { CartTrigger } from "@/components/cart/cart-trigger";
 import { AccountDropdown } from "@/components/layout/account-dropdown";
 import { CategoriesDropdown } from "@/components/layout/categories-dropdown";
@@ -8,6 +9,9 @@ import { SearchBar } from "@/components/layout/search-bar";
 import { BestSellersIcon, FireIcon } from "@/components/ui/icons";
 import { DEFAULT_CATEGORIES } from "@/config/categories";
 import { site } from "@/config/site";
+import { env } from "@/env";
+import { getAuthState } from "@/lib/auth/session";
+import { getCurrentCart } from "@/lib/cart/queries";
 import { getCurrentFavoritedIds } from "@/lib/favorites/queries";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
 import type { TaxonomyCategory } from "@/types/taxonomy";
@@ -28,20 +32,30 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  * a category row is hovered; Account uses the simple stacked layout.
  */
 export async function SiteHeader() {
-  /* Fan-out the two server reads in parallel — taxonomy is the heavy
+  /* Fan-out every server read in parallel — taxonomy is the heavy
    * one (Salespace category tree, cached an hour at the fetch
-   * boundary) and the favorites set is a small per-request lookup,
-   * already memoised via `cache()` for the rest of the render. Doing
-   * them sequentially would bill us the favorites round-trip on top
-   * of the taxonomy wait for no reason. */
-  const [taxonomy, favoritedIds] = await Promise.all([
+   * boundary). Favorites + auth + cart are small per-request
+   * lookups, already memoised via `cache()` so other server
+   * surfaces that need the same data don't re-fetch. The cart
+   * read short-circuits for guests inside `getCurrentCart` — no
+   * Shopify round-trip when there's nothing to fetch. */
+  const [taxonomy, favoritedIds, authState, initialCart] = await Promise.all([
     getTaxonomy(),
     getCurrentFavoritedIds(),
+    getAuthState(),
+    getCurrentCart(),
   ]);
   const categories: readonly TaxonomyCategory[] =
     taxonomy?.categories?.length
       ? taxonomy.categories
       : DEFAULT_CATEGORIES;
+
+  /* Hosted checkout subdomain for guest carts. Prefer the
+   * dedicated checkout domain when set; fall back to the
+   * storefront's `.myshopify.com` host (Shopify accepts the same
+   * `/cart/<variant>:<qty>` permalink shape on both). */
+  const checkoutDomain =
+    env.SHOPIFY_CHECKOUT_DOMAIN ?? env.SHOPIFY_STOREFRONT_DOMAIN;
 
   return (
     <header className="site-header sticky top-0 z-50 border-b border-[color:var(--color-border)]">
@@ -94,7 +108,12 @@ export async function SiteHeader() {
 
           <AccountDropdown />
 
-          <CartTrigger />
+          <CartTrigger initialCount={initialCart?.totalQuantity ?? 0} />
+          <CartHydrator
+            mode={authState.isLoggedIn ? "server" : "guest"}
+            initialCart={initialCart}
+            checkoutDomain={checkoutDomain}
+          />
         </div>
       </div>
     </header>

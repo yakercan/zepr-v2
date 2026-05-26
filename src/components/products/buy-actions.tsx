@@ -196,6 +196,11 @@ export function buildAnchorCartLine(
   return {
     id: `${product.id}:${variant.id}`,
     productId: product.id,
+    /* Shopify Storefront variant GID. Required by the
+     * `cartLinesAdd` mutation in server mode, and also feeds the
+     * guest-mode checkout permalink builder so the same line
+     * shape works on both paths without re-deriving it. */
+    merchandiseId: variant.id,
     handle: product.handle,
     title: product.title,
     imageUrl,

@@ -4,6 +4,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Backdrop } from "@/components/ui/backdrop";
 import { CloseIcon } from "@/components/ui/icons";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { CartEmpty } from "@/components/cart/cart-empty";
 import { CartFooter } from "@/components/cart/cart-footer";
 import { CartLineRow } from "@/components/cart/cart-line-row";
@@ -14,6 +15,7 @@ import {
 import {
   useCartCount,
   useCartLines,
+  useCartPending,
   useCartSubtotalCents,
 } from "@/lib/cart/store";
 import {
@@ -68,6 +70,7 @@ export function CartDrawer() {
   const lines = useCartLines();
   const count = useCartCount();
   const subtotalCents = useCartSubtotalCents();
+  const pending = useCartPending();
 
   /* Currency token comes from the first line — when the cart is empty
    * we don't render the footer, so the fallback is just defensive. */
@@ -132,20 +135,29 @@ export function CartDrawer() {
           )}
         >
           <CartHeader count={count} />
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            {lines.length === 0 ? (
-              <CartEmpty />
-            ) : (
-              <ul className="flex flex-col divide-y divide-[color:var(--color-border)] px-5">
-                {lines.map((line) => (
-                  <CartLineRow key={line.id} line={line} />
-                ))}
-              </ul>
+          {/* Body wrapper — `relative` so `<LoadingOverlay>` can
+           *  drop on top of the scrollable line list AND the
+           *  footer while the cart header (with its close button)
+           *  stays interactive above it. Same overlay component +
+           *  styling as the modal-form surfaces, so the in-flight
+           *  feedback reads consistently across the app. */}
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              {lines.length === 0 ? (
+                <CartEmpty />
+              ) : (
+                <ul className="flex flex-col divide-y divide-[color:var(--color-border)] px-5">
+                  {lines.map((line) => (
+                    <CartLineRow key={line.id} line={line} />
+                  ))}
+                </ul>
+              )}
+            </div>
+            {lines.length > 0 && (
+              <CartFooter subtotalCents={subtotalCents} currency={currency} />
             )}
+            <LoadingOverlay state={pending ? "loading" : null} />
           </div>
-          {lines.length > 0 && (
-            <CartFooter subtotalCents={subtotalCents} currency={currency} />
-          )}
         </aside>,
         document.body,
       )}

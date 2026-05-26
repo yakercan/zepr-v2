@@ -5,15 +5,17 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 /**
- * Absolutely-positioned loading overlay for modal panels.
+ * Absolutely-positioned loading overlay.
  *
  * Drops on top of its parent (which must be `position: relative`
- * and clip its overflow — `<Modal>`'s panel already does both)
- * and dims everything below with a blurred white scrim. The
- * pattern is one we'll reuse anywhere a modal-bound submit wants
- * a "loading → success" tail rather than just disabling inputs.
+ * and clip its overflow — `<Modal>`'s panel and the cart drawer's
+ * body wrapper both do) and dims everything below with a blurred
+ * white scrim. Reused across every surface where a server round-
+ * trip is the canonical "thinking" feedback rather than optimistic
+ * UI (modal-form submits, cart-drawer mutations). One look, one
+ * cadence, no per-caller theming — call sites just toggle `state`.
  *
- * Three states the caller toggles between:
+ * States the caller toggles between:
  *
  *   - `null`        — overlay hidden, inputs reachable.
  *   - `"loading"`   — spinner + optional label.
@@ -33,7 +35,7 @@ import { cn } from "@/lib/utils";
  *   />
  *
  * Colours come from global tokens (brand for the spinner, success
- * for the check disc) so the overlay slots into any modal without
+ * for the check disc) so the overlay slots into any panel without
  * a per-caller theme prop.
  */
 

@@ -10,6 +10,7 @@ import {
   ShopifyOAuthError,
   exchangeCodeForTokens,
 } from "@/lib/auth/shopify-oauth";
+import { setCartHandoffPending } from "@/lib/cart/cookie";
 import { fetchCustomerProfileWithToken } from "@/lib/shopify/customer-account-queries";
 
 /**
@@ -120,7 +121,17 @@ export async function GET(req: NextRequest) {
 
     await setSession(session);
 
-    return NextResponse.redirect(new URL(oauthState.returnTo, env.APP_URL));
+    /* Cart handoff is signalled via a short-lived cookie
+     * (`__Host-zepr_cart_handoff`) rather than a URL parameter
+     * so the returnTo location stays visually pristine — deep
+     * links like `/products/x?utm=foo` round-trip with the
+     * shopper's original URL intact. The landing page's layout
+     * reads the cookie server-side, `<CartLoginHandoff>` runs
+     * the merge from `localStorage`, and `mergeGuestCartAction`
+     * clears the cookie on its way through. */
+    await setCartHandoffPending();
+    const returnUrl = new URL(oauthState.returnTo, env.APP_URL);
+    return NextResponse.redirect(returnUrl);
   } catch (err) {
     if (err instanceof ShopifyOAuthError) {
       console.error("[auth] token exchange failed:", err.code, err.message);

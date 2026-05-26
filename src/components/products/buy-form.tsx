@@ -526,6 +526,7 @@ function buildCompanionCartLine(
   return {
     id: `${companion.id}:${variant.id}`,
     productId: companion.id,
+    merchandiseId: variant.id,
     handle: companion.handle,
     title: companion.title,
     imageUrl,

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { clearSession, getSession } from "@/lib/auth/session";
 import { buildLogoutUrl } from "@/lib/auth/shopify-oauth";
+import { clearCartId } from "@/lib/cart/cookie";
 
 /**
  * `/account/logout` — clears our session and bounces the
@@ -24,6 +25,12 @@ import { buildLogoutUrl } from "@/lib/auth/shopify-oauth";
 export async function GET() {
   const session = await getSession();
   await clearSession();
+  /* Drop the cart cookie alongside the session so the shopper
+   * lands on a clean slate post-logout — the next page renders
+   * as a guest, `<CartHydrator>` flips back into localStorage
+   * mode, and Shopify's no-longer-pointed-at cart is left to
+   * its natural ~10-day TTL on Shopify's side. */
+  await clearCartId();
 
   if (!session) {
     /* Use `env.APP_URL` rather than the request URL — behind a

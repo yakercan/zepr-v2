@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountLogoutItem } from "@/components/layout/account-logout-item";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { UserIcon } from "@/components/ui/icons";
 import { getAuthState } from "@/lib/auth/session";
@@ -101,13 +102,7 @@ function AccountPanelLoggedIn() {
         <DropdownItem href="/account/addresses" icon={<AddressIcon />}>
           My Addresses
         </DropdownItem>
-        <DropdownItem
-          href="/account/logout"
-          icon={<LogoutIcon />}
-          variant="danger"
-        >
-          Logout
-        </DropdownItem>
+        <AccountLogoutItem />
       </div>
 
       <div>
@@ -203,17 +198,6 @@ function AddressIcon({ className }: SvgProps) {
     <svg {...SVG_BASE_PROPS} className={cn(ICON_CLASS, className)}>
       <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
       <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-    </svg>
-  );
-}
-
-function LogoutIcon({ className }: SvgProps) {
-  return (
-    <svg
-      {...SVG_BASE_PROPS}
-      className={cn("h-4 w-4 shrink-0", className)}
-    >
-      <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
     </svg>
   );
 }

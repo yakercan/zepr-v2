@@ -2,7 +2,9 @@
 
 import { Price } from "@/components/ui/price";
 import { FREE_SHIPPING_THRESHOLD_CENTS } from "@/lib/badges";
+import { useCartCheckoutUrl } from "@/lib/cart/store";
 import { formatPrice } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 /**
  * Sticky footer for the cart drawer.
@@ -20,9 +22,24 @@ import { formatPrice } from "@/lib/format";
  *      the only "primary" thing on the screen at this point, which
  *      keeps the conversion path obvious.
  *
- * The whole footer sits behind a top border, never scrolls with the
- * line list, and uses `bg-[surface]` so the drag-on-scroll feel
- * stays clean against the panel background.
+ * Checkout URL routing — `useCartCheckoutUrl()` returns the right
+ * link per mode:
+ *
+ *   - Logged-in shopper → Shopify-issued `cart.checkoutUrl` with
+ *     buyer identity pre-filled (no second sign-in at checkout,
+ *     saved addresses + payment methods available immediately).
+ *   - Guest → `cart/<variant>:<qty>,…` permalink built from the
+ *     current lines + checkout domain. Same path the PDP "Buy Now"
+ *     CTA has used since v1.
+ *
+ * When no usable URL is available (e.g. a guest line missing its
+ * variant GID — rare, but possible across schema migrations) the
+ * CTA falls back to a disabled button so the shopper isn't sent
+ * down a dead link.
+ *
+ * The whole footer sits behind a top border, never scrolls with
+ * the line list, and uses `bg-[surface]` so the drag-on-scroll
+ * feel stays clean against the panel background.
  */
 export function CartFooter({
   subtotalCents,
@@ -31,6 +48,8 @@ export function CartFooter({
   subtotalCents: number;
   currency: string;
 }) {
+  const checkoutUrl = useCartCheckoutUrl();
+
   return (
     <div className="border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-5 py-4">
       <FreeShippingProgress
@@ -48,9 +67,27 @@ export function CartFooter({
         Shipping and taxes calculated at checkout.
       </p>
 
-      <a href="/checkout" className="btn-primary mt-4 w-full">
-        Checkout
-      </a>
+      {checkoutUrl ? (
+        <a
+          href={checkoutUrl}
+          className="btn-primary mt-4 w-full"
+          /* Native top-level navigation — Shopify-hosted checkout
+           * lives on a different origin and there's nothing the
+           * drawer needs to keep alive after handoff. Lets the
+           * browser tear down our SPA context cleanly. */
+        >
+          Checkout
+        </a>
+      ) : (
+        <button
+          type="button"
+          disabled
+          className={cn("btn-primary mt-4 w-full")}
+          aria-disabled="true"
+        >
+          Checkout
+        </button>
+      )}
     </div>
   );
 }
