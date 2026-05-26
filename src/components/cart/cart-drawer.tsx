@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Backdrop } from "@/components/ui/backdrop";
 import { CloseIcon } from "@/components/ui/icons";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { CartBadge } from "@/components/cart/cart-badge";
 import { CartEmpty } from "@/components/cart/cart-empty";
 import { CartFooter } from "@/components/cart/cart-footer";
 import { CartLineRow } from "@/components/cart/cart-line-row";
@@ -13,7 +14,6 @@ import {
   useCartDrawerOpen,
 } from "@/lib/cart/drawer-store";
 import {
-  useCartCount,
   useCartLines,
   useCartPending,
   useCartSubtotalCents,
@@ -68,7 +68,6 @@ import { cn } from "@/lib/utils";
 export function CartDrawer() {
   const open = useCartDrawerOpen();
   const lines = useCartLines();
-  const count = useCartCount();
   const subtotalCents = useCartSubtotalCents();
   const pending = useCartPending();
 
@@ -134,7 +133,7 @@ export function CartDrawer() {
             open ? "translate-x-0" : "translate-x-full",
           )}
         >
-          <CartHeader count={count} />
+          <CartHeader />
           {/* Body wrapper — `relative` so `<LoadingOverlay>` can
            *  drop on top of the scrollable line list AND the
            *  footer while the cart header (with its close button)
@@ -166,20 +165,28 @@ export function CartDrawer() {
 }
 
 /**
- * Drawer header — title with the live item count, plus the close
- * button. Sticks to the top of the panel without scrolling because
- * the parent uses `flex-col` + the body has `flex-1 overflow-y-auto`.
+ * Drawer header — title with the animated `<CartBadge>`, plus
+ * the close button. Sticks to the top of the panel without
+ * scrolling because the parent uses `flex-col` + the body has
+ * `flex-1 overflow-y-auto`.
+ *
+ * Badge replaces what used to be a `(N)` parenthetical next to
+ * the title. Same brand-orange pill that lives on the favorites
+ * link in the header — single visual primitive (`<CountBadgePill>`)
+ * so the count language reads identically across surfaces.
  */
-function CartHeader({ count }: { count: number }) {
+function CartHeader() {
   return (
-    <div className="flex items-center justify-between border-b border-[color:var(--color-border)] px-5 py-4">
-      <h2 className="text-base font-semibold text-[color:var(--color-ink)]">
+    /* `py-[18px]` (vs the tighter `py-4` everywhere else) gives
+     * the row enough vertical room that the `<CartBadge>` pill —
+     * which is slightly taller than the title's text line-box —
+     * doesn't read as crammed against the top/bottom border. The
+     * 2px-each-side bump is small enough that the rest of the
+     * drawer doesn't feel padded out. */
+    <div className="flex items-center justify-between border-b border-[color:var(--color-border)] px-5 py-[18px]">
+      <h2 className="inline-flex items-center text-base font-semibold text-[color:var(--color-ink)]">
         Your cart
-        {count > 0 && (
-          <span className="ml-2 text-sm font-normal text-[color:var(--color-ink-muted)]">
-            ({count})
-          </span>
-        )}
+        <CartBadge />
       </h2>
       <button
         type="button"

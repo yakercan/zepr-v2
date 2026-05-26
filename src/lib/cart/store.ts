@@ -3,11 +3,13 @@
 import {
   addToCartAction,
   clearCartAction,
+  refreshCartAction,
   removeCartLineAction,
   updateCartLineAction,
   type CartActionResult,
 } from "@/app/cart/actions";
 import { resolveFirstVariantGidAction } from "@/app/products/actions";
+import { trackAddToCart } from "@/lib/analytics/events";
 import { attributionToCartAttributes } from "@/lib/attribution/format";
 import {
   getCurrentAttribution,
@@ -196,6 +198,23 @@ if (typeof window !== "undefined") {
       linesStore.set(loadFromStorage());
     }
   });
+
+  /* bfcache restore — companion to `<BfcacheRefresh>` in the
+   * layout, which handles server-component staleness via
+   * `router.refresh()`. That covers everything Next renders;
+   * this listener covers what Next *doesn't* render: the
+   * client-side cart store, which holds its own line snapshot
+   * parallel to Shopify (for sub-ms drawer reads). On bfcache
+   * restore the snapshot reflects the pre-checkout world, so
+   * we re-sync against the authoritative Shopify cart (or
+   * localStorage in guest mode). `persisted: false` is a normal
+   * navigation and bypasses this — the SSR'd cart already
+   * landed via `<CartHydrator>`. */
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      void revalidateCart();
+    }
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -245,6 +264,89 @@ export function hydrateCart(input: HydrateCartInput): void {
     mode: "guest",
     checkoutDomain: input.checkoutDomain,
   });
+}
+
+/**
+ * Lightweight meta-only hydration. Sets `mode` + `checkoutDomain`
+ * without touching the cart-line snapshot.
+ *
+ * Mounted earlier than `<CartHydrator>` (in `<ShopLayout>`, not
+ * `<SiteHeader>`) so Buy Now and guest checkout permalinks have
+ * a real domain to splice into their URLs from the first frame —
+ * before the header's slow Shopify cart fetch resolves. Without
+ * this, a shopper who lands on a PDP and clicks "Buy Now" while
+ * the header is still streaming would get `https://undefined/cart/…`.
+ *
+ * Server-mode also clears `linesStore` here so the localStorage
+ * residue from a prior guest session (or a logout snapshot)
+ * doesn't flash into the drawer between paint and the server
+ * cart landing. `<CartLoginHandoff>` reads `localStorage`
+ * directly via `loadFromStorage()`, not the in-memory store, so
+ * the clear here doesn't race the merge.
+ */
+export function hydrateCartMeta(input: {
+  mode: "guest" | "server";
+  checkoutDomain: string;
+}): void {
+  if (input.mode === "server") {
+    linesStore.set(EMPTY);
+  }
+  metaStore.set((m) => ({
+    ...m,
+    mode: input.mode,
+    checkoutDomain: input.checkoutDomain,
+  }));
+}
+
+/**
+ * Refresh the in-memory cart against its authoritative source.
+ *
+ *   - Guest mode → re-read `localStorage` (covers cross-tab
+ *     edits that bypassed the `storage` event, and bfcache
+ *     restores where the cross-tab listener was torn down).
+ *   - Server mode → call `refreshCartAction()` to re-fetch the
+ *     Shopify cart and reconcile. `null` from the action means
+ *     the cart was completed at checkout (or expired); we reset
+ *     to an empty snapshot so the next add starts fresh.
+ *
+ * Fire-and-forget — UI surfaces that care subscribe to
+ * `linesStore`. Failures log a warning in dev and leave the
+ * existing snapshot intact (network blip shouldn't blank the
+ * drawer).
+ */
+export async function revalidateCart(): Promise<void> {
+  const meta = metaStore.get();
+  if (meta.mode === "guest") {
+    linesStore.set(loadFromStorage());
+    return;
+  }
+  try {
+    const cart = await refreshCartAction();
+    if (cart) {
+      linesStore.set(cart.lines);
+      metaStore.set((m) => ({
+        ...m,
+        cartId: cart.id,
+        checkoutUrl: cart.checkoutUrl,
+      }));
+    } else {
+      /* No cart on Shopify side — most likely the shopper just
+       * completed checkout. Empty the snapshot so the badge
+       * drops to 0 and the drawer reads "your cart is empty"
+       * instead of showing the pre-checkout lines that no
+       * longer exist server-side. */
+      linesStore.set(EMPTY);
+      metaStore.set((m) => ({
+        ...m,
+        cartId: undefined,
+        checkoutUrl: undefined,
+      }));
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[cart] revalidate failed:", err);
+    }
+  }
 }
 
 /**
@@ -418,7 +520,36 @@ export function addCartLine(
   if (quantity <= 0) return;
 
   const meta = metaStore.get();
-  if (!options.silent) openCart();
+  if (!options.silent) {
+    openCart();
+    /* Fire on user intent, not server confirmation. The server
+     * action might still be in-flight (server mode) or the
+     * variant id might still be resolving in the background
+     * (guest card-button adds), but the shopper has committed
+     * to adding the line — that's the moment Admin Analytics
+     * cares about for funnel math. A subsequent server failure
+     * is rare and the optimistic event is the right model for
+     * "intent to purchase". */
+    trackAddToCart({
+      cartId: meta.cartId ?? null,
+      totalValue: ((line.priceCents * quantity) / 100).toFixed(2),
+      currency: line.currency,
+      products: [
+        {
+          productId: line.productId,
+          /* `merchandiseId` may be empty for guest card-button
+           *  adds when the variant resolve hasn't landed yet —
+           *  the Shopify pipeline tolerates an empty variant id
+           *  and still attributes the event to the product. */
+          variantId: line.merchandiseId ?? "",
+          name: line.title,
+          price: (line.priceCents / 100).toFixed(2),
+          quantity,
+          currency: line.currency,
+        },
+      ],
+    });
+  }
 
   if (meta.mode === "guest") {
     const next = applyAdd(linesStore.get(), line, quantity);

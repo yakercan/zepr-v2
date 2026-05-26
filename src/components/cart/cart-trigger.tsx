@@ -10,17 +10,19 @@ import { useHydrated } from "@/lib/hooks/use-hydrated";
  * right-side cluster) because it needs to read the cart count and
  * open the drawer.
  *
- * The `<CartIcon>` itself already swaps between empty / 1-4 fruits;
- * we layer a numeric badge on top once the count exceeds the
- * four-fruit visual cap so users always see the real number.
+ * Visual cue is the `<CartIcon>` itself — it swaps art between
+ * empty / 1-4 fruits as items accumulate. No separate numeric
+ * badge layered on the icon: the canonical count lives in the
+ * drawer header (`<CartBadge>`), which is the only surface that
+ * needs to read the literal number. Keeping the trigger
+ * iconographic + the drawer numeric draws a cleaner line between
+ * "where you click" and "where you see the count".
  *
- * SSR-correct count on first paint for logged-in users —
- * `<SiteHeader>` resolves the Shopify cart server-side and forwards
- * the resulting `totalQuantity` as `initialCount`. Until React
- * hydration completes we render that prop; once hydrated we
- * subscribe to the client cart store for live updates. Mirrors the
- * `<FavoritesBadge>` pattern — same `useHydrated()` gate, same
- * "no empty-flash on first paint" guarantee.
+ * The `initialCount` prop is still threaded for accessibility —
+ * the `aria-label` reads "Open cart, N items" on first paint
+ * (SSR-correct for logged-in shoppers via `getCurrentCart()` in
+ * `<SiteHeader>`), then live-updates from the cart store after
+ * hydration. Same pattern as `<FavoritesBadge>`.
  *
  * Why a `<button>` (not a `<Link href="/cart">`):
  *
@@ -35,13 +37,12 @@ export function CartTrigger({ initialCount = 0 }: { initialCount?: number }) {
   const hydrated = useHydrated();
   const liveCount = useCartCount();
   const count = hydrated ? liveCount : initialCount;
-  const showNumericBadge = count > 4;
 
   return (
     <button
       type="button"
       onClick={openCart}
-      className="icon-bubble icon-bubble-no-tint relative h-10 w-10"
+      className="icon-bubble icon-bubble-no-tint h-10 w-10"
       aria-label={
         count === 0
           ? "Open cart, empty"
@@ -49,14 +50,6 @@ export function CartTrigger({ initialCount = 0 }: { initialCount?: number }) {
       }
     >
       <CartIcon itemCount={count} />
-      {showNumericBadge && (
-        <span
-          aria-hidden
-          className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--color-brand)] px-1 text-[10px] font-bold leading-none text-white"
-        >
-          {count > 99 ? "99+" : count}
-        </span>
-      )}
     </button>
   );
 }

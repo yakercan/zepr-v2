@@ -10,6 +10,7 @@ import {
   getCartId,
   setCartId,
 } from "@/lib/cart/cookie";
+import { getCurrentCart } from "@/lib/cart/queries";
 import {
   cartAttributesUpdate,
   cartCreate,
@@ -377,4 +378,25 @@ export async function mergeGuestCartAction(
   await setCartId(cart.id);
   updateTag("cart");
   return { ok: true, cart };
+}
+
+/**
+ * Read-only cart refresh. Returns the current authoritative
+ * Shopify cart (or `null` if there isn't one — guest session,
+ * cookie pointing at a checked-out cart, etc.).
+ *
+ * Called from the client store's `revalidateCart()` whenever the
+ * in-memory snapshot might be stale relative to Shopify's side:
+ *
+ *   - Bfcache restore after a Shopify checkout bounce-back.
+ *   - Future surfaces that want a "manual refresh" affordance.
+ *
+ * Unlike the mutation actions, this never `updateTag("cart")`
+ * or writes the cart cookie. It's just a thin server-action
+ * shim over the existing `getCurrentCart()` query so client
+ * code can pull a fresh snapshot without round-tripping through
+ * a full route revalidation.
+ */
+export async function refreshCartAction(): Promise<Cart | null> {
+  return await getCurrentCart();
 }

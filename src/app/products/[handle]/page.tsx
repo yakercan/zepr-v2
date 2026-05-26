@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { ProductViewTracker } from "@/components/analytics/view-trackers";
 import {
   ProductAccordion,
   ProductAccordionItem,
@@ -18,6 +19,7 @@ import {
   getCompanionProducts,
   getProductByHandle,
 } from "@/lib/shopify/products";
+import type { ProductInput } from "@/types/analytics";
 import type { ProductDetail } from "@/types/product";
 
 /**
@@ -112,9 +114,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const showReviews = authState.isLoggedIn || reviewsCount > 0;
 
   const breadcrumbItems = buildBreadcrumb(product);
+  const analyticsProduct = toAnalyticsProduct(product);
 
   return (
     <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
+      <ProductViewTracker product={analyticsProduct} />
       <Breadcrumb items={breadcrumbItems} className="mb-4" />
 
       {/* Additional PDP accordion sections drop in here as more
@@ -229,4 +233,28 @@ function buildBreadcrumb(product: ProductDetail): BreadcrumbItem[] {
 
   items.push({ label: product.title });
   return items;
+}
+
+/**
+ * Project a `ProductDetail` onto the provider-agnostic
+ * `ProductInput` shape consumed by the analytics layer.
+ *
+ * Uses the first variant for `variantId` (the shopper hasn't
+ * picked one yet on PDP arrival) and the min price band as the
+ * representative unit price. Currency carries through verbatim
+ * — every variant on a product shares the same currency in
+ * Shopify, so there's no ambiguity to resolve.
+ */
+function toAnalyticsProduct(product: ProductDetail): ProductInput {
+  const firstVariant = product.variants[0];
+  return {
+    productId: product.id,
+    variantId: firstVariant?.id ?? "",
+    name: product.title,
+    brand: product.vendor,
+    category: product.primaryCollection?.title,
+    price: (product.priceMinCents / 100).toFixed(2),
+    quantity: 1,
+    currency: product.currency,
+  };
 }

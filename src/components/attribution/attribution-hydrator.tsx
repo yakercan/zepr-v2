@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { hydrateAttribution } from "@/lib/attribution/store";
 import type { Attribution } from "@/types/attribution";
@@ -27,12 +27,29 @@ import type { Attribution } from "@/types/attribution";
  *     comparison off `captured_at`, which is the only field
  *     guaranteed to change on a fresh capture.
  *
- * Pattern below is React's canonical "store info from previous
- * renders" recipe — calling `setState` during render is the
- * idiomatic way to react to prop changes without a `useEffect`,
- * and it lets the store update land in the same commit as the
- * page render (so subscribers paint the right value on the
- * first frame after a fresh capture).
+ * Why the dispatch lives in `useEffect`, not render:
+ *
+ *   - `hydrateAttribution` calls `set()` on an external store,
+ *     which synchronously fans out to every subscriber (cart
+ *     footer's checkout URL, Buy Now action, etc.). Calling that
+ *     during this component's render schedules `setState` on
+ *     *other* components mid-render, which React 19 flags as
+ *     "Cannot update a component while rendering a different
+ *     component". The canonical "store info from previous renders"
+ *     pattern is only safe for `setState` on the *same* component
+ *     — for external store updates that cascade, we have to wait
+ *     until after commit.
+ *   - One frame's delay is fine here: attribution is consumed on
+ *     user clicks (Buy Now) and on checkout-URL builds. By the
+ *     time the page is interactive, this effect has flushed.
+ *
+ * `lastKeyRef` carries the most recent `captured_at` we've
+ * already dispatched for, so a parent re-render with the same
+ * attribution doesn't refire the store (which would be a no-op
+ * thanks to `Object.is` on identical refs, but `getAttribution`
+ * hands back a fresh object each request — that wouldn't be
+ * identity-equal). Keying on `captured_at` is the cheapest
+ * stable invariant.
  */
 export function AttributionHydrator({
   attribution,
@@ -44,13 +61,14 @@ export function AttributionHydrator({
    * call (even when the shopper arrived organically — we want
    * the store explicitly set to `null` rather than left at its
    * stale prior value from an earlier navigation). */
-  const [lastKey, setLastKey] = useState<string | null | undefined>(undefined);
-  const key = attribution?.captured_at ?? null;
+  const lastKeyRef = useRef<string | null | undefined>(undefined);
 
-  if (lastKey !== key) {
-    setLastKey(key);
+  useEffect(() => {
+    const key = attribution?.captured_at ?? null;
+    if (lastKeyRef.current === key) return;
+    lastKeyRef.current = key;
     hydrateAttribution(attribution);
-  }
+  }, [attribution]);
 
   return null;
 }

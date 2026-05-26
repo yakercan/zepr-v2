@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { CollectionViewTracker } from "@/components/analytics/view-trackers";
 import {
   CategoryResults,
   CategoryResultsSkeleton,
@@ -69,6 +70,12 @@ export default async function CategoryPage({
 
   return (
     <div className="page-container flex flex-col gap-6 py-6">
+      {category.shopifyCollectionId && (
+        <CollectionViewTracker
+          collectionId={category.shopifyCollectionId}
+          handle={category.handle}
+        />
+      )}
       <SubcategorySlider
         subcategories={category.subcategories}
         categoryIconUrl={category.iconUrl}

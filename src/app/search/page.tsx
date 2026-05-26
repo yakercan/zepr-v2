@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { SearchViewTracker } from "@/components/analytics/view-trackers";
 import {
   SearchResults,
   SearchResultsSkeleton,
@@ -68,6 +69,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   return (
     <div className="page-container py-6">
+      {/* Only track non-empty queries — an empty `?q=` is the
+       *  browse landing state, not a search the merchant would
+       *  want surfaced in the "Top searches" report. */}
+      {query && <SearchViewTracker query={query} />}
       <Suspense key={query} fallback={<SearchResultsSkeleton />}>
         <SearchResults
           query={query}
