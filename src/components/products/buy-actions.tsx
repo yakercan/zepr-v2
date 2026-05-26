@@ -77,12 +77,27 @@ export interface BuyActionsProps {
    *  this list. Pass `undefined` for the uncontrolled single-
    *  variant path (stepper visible, qty defaults to 1). */
   units?: ReadonlyArray<BuyUnit>;
+  /** Fires after Add to Cart commits the resolved units. Used by
+   *  the card-level quick-add modal to dismiss itself once the
+   *  shopper has added — the drawer is what opens next, so
+   *  leaving the modal up just stacks one overlay on top of
+   *  another. PDP doesn't pass this (the buy column stays
+   *  visible after the drawer pops). */
+  onAdded?: () => void;
+  /** Whether to render the Shop Pay "Pay in 4…" promise below
+   *  the Buy Now CTA. Defaults to `true` (PDP behaviour); pass
+   *  `false` for compact surfaces like the quick-add modal where
+   *  the installment line adds vertical noise to a CTA stack
+   *  that's already inside a dialog frame. */
+  showInstallmentBadge?: boolean;
 }
 
 export function BuyActions({
   product,
   selectedVariant,
   units: controlledUnits,
+  onAdded,
+  showInstallmentBadge = true,
 }: BuyActionsProps) {
   const [internalQuantity, setInternalQuantity] = useState(1);
 
@@ -112,6 +127,7 @@ export function BuyActions({
     effectiveUnits.forEach((unit, i) => {
       addCartLine(unit.cartLineSeed, unit.quantity, { silent: i > 0 });
     });
+    onAdded?.();
   };
 
   const handleBuyNow = () => {
@@ -160,7 +176,7 @@ export function BuyActions({
       >
         Buy Now - Fast Checkout
       </button>
-      {sellable && <ShopPayBadge className="mt-1" />}
+      {sellable && showInstallmentBadge && <ShopPayBadge className="mt-1" />}
     </div>
   );
 }

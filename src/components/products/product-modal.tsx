@@ -1,19 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import { getProductDetailAction } from "@/app/products/actions";
+import { BuyActions } from "@/components/products/buy-actions";
+import { DeliveryBadge } from "@/components/products/delivery-badge";
+import { ProductGallery } from "@/components/products/product-gallery";
 import { VariantPicker } from "@/components/products/variant-picker";
 import { Modal } from "@/components/ui/modal";
 import { Price } from "@/components/ui/price";
-import { ShimmerImage } from "@/components/ui/shimmer-image";
-import { addCartLine, buyNow } from "@/lib/cart/store";
 import {
   cascadeSelect,
   defaultSelection,
   findVariant,
   type OptionSelection,
 } from "@/lib/variants";
+import { cn } from "@/lib/utils";
 import type {
   ProductDetail,
   ProductVariant,
@@ -23,45 +32,85 @@ import type {
 type FetchStatus = "idle" | "loading" | "success" | "error";
 
 /**
- * Product modal — quick variant picker that opens from a product
- * card's Add-to-Cart pill when (and only when) the product carries
- * real option groups (`hasVariants(product) === true`). Single-
- * configuration products skip the modal and add directly; that
- * branch lives in `<AddToCartButton>`. Card flow only — PDPs keep
- * their own inline `<BuyForm>`.
+ * Product modal — a mini-PDP that opens from a product card's
+ * Add-to-Cart pill when the product carries real option groups
+ * (`hasVariants(product) === true`). Single-configuration
+ * products skip the modal and add directly; that branch lives in
+ * `<AddToCartButton>`.
+ *
+ * Composition philosophy: this is the same buy column the PDP
+ * renders, minus the page-only sections. Every visible piece
+ * imports from the existing PDP toolkit so behaviour, motion,
+ * styling, and analytics stay byte-for-byte consistent between
+ * surfaces — the modal isn't a parallel UI, it's a smaller frame
+ * around the same parts:
+ *
+ *   ┌─ Modal: "Quick add" ──────────────┐
+ *   │ <ProductGallery>            scroll│
+ *   │   thumbs + main + lightbox    ↕   │
+ *   │ Title  (linked → PDP)             │
+ *   │ <DeliveryBadge>                   │
+ *   │ $price   $compare   -PCT          │
+ *   │ <VariantPicker>                   │
+ *   ├─ footer (sticky) ─────────────────┤
+ *   │ <BuyActions>                      │
+ *   │  [qty] [ Add to Cart  ]           │
+ *   │        [ Buy Now      ]           │
+ *   └───────────────────────────────────┘
+ *
+ * Single column, gallery first. The modal is "decide fast" —
+ * there's no value in splitting attention between two side-by-
+ * side columns when the whole frame is already a focused
+ * dialog. Vertical scroll inside the body handles tall option
+ * stacks; the buy CTAs ride a pinned footer so the Add / Buy
+ * actions are always one click away regardless of scroll
+ * position. Border on top of the footer renders only when the
+ * body actually overflows — same dialect `<MediaFormModal>`
+ * uses for the review / return-request forms — so a short
+ * product (small gallery, no variants) doesn't pick up extra
+ * chrome for no reason.
+ *
+ * Intentionally omitted compared to the PDP:
+ *
+ *   - **Tiered offers / bundle picker** — modal lives at "decide
+ *     fast" speed; the upsell tile picker belongs on a page where
+ *     the shopper has committed to evaluating offers.
+ *   - **Description / Reviews / Disclaimer accordion** — reading
+ *     the long form means the shopper wants the full PDP. The
+ *     title link routes them there.
+ *   - **You may also like rail** — same rationale; cross-sell
+ *     surfaces are page-level merchandising, not buy-flow chrome.
+ *   - **Shop Pay "Pay in 4" installment promise** — page-level
+ *     trust copy; in a contained dialog the CTA stack already
+ *     reads cleanly without it.
+ *   - **Trust badges** (30-day guarantee / secure checkout / 24/7
+ *     support) — same rationale as the installment promise.
  *
  * Data shape:
  *
  *   - The card hands in a `SearchProduct` (Salespace search row)
- *     which carries option names + values but no variant ids and
- *     no per-variant pricing. We need those to call the Shopify
- *     Cart API with a real `merchandiseId`.
- *   - On open we lazy-fetch the full `ProductDetail` via a
- *     `getProductDetailAction` server action (cached through the
- *     same 1h `product:<handle>` fetch boundary the PDP uses).
+ *     which carries option names + values but no variant ids,
+ *     no per-variant pricing, and no media gallery. We need all
+ *     three to render the modal, so on first open we lazy-fetch
+ *     the full `ProductDetail` via `getProductDetailAction`
+ *     (cached through the same 1h `product:<handle>` fetch
+ *     boundary the PDP uses).
  *   - Skeleton state until the detail lands so the modal feels
  *     responsive even on a cold cache.
  *
- * Pickers reuse `<VariantPicker>` end-to-end so the modal's option
- * UI matches the PDP byte-for-byte — chips for short value lists,
- * dropdowns for long ones, full cascade selection. Variant
- * resolution rides the same `findVariant` helper.
+ * Add / Buy paths:
  *
- * Add flow:
- *
- *   1. Selection landed on a real variant + the variant is in
- *      stock → enable both CTAs.
- *   2. **Add to cart** → `addCartLine` with the resolved
- *      `merchandiseId`. The cart store routes by mode — guest
- *      writes localStorage, logged-in fires `addToCartAction`
- *      and reconciles against Shopify. Modal closes so the
- *      drawer pop is the user's next visible event.
- *   3. **Buy now** → `buyNow()` from the same store, which
- *      builds a Shopify cart permalink (with the current UTM
- *      attribution attached) and navigates. Bypasses the local
- *      cart entirely — same fast-checkout path the PDP CTA uses,
- *      so attribution / cart-permalink construction stays one
- *      code path regardless of where Buy Now is initiated.
+ *   - `<BuyActions>` owns the qty stepper, Add-to-Cart, Buy Now,
+ *     and the Shop Pay installment promise. It writes to the cart
+ *     store directly via `addCartLine` / `buyNow`, so the modal
+ *     itself doesn't need to know about those primitives.
+ *   - On a successful Add to Cart we dismiss the modal via the
+ *     `onAdded` callback — the cart drawer pops next as the
+ *     shopper's confirmation, and stacking modal-over-drawer
+ *     would just hide the drawer behind the overlay.
+ *   - Buy Now navigates away (Shopify-hosted checkout), so we
+ *     don't need to actively close — the modal unmounts with the
+ *     page.
  *
  * Stays mounted (even when closed) so the option state survives
  * a reopen without re-fetching. The `<Modal>` shell owns
@@ -92,17 +141,14 @@ export function ProductModal({
    * "loading" rides through `startTransition`, which lets React
    * defer the loading state behind the fetch without us calling
    * `setStatus` directly in the effect body (that would trip
-   * `react-hooks/set-state-in-effect`). The transition is
-   * dispatched, React schedules the update, the fetch runs, and
-   * the success / error state lands inside the transition's
-   * continuation. */
+   * `react-hooks/set-state-in-effect`). */
   useEffect(() => {
     if (!open || status !== "idle") return;
     startTransition(async () => {
       setStatus("loading");
       const d = await getProductDetailAction(product.handle);
       if (d) {
-        setDetail(d);
+        setDetail({ ...d, bundleCompanions: [] });
         setStatus("success");
       } else {
         setStatus("error");
@@ -116,8 +162,7 @@ export function ProductModal({
    * `setState` if it changed. React discards the in-flight render
    * output and replays with the updated state in a single commit,
    * so there's no extra paint and no `set-state-in-effect`
-   * violation. See https://react.dev/reference/react/useState
-   * #storing-information-from-previous-renders. */
+   * violation. */
   const [seededFor, setSeededFor] = useState<ProductDetail | null>(null);
   const [selection, setSelection] = useState<OptionSelection>({});
   if (detail && detail !== seededFor) {
@@ -131,7 +176,23 @@ export function ProductModal({
     return findVariant(detail.variants, selection);
   }, [detail, selection]);
 
-  const sellable = !!selectedVariant?.availableForSale;
+  /* Pre-built `image-url → media index` map for variant-driven
+   * gallery sync. Same shape `<ProductLayout>` uses on the PDP —
+   * one O(n) walk on detail load, O(1) lookup per variant
+   * change. When a variant has an attached image AND that image
+   * exists in the media gallery, the gallery crossfades to that
+   * index; otherwise it stays where it is. */
+  const urlToMediaIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    detail?.media.forEach((m, i) => map.set(m.preview.url, i));
+    return map;
+  }, [detail]);
+
+  const syncedGalleryIndex = useMemo<number | undefined>(() => {
+    const url = selectedVariant?.image?.url;
+    if (!url) return undefined;
+    return urlToMediaIndex.get(url);
+  }, [selectedVariant, urlToMediaIndex]);
 
   const handleSelect = (optionName: string, value: string) => {
     if (!detail) return;
@@ -140,208 +201,319 @@ export function ProductModal({
     );
   };
 
-  const handleAdd = () => {
-    if (!detail || !selectedVariant) return;
-    addCartLine(buildCartLineFromVariant(detail, selectedVariant));
-    onClose();
-  };
+  /* Overflow tracking for the footer's top border.
+   *
+   * The footer (buy CTAs) is pinned at the bottom of the panel
+   * via `shrink-0` while the body above takes `flex-1 min-h-0
+   * overflow-y-auto`. When the body's content actually exceeds
+   * its available height we draw a `border-t` on the footer so
+   * the shopper has a visual cue that there's more above the
+   * fold; on a short product (compact gallery, no options) we
+   * skip the border so the CTAs read as the natural bottom of
+   * the panel rather than chrome-stacked-on-chrome.
+   *
+   * Two observers, one callback: the body's clientHeight
+   * changes when the panel's `max-h` engages or the viewport
+   * resizes; the content's scrollHeight changes when children
+   * mount / unmount (skeleton → detail, error → recovery,
+   * variant picker rows shifting). Either firing re-evaluates
+   * the predicate. `+1` fudge avoids a sub-pixel false positive
+   * on hi-dpi displays where `scrollHeight` can round a fraction
+   * above `clientHeight` without the content actually
+   * overflowing. */
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [bodyOverflows, setBodyOverflows] = useState(false);
 
-  const handleBuyNow = () => {
-    if (!selectedVariant) return;
-    buyNow([{ variantGid: selectedVariant.id, quantity: 1 }]);
-  };
+  useEffect(() => {
+    const body = bodyRef.current;
+    const content = contentRef.current;
+    if (!body || !content) return;
 
-  /* Pricing — prefer the resolved variant's price (we have it the
-   * moment the picker lands on a valid combo); fall back to the
-   * product-level range so the modal never shows "$undefined"
-   * during a mid-cascade invalid pick. */
-  const priceMinCents = selectedVariant?.priceCents ?? detail?.priceMinCents ?? product.price_min_cents;
-  const priceMaxCents = selectedVariant?.priceCents ?? detail?.priceMaxCents ?? product.price_max_cents;
+    const check = () => {
+      setBodyOverflows(content.scrollHeight > body.clientHeight + 1);
+    };
+    check();
+
+    const ro = new ResizeObserver(check);
+    ro.observe(body);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [open, detail, status]);
+
+  /* Resolved-variant pricing wins over the product-level range
+   * the moment we have one. When the picker lands on an invalid
+   * combo `selectedVariant` is `undefined` — we fall back to the
+   * range so the modal never shows "$undefined" mid-cascade. */
+  const priceMinCents =
+    selectedVariant?.priceCents ??
+    detail?.priceMinCents ??
+    product.price_min_cents;
+  const priceMaxCents =
+    selectedVariant?.priceCents ??
+    detail?.priceMaxCents ??
+    product.price_max_cents;
   const compareAtCents =
     selectedVariant?.compareAtCents ?? detail?.compareAtMinCents;
   const currency = detail?.currency ?? product.currency;
-  const hasRange = priceMaxCents > priceMinCents;
-  const hasCompareAt =
-    compareAtCents !== undefined && compareAtCents > priceMinCents;
-
-  /* Hero image — variant-specific photo when Shopify admin set one
-   * (e.g. the blue colourway), product hero otherwise, finally
-   * the Salespace card image as the last-resort fallback. */
-  const heroImage =
-    selectedVariant?.image?.url ??
-    detail?.featuredImage?.url ??
-    product.image_url;
-
-  const ctaLabel = !detail
-    ? "Loading…"
-    : !selectedVariant
-      ? "Select options"
-      : sellable
-        ? "Add to Cart"
-        : "Sold out";
+  const hasPriceRange = priceMaxCents > priceMinCents;
+  const discountPct =
+    compareAtCents && compareAtCents > priceMinCents
+      ? Math.round(((compareAtCents - priceMinCents) / compareAtCents) * 100)
+      : 0;
+  const isDiscounted = discountPct > 0;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Quick add"
-      className="max-w-md"
+      /* Single-column dialog — modest cap (`max-w-lg` ≈ 32rem)
+       *  that frames the gallery as the dominant element without
+       *  blowing out the modal into page-takeover territory.
+       *  Vertical overflow scrolls inside the shared modal body
+       *  cap, so tall option stacks just scroll naturally. */
+      className="max-w-lg"
     >
-      <div className="flex flex-col gap-4 p-5">
-        <div className="flex gap-3">
-          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-[color:var(--color-border)]">
-            <ShimmerImage
-              src={heroImage}
-              alt={detail?.title ?? product.title}
-              wrapperClassName="block h-full w-full"
-              className="h-full w-full object-cover"
-            />
-          </div>
-          <div className="flex min-w-0 flex-col">
-            <h3 className="line-clamp-2 text-sm font-semibold text-[color:var(--color-ink)]">
-              {detail?.title ?? product.title}
-            </h3>
-            <div className="mt-1 flex items-baseline gap-1.5">
-              <Price
-                cents={priceMinCents}
-                currency={currency}
-                discounted={hasCompareAt}
-              />
-              {hasRange && (
-                <span className="text-xs text-[color:var(--color-ink-muted)]">
-                  –{" "}
-                  <Price
-                    cents={priceMaxCents}
-                    currency={currency}
-                    discounted={hasCompareAt}
-                  />
-                </span>
-              )}
-              {hasCompareAt && compareAtCents !== undefined && (
-                <Price
-                  cents={compareAtCents}
-                  currency={currency}
-                  variant="compare"
-                />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {status === "error" ? (
-          <div className="rounded-lg border border-dashed border-[color:var(--color-border)] px-4 py-6 text-center text-sm text-[color:var(--color-ink-muted)]">
-            Couldn&rsquo;t load this product&rsquo;s options. Open the
-            product page to add it.
-          </div>
-        ) : !detail ? (
-          <VariantPickerSkeleton product={product} />
-        ) : (
-          <VariantPicker
-            options={detail.options}
-            variants={detail.variants}
-            selection={selection}
-            onSelect={handleSelect}
-          />
-        )}
-
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={!detail || !sellable}
-            className="btn-secondary w-full"
+      {/* Panel-relative column. `flex-1 min-h-0` claims the
+       *  remaining vertical space after the modal's title bar
+       *  so the body inside can scroll against a finite parent
+       *  rather than push the footer off-screen. Same shape
+       *  `<MediaFormModal>` uses for its review / return-
+       *  request forms. */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {/* Scroll container. Padding lives on the inner content
+         *  wrapper, not here, so the scrollbar (when present)
+         *  sits flush against the panel's right edge instead of
+         *  inside the body padding. */}
+        <div
+          ref={bodyRef}
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
+          <div
+            ref={contentRef}
+            className="flex flex-col gap-5 p-5"
           >
-            {ctaLabel}
-          </button>
-          {/* Buy Now mirrors the PDP CTA but only renders when we
-           *  have a real, sellable variant in hand — pre-load /
-           *  unavailable states would otherwise show a button
-           *  that's never enabled. */}
-          {detail && sellable && (
-            <button
-              type="button"
-              onClick={handleBuyNow}
-              className="btn-primary w-full"
-            >
-              Buy Now - Fast Checkout
-            </button>
-          )}
+            {status === "error" ? (
+              <ErrorState onClose={onClose} />
+            ) : !detail ? (
+              <BodySkeleton product={product} />
+            ) : (
+              <>
+                <ProductGallery
+                  media={detail.media}
+                  title={detail.title}
+                  syncedIndex={syncedGalleryIndex}
+                />
+
+                {/* Title links through to the full PDP — same
+                 *  hover dialect as the cart-row title so the
+                 *  affordance reads consistently ("title turns
+                 *  brand orange → product page"). The modal
+                 *  closes on navigate because the next surface
+                 *  owns the chrome. */}
+                <Link
+                  href={`/products/${detail.handle}`}
+                  onClick={onClose}
+                  className="text-lg font-bold leading-snug text-[color:var(--color-ink)] transition-colors hover:text-[color:var(--color-brand)] md:text-xl"
+                >
+                  {detail.title}
+                </Link>
+
+                <DeliveryBadge
+                  deliveryTime={detail.deliveryTime}
+                  priceCents={priceMinCents}
+                />
+
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <Price
+                    cents={priceMinCents}
+                    currency={currency}
+                    discounted={isDiscounted}
+                    className="text-2xl"
+                  />
+                  {hasPriceRange && (
+                    <>
+                      <span
+                        className="text-base text-[color:var(--color-ink-muted)]"
+                        aria-hidden
+                      >
+                        –
+                      </span>
+                      <Price
+                        cents={priceMaxCents}
+                        currency={currency}
+                        discounted={isDiscounted}
+                        className="text-2xl"
+                      />
+                    </>
+                  )}
+                  {isDiscounted && compareAtCents && (
+                    <>
+                      <Price
+                        cents={compareAtCents}
+                        currency={currency}
+                        variant="compare"
+                        className="text-base"
+                      />
+                      <DiscountBadge percent={discountPct} />
+                    </>
+                  )}
+                </div>
+
+                <VariantPicker
+                  options={detail.options}
+                  variants={detail.variants}
+                  selection={selection}
+                  onSelect={handleSelect}
+                />
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Footer — pinned at the bottom of the panel via
+         *  `shrink-0`. Border on top only when the body
+         *  actually overflows, matching the `<MediaFormModal>`
+         *  pattern (see `bodyOverflows` effect above). The
+         *  error branch hides the footer entirely (its
+         *  ErrorState owns its own dismiss button), so the
+         *  buy CTAs aren't shown for a product we couldn't
+         *  load. The skeleton branch swaps in a CTA-stack
+         *  placeholder so the footer's height matches what's
+         *  coming, no jump when `detail` lands. */}
+        {status !== "error" && (
+          <div
+            className={cn(
+              "shrink-0 px-5 py-4",
+              bodyOverflows &&
+                "border-t border-[color:var(--color-border)]",
+            )}
+          >
+            {detail ? (
+              <BuyActions
+                product={detail}
+                selectedVariant={selectedVariant}
+                onAdded={onClose}
+                showInstallmentBadge={false}
+              />
+            ) : (
+              <FooterSkeleton />
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );
 }
 
 /**
- * Compose the cart-line payload for a card-modal add. Mirrors
- * `buildAnchorCartLine` from `<BuyActions>`: same id convention,
- * same `Title: Default Title` placeholder strip on the variant
- * title, same image fallback ladder. Kept in this file rather
- * than exported from `buy-actions.tsx` because the modal works
- * off `ProductDetail` shape and the existing helper is colocated
- * with the PDP CTAs that already consume it.
+ * Inline error fallback when `getProductDetailAction` returns
+ * null (product unpublished mid-session, network failure, etc.).
+ * Routes the shopper to the PDP they came from — same surface,
+ * same handle, same fetch upstream, so a refresh-style retry
+ * costs nothing on the cache side.
  */
-function buildCartLineFromVariant(
-  product: ProductDetail,
-  variant: ProductVariant,
-) {
-  const variantTitle =
-    variant.selectedOptions.length > 0
-      ? variant.selectedOptions
-          .filter(
-            (o) => !(o.name === "Title" && o.value === "Default Title"),
-          )
-          .map((o) => `${o.name}: ${o.value}`)
-          .join(" / ") || undefined
-      : undefined;
-
-  const imageUrl =
-    variant.image?.url ??
-    product.featuredImage?.url ??
-    product.media[0]?.preview.url ??
-    "";
-
-  return {
-    id: `${product.id}:${variant.id}`,
-    productId: product.id,
-    merchandiseId: variant.id,
-    handle: product.handle,
-    title: product.title,
-    imageUrl,
-    priceCents: variant.priceCents,
-    compareAtCents: variant.compareAtCents,
-    currency: product.currency,
-    variantTitle,
-  };
+function ErrorState({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex flex-1 items-center justify-center px-4 py-8 text-center">
+      <div className="rounded-lg border border-dashed border-[color:var(--color-border)] px-6 py-8 text-sm text-[color:var(--color-ink-muted)]">
+        Couldn&rsquo;t load this product&rsquo;s options. Open the product
+        page to add it.
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-primary"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
- * Picker skeleton — one shimmer row per option group the
- * Salespace search index already told us exists, sized to roughly
- * match the chip rows that'll land once `getProductDetailAction`
- * resolves. Keeping the row count + label height stable means the
- * modal doesn't jump when the real picker swaps in. The
- * `animate-pulse` is the same dialect as the rest of the
- * storefront's loading states.
+ * Body half of the skeleton — everything that lives inside the
+ * scrollable region while `getProductDetailAction` is in flight.
+ * Mirrors the modal's content stack (gallery → title → delivery
+ * → price → option chip rows) so the panel doesn't reshape when
+ * `detail` lands; just the shimmer bars swap for real content.
+ *
+ * `product.options` from the search row is enough to know the
+ * shape of the option picker that's coming; we render one
+ * skeleton row per option group so the chip layout doesn't shift
+ * when the real picker arrives.
  */
-function VariantPickerSkeleton({ product }: { product: SearchProduct }) {
+function BodySkeleton({ product }: { product: SearchProduct }) {
   const optionNames = Object.keys(product.options ?? {});
-  if (optionNames.length === 0) return null;
   return (
-    <div className="flex flex-col gap-5">
-      {optionNames.map((name) => (
-        <div key={name} className="flex flex-col gap-3">
-          <div className="h-4 w-20 animate-pulse rounded bg-[color:var(--color-surface-muted)]" />
-          <div className="flex flex-wrap gap-2">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-9 w-14 animate-pulse rounded-full bg-[color:var(--color-surface-muted)]"
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+    <>
+      <div
+        aria-hidden
+        className="aspect-square animate-pulse rounded-2xl bg-[color:var(--color-surface-muted)]"
+      />
+      <div className="h-6 w-3/4 animate-pulse rounded bg-[color:var(--color-surface-muted)]" />
+      <div className="h-10 animate-pulse rounded-lg bg-[color:var(--color-surface-muted)]" />
+      <div className="h-8 w-1/3 animate-pulse rounded bg-[color:var(--color-surface-muted)]" />
+      {optionNames.length > 0 ? (
+        optionNames.map((name) => <ChipRowSkeleton key={name} />)
+      ) : (
+        <ChipRowSkeleton />
+      )}
+    </>
+  );
+}
+
+/**
+ * Footer half of the skeleton — two CTA placeholders matching
+ * `<BuyActions>`'s eventual height (qty + Add-to-Cart row, then
+ * Buy Now below). Keeps the pinned footer's height stable
+ * between the loading and loaded states so the body's scroll
+ * geometry doesn't jump under the shopper.
+ */
+function FooterSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="h-12 w-full animate-pulse rounded-lg bg-[color:var(--color-surface-muted)]" />
+      <div className="h-12 w-full animate-pulse rounded-lg bg-[color:var(--color-surface-muted)]" />
     </div>
+  );
+}
+
+function ChipRowSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="h-4 w-20 animate-pulse rounded bg-[color:var(--color-surface-muted)]" />
+      <div className="flex flex-wrap gap-2">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-9 w-14 animate-pulse rounded-full bg-[color:var(--color-surface-muted)]"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Headline "X% off" pill — solid brand-orange, white label. Mirrors
+ * the PDP's version pixel-for-pixel; module-private here because
+ * lifting it to a shared file just to share three lines of JSX
+ * doesn't earn the indirection.
+ */
+function DiscountBadge({ percent }: { percent: number }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center self-center rounded-full",
+        "px-2.5 py-1 text-sm font-semibold tracking-wide text-white",
+        "bg-[color:var(--color-brand)]",
+      )}
+    >
+      {percent}% off
+    </span>
   );
 }

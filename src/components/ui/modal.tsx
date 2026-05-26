@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -88,6 +89,15 @@ const LAYER_Z = {
   confirm: { backdrop: "z-[140]", panel: "z-[150]" },
 } as const;
 
+/**
+ * Easing + duration for the panel's content-driven size animation.
+ * Same cubic-bezier curve the enter / exit keyframes use so a
+ * height shrink that fires alongside a close fade reads as one
+ * coordinated motion rather than two competing eases.
+ */
+const MODAL_SIZE_TRANSITION =
+  "height 200ms cubic-bezier(0.16, 1, 0.3, 1)";
+
 export type ModalLayer = keyof typeof LAYER_Z;
 
 export interface ModalProps {
@@ -155,6 +165,136 @@ export function Modal({
     first?.focus({ preventScroll: true });
   }, [active]);
 
+  /* Size animation — when the panel's content reshapes (skeleton
+   * → real data, error → recovery, picker state changes), the
+   * height tween between sizes rather than snapping.
+   *
+   * Approach: own the panel's explicit `height` via inline style,
+   * driven by a `ResizeObserver` watching the panel's children.
+   * Every measurement temporarily releases `height: auto` to read
+   * the natural size, then writes the clamped target back. The
+   * first measurement applies without transition so the modal
+   * doesn't pop from 0 to its initial size; subsequent changes
+   * animate through `transition: height` with the same easing
+   * curve as the enter / exit keyframes.
+   *
+   * Loop guard: a `measuring` flag short-circuits the
+   * observer for two frames after each measurement, so the
+   * observer's own resize echoes (from our `height: auto` swap)
+   * don't trigger a new pass before the layout has settled.
+   *
+   * Why useLayoutEffect: the first measurement must run after
+   * the panel has been laid out by the browser but before paint,
+   * otherwise the modal flashes at its CSS-default size for one
+   * frame on open. */
+  useLayoutEffect(() => {
+    if (!active) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    let lastApplied: number | null = null;
+    let measuring = false;
+
+    const measure = () => {
+      if (measuring) return;
+      measuring = true;
+
+      /* Read the panel's natural content height by temporarily
+       * releasing the explicit height. `void offsetHeight` is a
+       * sync-layout boundary — the browser computes layout
+       * immediately, no paint, no React commit. */
+      panel.style.transition = "none";
+      panel.style.height = "auto";
+      void panel.offsetHeight;
+      const naturalH = panel.offsetHeight;
+
+      /* Clamp to the same margin the wrapper enforces. Reads
+       * `window.innerHeight` rather than parsing the CSS `dvh`
+       * value so mobile viewport changes (URL bar collapse, etc.)
+       * are caught by the resize listener below. */
+      const maxH = window.innerHeight - 64; // matches `calc(100dvh - 4rem)`
+      const target = Math.min(naturalH, maxH);
+
+      if (lastApplied === null) {
+        /* First measurement after mount/reopen — snap to target
+         * with the transition disabled so we don't animate from
+         * the panel's CSS-default opening size. The enter
+         * keyframe is doing the opacity + scale flourish; the
+         * explicit-height swap rides under it invisibly. */
+        panel.style.height = `${target}px`;
+        void panel.offsetHeight;
+        panel.style.transition = MODAL_SIZE_TRANSITION;
+      } else if (lastApplied !== target) {
+        /* Subsequent change — restore the previous height first
+         * so CSS has a valid numeric "from" value, then defer
+         * the target set into the next frame so the transition
+         * actually picks up the change rather than collapsing
+         * both writes into one frame. */
+        panel.style.height = `${lastApplied}px`;
+        void panel.offsetHeight;
+        panel.style.transition = MODAL_SIZE_TRANSITION;
+        requestAnimationFrame(() => {
+          panel.style.height = `${target}px`;
+        });
+      } else {
+        /* No change — restore last height + transition and bail.
+         * Happens when the resize observer fires from our own
+         * `height: auto` swap, or when the resize listener fires
+         * but the content's natural size is unchanged. */
+        panel.style.height = `${lastApplied}px`;
+        panel.style.transition = MODAL_SIZE_TRANSITION;
+      }
+
+      lastApplied = target;
+
+      /* Release the loop guard after the next two frames so any
+       * observer echoes from our measurement settle before we
+       * accept another pass. Two RAFs gives the browser a full
+       * layout + paint to land before re-arming. */
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          measuring = false;
+        });
+      });
+    };
+
+    measure();
+
+    const ro = new ResizeObserver(() => measure());
+    /* Observe each direct child rather than the panel itself —
+     * observing the panel would create a feedback loop with our
+     * height writes. Children re-mount when content swaps
+     * (e.g. skeleton → real), so we also re-observe whenever the
+     * panel's child list changes. */
+    const observeChildren = () => {
+      ro.disconnect();
+      for (const child of Array.from(panel.children)) {
+        ro.observe(child);
+      }
+    };
+    observeChildren();
+    const mo = new MutationObserver(() => {
+      observeChildren();
+      measure();
+    });
+    mo.observe(panel, { childList: true });
+
+    window.addEventListener("resize", measure);
+
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+      window.removeEventListener("resize", measure);
+      /* Intentionally not resetting `style.height` / `transition`
+       * here — the panel stays mounted through the close
+       * keyframe (which animates opacity + transform), and
+       * resetting height mid-animation would visually jump the
+       * panel back to `auto` before the fade completes. The
+       * style attribute is cleared naturally when the panel
+       * unmounts via `setMounted(false)` in `handlePanelAnimationEnd`. */
+    };
+  }, [active]);
+
   const handlePanelAnimationEnd = useCallback(
     (e: ReactAnimationEvent<HTMLDivElement>) => {
       if (e.target !== e.currentTarget) return;
@@ -216,13 +356,17 @@ export function Modal({
             onAnimationEnd={handlePanelAnimationEnd}
             className={cn(
               "pointer-events-auto relative flex w-full max-w-md flex-col overflow-hidden",
-              /* Height cap — matches the wrapper's `p-4` (1rem top
-               *  + 1rem bottom) so the panel never grows past the
-               *  viewport's safe area. `dvh` (dynamic viewport
-               *  height) tracks the visible area on mobile, so the
-               *  panel shrinks when iOS shows its address bar
-               *  instead of sliding beneath it. */
-              "max-h-[calc(100dvh_-_2rem)]",
+              /* Height cap — sits 2rem inside the wrapper's `p-4`
+               *  (1rem each side) for a comfortable safe-area
+               *  gutter that doesn't make the panel feel
+               *  edge-anchored. `dvh` tracks the visible viewport
+               *  area on mobile, so the cap shrinks when iOS
+               *  shows its address bar instead of letting the
+               *  panel slide beneath it. Pairs with the
+               *  layout-effect that owns the actual `height`
+               *  inline style and animates it between content-
+               *  driven sizes. */
+              "max-h-[calc(100dvh_-_4rem)]",
               "rounded-2xl border border-[color:var(--color-border)]",
               "bg-[color:var(--color-surface)] shadow-2xl",
               open ? "animate-modal-in" : "animate-modal-out",

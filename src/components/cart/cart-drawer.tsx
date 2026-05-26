@@ -153,7 +153,18 @@ export function CartDrawer() {
               )}
             </div>
             {lines.length > 0 && (
-              <CartFooter subtotalCents={subtotalCents} currency={currency} />
+              /* The drawer's footer reads as a sticky bottom slab
+               * — `border-t` separates it from the scrolling line
+               * list above, `bg-[surface]` keeps it opaque so
+               * scroll content can't bleed through. `<CartFooter>`
+               * itself ships unstyled; chrome lives at the call
+               * site so the cart page can re-skin it as a panel
+               * card without fighting an inherited border. */
+              <CartFooter
+                subtotalCents={subtotalCents}
+                currency={currency}
+                className="border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
+              />
             )}
             <LoadingOverlay state={pending ? "loading" : null} />
           </div>

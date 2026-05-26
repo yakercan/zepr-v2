@@ -7,7 +7,22 @@ import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * Sticky footer for the cart drawer.
+ * Cart summary footer — free-shipping progress, subtotal, and the
+ * checkout CTA. Used by:
+ *
+ *   - **Cart drawer** as a sticky footer pinned to the bottom of
+ *     the panel, with the drawer adding its own `border-t` +
+ *     surface bg so the footer reads as separate from the
+ *     scrolling line list.
+ *   - **Cart page** wrapped in a rounded `PANEL_SURFACE_THIN`
+ *     card on the right column, no top border needed because the
+ *     card itself frames the content.
+ *
+ * Component is surface-agnostic on purpose — the chrome decisions
+ * (border, background, rounding) live with each caller because
+ * they're a function of the layout context, not the footer's own
+ * concern. Internal padding (`px-5 py-4`) stays here because every
+ * caller wants the same content inset.
  *
  * Three rows, top-to-bottom:
  *
@@ -36,22 +51,20 @@ import { cn } from "@/lib/utils";
  * variant GID — rare, but possible across schema migrations) the
  * CTA falls back to a disabled button so the shopper isn't sent
  * down a dead link.
- *
- * The whole footer sits behind a top border, never scrolls with
- * the line list, and uses `bg-[surface]` so the drag-on-scroll
- * feel stays clean against the panel background.
  */
 export function CartFooter({
   subtotalCents,
   currency,
+  className,
 }: {
   subtotalCents: number;
   currency: string;
+  className?: string;
 }) {
   const checkoutUrl = useCartCheckoutUrl();
 
   return (
-    <div className="border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-5 py-4">
+    <div className={cn("px-5 py-4", className)}>
       <FreeShippingProgress
         subtotalCents={subtotalCents}
         currency={currency}

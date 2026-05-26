@@ -26,12 +26,33 @@ type ShopifyResponse<T> = {
 };
 
 export interface ShopifyFetchOptions {
-  /** Seconds before Next.js will revalidate this fetch's cached
-   *  result. `false` disables caching entirely (use sparingly — most
-   *  storefront content is fine on a long revalidate). */
+  /** Caching policy for this fetch, in seconds:
+   *
+   *   - `number` — cache for N seconds, then revalidate on the
+   *     next request (Next's standard ISR-style data cache).
+   *     Pair with `tags` for surgical `revalidateTag()` purges.
+   *   - `false` — **no caching at all** (`cache: "no-store"`).
+   *     Use for per-request, per-user, or mutation responses
+   *     (cart reads, cart mutations, OAuth, etc.) where even a
+   *     "cache forever, invalidate on tag" story is the wrong
+   *     model. `tags` is meaningless in this mode and is
+   *     ignored.
+   *   - `undefined` — falls back to `DEFAULT_REVALIDATE_SEC`
+   *     (1 hour), suitable for most storefront content.
+   *
+   *  ⚠️ Subtle Next.js footgun: passing `revalidate: false` to
+   *  `fetch()`'s `next` option *natively* means "cache forever",
+   *  not "no cache". This wrapper inverts that to match the
+   *  intent the doc states above — the no-store branch sets
+   *  `cache: "no-store"` at the fetch level rather than `next.
+   *  revalidate: false`. Without this, the cart's `fetchCart()`
+   *  call would silently return a pre-mutation snapshot for
+   *  every subsequent reload until the dev server's data cache
+   *  evicted the entry. */
   revalidate?: number | false;
   /** Cache tags so callers can target a specific entry via
-   *  `revalidateTag()` if/when we need surgical invalidation. */
+   *  `revalidateTag()` if/when we need surgical invalidation.
+   *  Ignored when `revalidate: false` (no cache entry to tag). */
   tags?: string[];
 }
 
@@ -70,6 +91,23 @@ export async function shopifyFetch<T>(
     ? { "Shopify-Storefront-Private-Token": privateToken }
     : { "X-Shopify-Storefront-Access-Token": token };
 
+  /* Translate our `revalidate` option into the correct shape for
+   * native fetch. The two branches are not interchangeable —
+   * `next.revalidate: false` opts INTO Next's data cache with an
+   * infinite TTL, which is the opposite of what every cart read
+   * & mutation in `cart.ts` wants. `cache: "no-store"` is the
+   * actual "skip the data cache entirely" toggle. See the option
+   * docstring above for the full reasoning. */
+  const cachingInit: RequestInit =
+    options.revalidate === false
+      ? { cache: "no-store" }
+      : {
+          next: {
+            revalidate: options.revalidate ?? DEFAULT_REVALIDATE_SEC,
+            tags: options.tags,
+          },
+        };
+
   const res = await fetch(endpoint(), {
     method: "POST",
     headers: {
@@ -77,10 +115,7 @@ export async function shopifyFetch<T>(
       ...authHeader,
     },
     body: JSON.stringify({ query, variables }),
-    next: {
-      revalidate: options.revalidate ?? DEFAULT_REVALIDATE_SEC,
-      tags: options.tags,
-    },
+    ...cachingInit,
   });
 
   if (!res.ok) {

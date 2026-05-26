@@ -1,24 +1,46 @@
 "use client";
 
+import Link from "next/link";
 import { closeCart } from "@/lib/cart/drawer-store";
+import { cn } from "@/lib/utils";
 
 /**
- * Empty-state body for the cart drawer.
+ * Empty-state body for the cart — shared by the drawer and the
+ * `/cart` page. Same copy + visual rhythm on both surfaces;
+ * "Continue shopping" branches by `mode`:
  *
- * Centered vertically inside the drawer's scroll area so the message
- * sits at the visual middle on any drawer height (long screen,
- * short laptop window, mobile sheet). The "Continue shopping" button
- * just closes the drawer — there's no separate "back to home" CTA
- * because the user is already on a page; they just need the overlay
- * dismissed so they can keep browsing.
+ *   - **`drawer`** (default) → dismisses the overlay so the
+ *     shopper lands back on whatever page they were already on,
+ *     no URL change. The drawer body is a tall flex column, so
+ *     the container claims `h-full flex-1` to vertically centre
+ *     the message inside it.
+ *   - **`page`** → routes to the homepage. The empty state sits
+ *     inside a `PANEL_SURFACE_THIN` card on the cart page, which
+ *     has its own natural height, so the container drops the
+ *     `h-full flex-1` and just pads + centres.
  *
  * Copy-only — no decorative bag icon. The drawer's header already
- * shows the cart context ("Your cart"), so a second glyph here would
- * be redundant and add visual weight the empty state doesn't need.
+ * shows the cart context ("Your cart"), and the page's `<h1>`
+ * does the same; a second glyph here would add visual weight the
+ * empty state doesn't need.
  */
-export function CartEmpty() {
+export interface CartEmptyProps {
+  mode?: "drawer" | "page";
+}
+
+export function CartEmpty({ mode = "drawer" }: CartEmptyProps) {
   return (
-    <div className="flex h-full flex-1 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center gap-3 px-6 py-12 text-center",
+        /* Drawer-only sizing: the parent body is a tall flex
+         * column with `min-h-0 flex-1`, so the empty state claims
+         * the full height and centres vertically. On the page,
+         * the card surface frames the message at its natural
+         * height — no fill behaviour wanted. */
+        mode === "drawer" && "h-full flex-1",
+      )}
+    >
       <div>
         <h3 className="text-base font-semibold text-[color:var(--color-ink)]">
           Your cart is empty
@@ -27,13 +49,19 @@ export function CartEmpty() {
           Add a few items to get started.
         </p>
       </div>
-      <button
-        type="button"
-        onClick={closeCart}
-        className="btn-primary mt-2"
-      >
-        Continue shopping
-      </button>
+      {mode === "drawer" ? (
+        <button
+          type="button"
+          onClick={closeCart}
+          className="btn-primary mt-2"
+        >
+          Continue shopping
+        </button>
+      ) : (
+        <Link href="/" className="btn-primary mt-2">
+          Continue shopping
+        </Link>
+      )}
     </div>
   );
 }

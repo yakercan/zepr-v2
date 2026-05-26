@@ -29,9 +29,10 @@ import { useHydrated } from "@/lib/hooks/use-hydrated";
  *   - Opening a drawer is an interaction, not navigation. The native
  *     element should match the semantics so screen readers announce
  *     "Cart, button" and the user knows it won't change the URL.
- *   - There's no `/cart` route in v2 — the drawer + Shopify-hosted
- *     checkout cover the full flow. The drawer's footer Checkout
- *     CTA owns the keyboard path to checkout.
+ *   - The drawer is the high-conversion primary path (one click,
+ *     sticky-footer Checkout). The `/cart` route exists as a
+ *     secondary surface for direct navigation (URL bar, bookmarks,
+ *     share links) — not the default click target.
  */
 export function CartTrigger({ initialCount = 0 }: { initialCount?: number }) {
   const hydrated = useHydrated();
