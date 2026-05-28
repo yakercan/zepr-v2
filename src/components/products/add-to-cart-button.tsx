@@ -95,13 +95,47 @@ export function AddToCartButton({
       {/* Only mount the modal for products that actually need it.
           Saves the per-card cost (state + portal subtree) on every
           single-variant tile in a grid that may render 60+ at a
-          time. */}
+          time.
+        
+          # Why the wrapping stopPropagation span
+        
+          `<ProductCard>` is, structurally, a Next.js `<Link>` —
+          the entire card is one big anchor. `<AddToCartButton>`
+          renders here as one of that anchor's children, and so
+          does the `<ProductModal>` it mounts.
+        
+          The modal opens via a portal (Vaul's `Drawer.Portal` /
+          our `<Modal>` primitive's `createPortal`), so its DOM
+          lives at `document.body` and *DOM* click events
+          correctly stop at the body — they never bubble back up
+          to the card's anchor.
+        
+          But React's synthetic event system bubbles through the
+          **component tree**, not the DOM tree. Every click
+          inside the modal subtree — gallery thumbs, lightbox
+          close, variant chip, even empty space in the
+          `<Drawer.Overlay>` — bubbles up through React's
+          fibers (modal → AddToCartButton → ProductCard's Link)
+          and lands on the Link's onClick, which routes the
+          shopper to the PDP mid-interaction.
+        
+          This `<span>` sits *between* the modal subtree and
+          the card-level Link in React's tree. A single
+          `onClick={stopPropagation}` here intercepts every
+          click from inside the modal before it can escape and
+          trigger the navigation. Zero layout impact (span is
+          inline and empty in DOM terms once Vaul portals its
+          children out). The `<button>` above already
+          stop-propagates its own click; this is the same
+          discipline applied to everything the modal owns. */}
       {needsModal && (
-        <ProductModal
-          product={product}
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-        />
+        <span onClick={(e) => e.stopPropagation()}>
+          <ProductModal
+            product={product}
+            open={modalOpen}
+            onClose={() => setModalOpen(false)}
+          />
+        </span>
       )}
     </>
   );

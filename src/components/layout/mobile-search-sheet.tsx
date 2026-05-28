@@ -170,8 +170,27 @@ export function MobileSearchSheet({
              * vertical slab so the suggestions list reads as a
              * page in its own right. Rounded only on the bottom
              * corners so the seam against the top of the viewport
-             * looks like a peel-down rather than a floating card. */
-            "fixed inset-x-0 top-0 flex max-h-[85svh] flex-col",
+             * looks like a peel-down rather than a floating card.
+             *
+             * `overflow-hidden` here is purely a *visual clip* —
+             * the panel paints `rounded-b-2xl` but its children
+             * (the form, the embedded `<SearchModal>` block) are
+             * regular rectangles with their own surface fill, and
+             * the last child paints right up to the panel's
+             * rectangular bottom edge. Without the clip the
+             * child's square corners overlay the panel's curve
+             * and the bottom corners read as flat (a giveaway:
+             * when the OS keyboard opens, Vaul resizes the panel
+             * so the children no longer reach the bottom edge,
+             * and the rounded corners pop back into view — same
+             * panel, same children, just different available
+             * height).
+             *
+             * This is *not* the body-only scroll setup from a
+             * previous iteration. The list itself fits in
+             * `max-h-[85svh]` at the 2 + 3 mobile cap; the
+             * overflow utility is only doing corner clipping. */
+            "fixed inset-x-0 top-0 flex max-h-[85svh] flex-col overflow-hidden",
             "rounded-b-2xl border border-t-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
             "outline-none",
             "shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)]",
