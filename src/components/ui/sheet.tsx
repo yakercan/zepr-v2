@@ -117,6 +117,14 @@ export interface SheetProps {
   /** Inner body classes. The wrapper owns the chrome; consumers
    *  add their own padding / layout rules here. */
   className?: string;
+  /** Render one z-index tier higher (`--z-sheet-elevated`) so this
+   *  sheet — and its backdrop — stack *above* another sheet that's
+   *  already open. Use for sub-overlays launched from inside a sheet
+   *  (e.g. the size-chart sheet opened from the product modal's
+   *  variant picker), so the parent sheet dims correctly behind it
+   *  instead of bleeding through. Harmless when the sheet opens
+   *  standalone — it just lands a tier higher on an empty stack. */
+  elevated?: boolean;
   /** Sheet body. */
   children: ReactNode;
   /** Optional sticky footer pinned to the bottom of the sheet
@@ -142,6 +150,7 @@ export function Sheet({
   className,
   children,
   footer,
+  elevated = false,
 }: SheetProps) {
   const isDesktop = useIsDesktop();
   /* Desktop branch: render nothing. Callers pair this with a
@@ -213,6 +222,13 @@ export function Sheet({
     },
   }[direction];
 
+  /* Base vs elevated tier. Overlay always rides `(panel - 10)` —
+   * the same convention the modal ladder uses — so the backdrop
+   * tucks just under its own panel and, when elevated, above the
+   * parent sheet's panel. */
+  const panelZ = elevated ? "var(--z-sheet-elevated)" : "var(--z-sheet)";
+  const overlayZ = `calc(${panelZ} - 10)`;
+
   return (
     <Drawer.Root
       open={open}
@@ -227,7 +243,7 @@ export function Sheet({
            * sheets and modals share a consistent dim
            * affordance. Vaul handles the fade timing. */
           className="fixed inset-0 bg-black/40"
-          style={{ zIndex: "calc(var(--z-sheet) - 10)" }}
+          style={{ zIndex: overlayZ }}
         />
         <Drawer.Content
           /* `aria-describedby={undefined}` opts out of the Radix
@@ -238,7 +254,7 @@ export function Sheet({
            * where the description is provided but Radix hasn't
            * picked up the association yet during fast refresh. */
           aria-describedby={undefined}
-          style={{ zIndex: "var(--z-sheet)" }}
+          style={{ zIndex: panelZ }}
           className={cn(
             chrome.panel,
             "border-[color:var(--color-border)] bg-[color:var(--color-surface)]",

@@ -47,6 +47,13 @@ export interface ShimmerImageProps
    *  `relative inline-block` — pass `block h-full w-full` (etc.) when
    *  the ShimmerImage should fill an aspect-ratio parent. */
   wrapperClassName?: string;
+  /** Optional art-direction sources. When provided the `<img>` is
+   *  wrapped in a `<picture>` and these render as `<source>` elements
+   *  *before* it, so the browser picks the first media-matching
+   *  candidate and fetches only that one file (`src` stays the
+   *  universal fallback). Use for responsive banners that swap the
+   *  whole asset — not just the resolution — across breakpoints. */
+  sources?: ReadonlyArray<{ srcSet: string; media?: string; type?: string }>;
 }
 
 export function ShimmerImage({
@@ -57,6 +64,7 @@ export function ShimmerImage({
   loading = "lazy",
   skeletonRounded = "md",
   wrapperClassName,
+  sources,
   alt = "",
   ...imgProps
 }: ShimmerImageProps) {
@@ -89,24 +97,42 @@ export function ShimmerImage({
   // in DOM order as an absolute overlay so it paints on top while
   // `loaded === false`. Both fade via opacity — unmounting would kill
   // the transition.
+  const img = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      ref={handleImgRef}
+      src={src}
+      alt={alt}
+      loading={loading}
+      decoding="async"
+      onLoad={handleLoad}
+      onError={onError}
+      className={cn(
+        "transition-opacity duration-200",
+        loaded ? "opacity-100" : "opacity-0",
+        className,
+      )}
+      {...imgProps}
+    />
+  );
+
   return (
     <span className={cn("relative inline-block", wrapperClassName)}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={handleImgRef}
-        src={src}
-        alt={alt}
-        loading={loading}
-        decoding="async"
-        onLoad={handleLoad}
-        onError={onError}
-        className={cn(
-          "transition-opacity duration-200",
-          loaded ? "opacity-100" : "opacity-0",
-          className,
-        )}
-        {...imgProps}
-      />
+      {sources && sources.length > 0 ? (
+        <picture>
+          {sources.map((s) => (
+            <source
+              key={`${s.media ?? ""}|${s.type ?? ""}|${s.srcSet}`}
+              srcSet={s.srcSet}
+              media={s.media}
+              type={s.type}
+            />
+          ))}
+          {img}
+        </picture>
+      ) : (
+        img
+      )}
       <Skeleton
         rounded={skeletonRounded}
         className={cn(

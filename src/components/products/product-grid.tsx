@@ -25,9 +25,10 @@ import { cn } from "@/lib/utils";
  *   horizontal gap is *intentionally* the same as the mobile page
  *   gutter (see `--page-gutter-px` override in globals.css), so a
  *   2-col row reads as evenly-paced columns flush with the page
- *   bleed: `[12, card, 12, card, 12]`. The 24px vertical gives
- *   each row enough air without going so generous that the page
- *   feels under-populated on a short phone screen.
+ *   bleed: `[12, card, 12, card, 12]`. The vertical gap is left a
+ *   little larger (24px) so rows stay visually distinct — matching
+ *   it to the 12px gutter packed the tiles too tightly top-to-
+ *   bottom — while still sitting below the roomier desktop value.
  * - **md+ desktop:** `md:gap-x-5 md:gap-y-8` = 20 / 32px. Looser
  *   because the page-gutter widens to 24px on desktop and the
  *   cards themselves are sitting in 3–5 column rows, so the eye

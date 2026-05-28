@@ -21,8 +21,13 @@
 
 export interface HomeBanner {
   id: string;
-  /** 1920×300 image; rendered at the slider's aspect ratio. */
+  /** Desktop asset — 1920×300, rendered at `aspect-[1920/300]`
+   *  from `md` up. */
   image: string;
+  /** Mobile asset — taller 1920×800 crop, rendered at
+   *  `aspect-[1920/800]` below `md`. Optional: banners without one
+   *  fall back to the desktop `image` on every breakpoint. */
+  mobileImage?: string;
   /** Decorative banners use empty alt; pass meaningful copy
    *  whenever the banner carries unique information not already
    *  duplicated in nearby DOM. */
@@ -133,18 +138,21 @@ export const HOME_BANNERS: readonly HomeBanner[] = [
   {
     id: "hot-deals",
     image: "https://cdn.salespace.com/zepr-desktop-banner-1.webp",
+    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-1.webp",
     alt: "Shop hot deals",
     href: buildSearchHref({ sort: "hot_deals:desc" }),
   },
   {
     id: "featured",
     image: "https://cdn.salespace.com/zepr-desktop-banner-2.webp",
+    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-2.webp",
     alt: "Shop featured categories",
     href: buildSearchHref({ subcategories: FEATURED_SUBCATEGORIES }),
   },
   {
     id: "best-rated",
     image: "https://cdn.salespace.com/zepr-desktop-banner-3.webp",
+    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-3.webp",
     alt: "Shop best rated",
     href: buildSearchHref({
       sort: "best_rated:desc",

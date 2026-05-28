@@ -186,6 +186,15 @@ export function SizeChartModal({ open, onClose, chart }: SizeChartModalProps) {
           if (!next) onClose();
         }}
         title="Size Chart"
+        /* Elevated tier: the size guide is launched from the variant
+         * picker, which on mobile lives *inside* the product modal's
+         * own sheet. Without the bump both sheets share `--z-sheet`,
+         * so this backdrop would slip under the product modal's panel
+         * and the two bottom sheets would overlap instead of stacking.
+         * `elevated` lifts it a full tier so the product modal dims
+         * cleanly behind it. (No-op when the guide is opened from the
+         * PDP, where it's the only sheet on the stack.) */
+        elevated
         className="flex flex-col gap-5 px-5 py-4"
       >
         {body}

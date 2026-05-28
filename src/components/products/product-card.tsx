@@ -34,7 +34,7 @@ import type { SearchProduct } from "@/types/product";
  *   │   ── sold-out scrim when not available               │
  *   ├──────────────────────────────────────────────────────┤
  *   │  [★ 4.7] [BADGE] Product title that wraps onto the   │
- *   │  second line if it's long (line-clamp-2)             │
+ *   │  second line if it's long (2-line clamp)             │
  *   │  price    (tinted with badge accent · strikethrough) │
  *   └──────────────────────────────────────────────────────┘
  *
@@ -47,7 +47,8 @@ import type { SearchProduct } from "@/types/product";
  *
  * Badge rules:
  *   • At most ONE product badge (priority-picked from API `badges`)
- *     plus the rating, both inline with the title as outlined pills.
+ *     plus the rating, both inline at the head of the title as
+ *     outlined pills.
  *   • Free Shipping shows on the image as a solid green callout —
  *     it's a delivery promise, not a product attribute, so it lives
  *     on the media to read like a sticker rather than a tag.
@@ -170,23 +171,38 @@ export function ProductCard({
           baseline regardless of how long the title is or whether
           a promo badge takes up space. */}
       <div className="flex flex-1 flex-col gap-1 p-3">
-        {/* Badges sit *inline* with the title — they flow as
-            inline-flex pills inside the `<h3>` so the title text
-            wraps naturally around them, and the line-clamp clips
-            the whole composition (badges + text) as a single block
-            of two lines max. `align-middle` lines each pill up with
-            the title's x-height instead of dropping it to the
-            baseline. Order: rating leads (every product has one, so
-            it's the row's anchor) → promo badge (only the standouts
-            get one) → title. Free Shipping is intentionally not in
-            this row — it lives on the media as a callout sticker. */}
+        {/* Badges flow *inline* at the head of the title so the text
+            continues right after them and wraps naturally beneath.
+            Order: rating leads (every product has one, so it anchors
+            the row) → promo badge (only standouts get one) → title.
+            Free Shipping is intentionally not here — it lives on the
+            media as a callout sticker.
+          
+            # Two-line clamp without `-webkit-box` (the bug-free path)
+          
+            We deliberately do NOT use `line-clamp-2` here. `line-clamp`
+            forces `display:-webkit-box`, and WebKit mishandles pills
+            inside it: as `inline-flex` they get the line *clipped* on
+            mobile (the "cutoff"), and as plain `inline` they lose
+            `white-space:nowrap` and *break apart* (star on one line,
+            rating on the next). Both are the same root cause — pills
+            don't belong in a `-webkit-box`.
+          
+            Instead we clamp with a plain block + `overflow-hidden`
+            capped at `max-h-[2lh]` (two line-heights — the `lh` unit
+            tracks `leading-relaxed` automatically, so the cap stays
+            exactly two lines if the leading ever changes). Ordinary
+            block flow handles `inline-flex` children correctly, so the
+            pills stay atomic (no break) and uncliped (no `-webkit-box`)
+            while the title still hard-stops at two lines. `align-middle`
+            keeps each pill centred on the text line. The only thing we
+            give up vs `line-clamp` is the trailing ellipsis — overflow
+            clips cleanly at the line boundary instead. */}
         {/* `leading-relaxed` instead of `snug` so the line carrying
-            the badge pills (which are taller than plain text because
-            of their 1px border + py-0.5) doesn't crowd the wrapped
-            title text below. Applied unconditionally so cards with
-            and without badges share the same title rhythm — keeps
-            the row baseline-consistent. */}
-        <h3 className="line-clamp-2 text-sm font-medium leading-relaxed text-[color:var(--color-ink)]">
+            the badge pills (taller than plain text) doesn't crowd the
+            wrapped title below. Applied unconditionally so cards with
+            and without badges share the same title rhythm. */}
+        <h3 className="max-h-[2lh] overflow-hidden text-sm font-medium leading-relaxed text-[color:var(--color-ink)]">
           {product.rating && (
             <RatingBadge
               value={product.rating.value}

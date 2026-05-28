@@ -252,6 +252,13 @@
    *   --z-modal-confirm      150      confirm-tier modal panel
    *                                   (destructive prompts)
    *   --z-sheet              170      bottom sheet (mobile)
+   *   --z-sheet-elevated     190      a sheet opened *over* another
+   *                                   sheet (e.g. size-chart over the
+   *                                   product modal). Sits a full tier
+   *                                   above the base sheet so its
+   *                                   backdrop (180) dims the parent
+   *                                   sheet's panel (170) and its own
+   *                                   panel (190) stacks on top.
    *
    * Backdrops sit at `(panel - 10)` by convention — see the
    * `<Backdrop>` and `<Modal>` source for the existing pattern.
@@ -264,6 +271,7 @@
   --z-modal-preview: 130;
   --z-modal-confirm: 150;
   --z-sheet: 170;
+  --z-sheet-elevated: 190;
 
   /* Page-level layout tokens.
    *
