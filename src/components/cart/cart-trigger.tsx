@@ -43,7 +43,13 @@ export function CartTrigger({ initialCount = 0 }: { initialCount?: number }) {
     <button
       type="button"
       onClick={openCart}
-      className="icon-bubble icon-bubble-no-tint h-10 w-10"
+      /* h-10 on desktop, h-11 on mobile. The mobile header pairs
+       * this trigger with a hamburger button — bumping the touch
+       * size to 44px gives the cluster a more confident footprint
+       * on phones (and matches the Apple/Material 44px tap-target
+       * floor) while keeping the desktop header's denser chrome
+       * untouched. */
+      className="icon-bubble icon-bubble-no-tint h-10 w-10 touch:h-11 touch:w-11"
       aria-label={
         count === 0
           ? "Open cart, empty"

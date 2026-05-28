@@ -31,13 +31,23 @@ import { cn } from "@/lib/utils";
  *     visible track; `overscroll-behavior-x: contain` keeps the
  *     browser back-swipe gesture from hijacking horizontal pans.
  *
- * # Why the trailing slot is hidden on mobile
+ * # Trailing slot visibility
  *
  * A right-anchored "View all →" link gets lost the moment the
- * row scrolls — the user has to scroll past every pill just to
- * find it. The scroll itself is the discovery affordance on
- * mobile, so the slot collapses. The desktop branch keeps it as
- * the conventional bridge to the full result page.
+ * row needs to scroll horizontally — the shopper has to scroll
+ * past every pill just to find it. So we hide it on phones and
+ * surface it from *tablet width up* (`md:` breakpoint, 768px+),
+ * which is where the row has enough horizontal room to host both
+ * the pills and a trailing link without crowding.
+ *
+ * Using a plain Tailwind breakpoint (rather than measuring
+ * scroll overflow with JS) keeps this primitive zero-cost at
+ * runtime: no `ResizeObserver`, no `MutationObserver`, no
+ * extra render on layout shifts. The trade-off is the
+ * breakpoint isn't aware of how many pills are actually in the
+ * row — but for the consumers we have today (a handful of
+ * pills, never approaching the 768px ceiling), the threshold
+ * is a clean enough proxy for "is there room?".
  *
  * # Bleed math
  *
@@ -157,8 +167,11 @@ export function ScrollRow({
       {trailing && (
         /* `ml-auto` pushes the slot to the right on desktop and
          * naturally drops to a new flex line if the pills wrap.
-         * Hidden entirely on mobile (see component doc). */
-        <div className="ml-auto touch:hidden">{trailing}</div>
+         * `hidden md:block` collapses it on phones — where the
+         * row scrolls horizontally and a right-anchored link
+         * would just get lost off-screen — and reveals it from
+         * tablet width (768px) up. */
+        <div className="ml-auto hidden md:block">{trailing}</div>
       )}
     </div>
   );

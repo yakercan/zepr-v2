@@ -396,21 +396,17 @@ export function CloseIcon({ className }: IconProps) {
  *  contemporary "elephant" silhouette; keeps it visually distinct
  *  from a generic kebab or settings glyph. */
 export function MenuIcon({ className }: IconProps) {
-  /* Lines sit at y=4, y=12, y=20 (8-unit gap) — a wider spread
-   * than the conventional y=7/12/17 (5-unit gap). The mobile
-   * header pairs this icon with the cart trigger, whose glyph
-   * paints from ~y=12 (handle) to ~y=94 (wheels) of its 100-unit
-   * canvas — i.e. it consumes roughly the full height of its
-   * tap target. A 5-unit hamburger looked stubby alongside that
-   * tall cart; the 8-unit spacing brings the hamburger's visual
-   * extent (`y=3.1` → `y=20.9` once the 1.75 stroke width is
-   * accounted for, ≈74% of canvas) into the same ballpark so
-   * the two icons read as the same height on screen. */
+  /* Lines at y=6, y=12, y=18 (6-unit gap). The mobile header
+   * renders this glyph at `h-7 w-7` (28px), where a 6-unit SVG
+   * gap reads as ≈7px between line centres on screen — close
+   * to the conventional "hamburger" rhythm without looking
+   * cramped. Wider spreads (8-unit) felt loose at 28px; this is
+   * the sweet spot. */
   return (
     <svg {...svgProps(className)}>
-      <path d="M4 4h16" />
+      <path d="M4 6h16" />
       <path d="M4 12h16" />
-      <path d="M4 20h16" />
+      <path d="M4 18h16" />
     </svg>
   );
 }

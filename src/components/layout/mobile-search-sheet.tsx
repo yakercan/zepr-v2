@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useEffect,
   useRef,
@@ -71,7 +71,14 @@ export function MobileSearchSheet({
   onOpenChange,
 }: MobileSearchSheetProps) {
   const router = useRouter();
-  const [value, setValue] = useState("");
+  /* `?q` from the current URL — pre-fills the input the moment
+   * the sheet opens so the shopper sees "what they searched for"
+   * instead of an empty field with the placeholder. Same pattern
+   * the desktop `<SearchBar>` uses; keeping both surfaces in
+   * sync means the bar that launches the sheet and the input
+   * inside the sheet present the same value at all times. */
+  const urlQuery = useSearchParams().get("q") ?? "";
+  const [value, setValue] = useState(urlQuery);
   const inputRef = useRef<HTMLInputElement>(null);
 
   /* Desktop short-circuit (same pattern as `<Sheet>` and the nav
@@ -82,19 +89,26 @@ export function MobileSearchSheet({
   const isDesktop = useIsDesktop();
 
   /* Prop-derived state sync — every time `open` flips from false
-   * to true we want a clean input. Doing it via render-time
-   * `setState` rather than an effect keeps React's effect-purity
-   * lint happy (see https://react.dev/learn/you-might-not-need-an-effect)
-   * and avoids the cascading render that an `if (open) setValue("")`
-   * inside `useEffect` would trigger.
+   * to true we snap the input back to the URL's `q` value. The
+   * shopper either:
+   *   - has no `?q` (browsing landing / category page) → the
+   *     field opens empty and the placeholder shows.
+   *   - has `?q=foo` (already on /search?q=foo) → the field
+   *     opens pre-filled with "foo", so they can edit / extend
+   *     the query instead of retyping it.
    *
-   * The autofocus *is* a side effect — it has to wait for Vaul's
-   * entry animation to settle before iOS will pop the keyboard —
-   * so that piece stays in the effect below. */
+   * Doing it via render-time `setState` rather than an effect
+   * keeps React's effect-purity lint happy (see
+   * https://react.dev/learn/you-might-not-need-an-effect) and
+   * avoids the cascading render that an
+   * `if (open) setValue(urlQuery)` inside `useEffect` would
+   * trigger. The autofocus *is* a side effect — it has to wait
+   * for Vaul's entry animation to settle before iOS will pop the
+   * keyboard — so that piece stays in the effect below. */
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (open) setValue("");
+    if (open) setValue(urlQuery);
   }
 
   useEffect(() => {
@@ -205,17 +219,21 @@ export function MobileSearchSheet({
                  * return key's label to "Search", matching the
                  * sheet's intent. Cheap WCAG-aligned polish. */
                 enterKeyHint="search"
-                /* Resting style mirrors the mobile header trigger
-                 * and the desktop bar — `SEARCH_BAR_SURFACE_CLASSES`
-                 * is the single source of truth for the bar's
-                 * idle look. Focus promotes to the same white +
-                 * 2px ink ring the desktop bar uses on hover/focus,
-                 * so the field reads "engaged" the moment the OS
-                 * keyboard pops. */
+                /* The sheet input wears the desktop bar's *active*
+                 * look (white fill + 2px ink ring) regardless of
+                 * focus. Inside the search drawer, "engaged" is
+                 * the only state that makes sense — the shopper
+                 * opened the surface to search; we don't need a
+                 * resting visual that asks them to focus the
+                 * input before it looks ready. Skipping the
+                 * `focus:`-prefixed promotion also dodges a Vaul
+                 * + iOS `repositionInputs` flicker where the
+                 * focus styles toggle on a half-beat as the OS
+                 * keyboard slides in. */
                 className={cn(
                   SEARCH_BAR_SURFACE_CLASSES,
                   "w-full pl-9 pr-3 placeholder:text-[color:var(--color-ink-muted)]",
-                  "focus:bg-white focus:ring-2 focus:ring-[color:var(--color-ink)]",
+                  "bg-white ring-2 ring-[color:var(--color-ink)]",
                 )}
               />
             </div>
@@ -238,18 +256,17 @@ export function MobileSearchSheet({
           {/* Suggestions surface — re-uses the desktop search
            *  modal in `embedded` mode, which strips the floating
            *  chrome (absolute positioning, rounded border, shadow)
-           *  so the suggestions render as a normal in-flow block
-           *  that fills the remaining sheet height. The fetch /
-           *  debounce / skeleton machinery still comes from the
-           *  same component — no duplication. */}
-          <div className="flex-1 overflow-y-auto">
-            <SearchModal
-              query={value}
-              open
-              embedded
-              onClose={closeFromSuggestion}
-            />
-          </div>
+           *  so the suggestions render as a normal in-flow block.
+           *  With 2 keyword + 3 product results capped on mobile
+           *  (see `search-modal.tsx`), the list fits comfortably
+           *  inside the sheet's `max-h-[85svh]` slab without
+           *  needing an explicit body-scroll container. */}
+          <SearchModal
+            query={value}
+            open
+            embedded
+            onClose={closeFromSuggestion}
+          />
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

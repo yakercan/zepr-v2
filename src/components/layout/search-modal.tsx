@@ -57,6 +57,26 @@ import { cn } from "@/lib/utils";
 
 const DEBOUNCE_MS = 180;
 
+/* Display-side caps on what the modal renders out of the
+ * upstream response. The fetch always returns up to 5 keywords +
+ * 5 products (`MAX_KEYWORDS` / `MAX_PRODUCTS` in
+ * `salespace/suggest.ts`); the desktop panel shows all of them,
+ * while the mobile sheet trims to 2 + 3.
+ *
+ * Asymmetric mobile caps reflect what each section is *for*:
+ * keyword suggestions are typed shortcuts (a couple of "did you
+ * mean…" is enough), product cards are the actual results
+ * (showing a few is the point). 2 keywords keeps the typed
+ * shortcuts from pushing the product hits below the fold; 3
+ * products fits in the sheet without forcing a scroll.
+ *
+ * Keeping the cap here (not in the fetch) means a future redesign
+ * — say, "show 5 on tablets" — is a one-line change and the
+ * server-side data layer keeps its single contract. */
+const DESKTOP_DISPLAY_CAP = 5;
+const MOBILE_KEYWORD_CAP = 2;
+const MOBILE_PRODUCT_CAP = 3;
+
 export interface SearchModalProps {
   /** Live input value. We debounce internally before fetching. */
   query: string;
@@ -88,8 +108,12 @@ export function SearchModal({
 
   if (!open) return null;
 
-  const hasKeywords = (data?.keywords.length ?? 0) > 0;
-  const hasProducts = (data?.products.length ?? 0) > 0;
+  const keywordCap = embedded ? MOBILE_KEYWORD_CAP : DESKTOP_DISPLAY_CAP;
+  const productCap = embedded ? MOBILE_PRODUCT_CAP : DESKTOP_DISPLAY_CAP;
+  const keywords = data?.keywords.slice(0, keywordCap) ?? [];
+  const products = data?.products.slice(0, productCap) ?? [];
+  const hasKeywords = keywords.length > 0;
+  const hasProducts = products.length > 0;
   const hasResults = hasKeywords || hasProducts;
   // Skeleton covers both the in-flight fetch *and* the brief gap
   // between a keystroke and the debounce window firing — without
@@ -125,7 +149,9 @@ export function SearchModal({
             ),
       )}
     >
-      {showSkeleton && <ResultsSkeleton />}
+      {showSkeleton && (
+        <ResultsSkeleton keywordCap={keywordCap} productCap={productCap} />
+      )}
       {!showSkeleton && !hasResults && (
         // Only reachable when the upstream truly returns nothing
         // for a typed query (popular suggestions always have a
@@ -136,10 +162,7 @@ export function SearchModal({
       {!showSkeleton && hasResults && (
         <div>
           {hasKeywords && (
-            <KeywordsSection
-              keywords={data!.keywords}
-              onClose={onClose}
-            />
+            <KeywordsSection keywords={keywords} onClose={onClose} />
           )}
           {/* Between-section divider that lines up with the section
               labels' horizontal padding (px-3) — keeps the rhythm
@@ -149,10 +172,7 @@ export function SearchModal({
             <div className="mx-3 border-t border-[color:var(--color-border)]" />
           )}
           {hasProducts && (
-            <ProductsSection
-              products={data!.products}
-              onClose={onClose}
-            />
+            <ProductsSection products={products} onClose={onClose} />
           )}
         </div>
       )}
@@ -259,12 +279,22 @@ function NoResults({ query }: { query: string }) {
   );
 }
 
-function ResultsSkeleton() {
+/* Skeleton row counts track the actual caps so the placeholder
+ * layout matches the real-data layout — no row-count flicker
+ * when the fetch resolves. Mobile renders 2 + 3, desktop renders
+ * 5 + 5. */
+function ResultsSkeleton({
+  keywordCap,
+  productCap,
+}: {
+  keywordCap: number;
+  productCap: number;
+}) {
   return (
     <div className="py-2">
       <p className={SECTION_LABEL_CLASS}>Suggestions</p>
       <ul className="space-y-1 px-3 py-1">
-        {Array.from({ length: 4 }, (_, i) => (
+        {Array.from({ length: keywordCap }, (_, i) => (
           <li key={i}>
             <Skeleton className="h-5 w-3/4 rounded" />
           </li>
@@ -272,7 +302,7 @@ function ResultsSkeleton() {
       </ul>
       <p className={SECTION_LABEL_CLASS}>Products</p>
       <ul className="space-y-2 px-3 py-1">
-        {Array.from({ length: 3 }, (_, i) => (
+        {Array.from({ length: productCap }, (_, i) => (
           <li key={i} className="flex items-center gap-3">
             <Skeleton className="h-12 w-12 shrink-0 rounded-md" />
             <Skeleton className="h-4 flex-1 rounded" />

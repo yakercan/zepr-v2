@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { CartTrigger } from "@/components/cart/cart-trigger";
@@ -12,6 +13,8 @@ import { SEARCH_BAR_SURFACE_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
+const SEARCH_PLACEHOLDER = "Search products, brands, and more";
+
 /**
  * Mobile-condensed site header.
  *
@@ -19,31 +22,33 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  * `<SiteHeader>` switch. Footprint:
  *
  *   ┌──────────────────────────────────────────────────┐
- *   │ [logo] [🔍 Search products…  ]  [☰]  [Cart]      │
+ *   │ [☰] [logo]  [🔍 Search products…  ] [Cart]       │
  *   └──────────────────────────────────────────────────┘
  *
  * Layout choices:
  *
- *   - **Logo on the far left** anchors the brand at the same
- *     position it occupies in the desktop header.
- *   - **Search bar fills the middle** so the storefront's primary
- *     discovery affordance is always tappable — no hidden icon,
- *     no extra trip through a sub-menu.
- *   - **Hamburger + cart cluster on the right.** Both render as
- *     40×40 round buttons (`<CartTrigger>`'s `icon-bubble h-10 w-10`
- *     dictates the family) so the two icons line up visually
- *     pixel-for-pixel — same height, same hit area, same hover
- *     halo.
+ *   - **Hamburger on the far left** matches the conventional
+ *     mobile nav pattern (Instagram, YouTube, Amazon).
+ *   - **Logo next to the hamburger** keeps the brand anchored
+ *     near the screen edge where the eye lands first.
+ *   - **Search bar fills the middle** with a small extra gutter
+ *     between it and the logo — that visual breathing room is
+ *     what separates the brand cluster from the discovery
+ *     surface.
+ *   - **Cart on the far right.** Both the hamburger and the cart
+ *     render as 44×44 round buttons on touch — the hamburger via
+ *     a literal `h-11 w-11`, the cart via `<CartTrigger>`'s
+ *     `touch:h-11 touch:w-11`. Two matched hit areas bookend
+ *     the row.
  *
  * Trade-offs vs. the desktop bar:
  *
  *   - **Search is a visible bar trigger, not a hidden icon.**
- *     The bar fills the row between the logo and the right-side
- *     cluster so the affordance reads as a real search input.
- *     Tapping it opens the full-height `<MobileSearchSheet>` for
- *     the actual typing experience — the OS keyboard gets a
- *     dedicated sheet built around it rather than overlaying the
- *     rest of the chrome.
+ *     The bar fills the row between the logo and the cart so the
+ *     affordance reads as a real search input. Tapping it opens
+ *     the full-height `<MobileSearchSheet>` for the actual typing
+ *     experience — the OS keyboard gets a dedicated sheet built
+ *     around it rather than overlaying the rest of the chrome.
  *   - **Categories drop the mega-menu.** The hamburger opens
  *     `<MobileNavDrawer>` whose nested-drawer drill-down replaces
  *     the desktop subcategory grid.
@@ -86,6 +91,14 @@ export function MobileHeader({
 }: MobileHeaderProps) {
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  /* `?q` from the current URL — mirrors what the desktop bar
+   * shows in its input on a `/search?q=foo` page. The trigger
+   * is a button (no editable input), so we just render the
+   * value as the label: shoppers see *what they searched for*
+   * in the bar at all times, and tapping it opens the sheet
+   * with the same value pre-filled (`<MobileSearchSheet>` reads
+   * the same hook). */
+  const urlQuery = useSearchParams().get("q") ?? "";
 
   return (
     <>
@@ -101,6 +114,21 @@ export function MobileHeader({
         style={{ zIndex: "var(--z-header)" }}
       >
         <div className="flex h-14 items-center gap-2 px-3">
+          {/* Hamburger — left-anchored per conventional mobile
+           *  nav pattern. 44×44 hit area (Apple/Material's
+           *  recommended floor) matches `<CartTrigger>`'s
+           *  touch-bumped size on the far right so the row's two
+           *  bookend buttons read as the same size. */}
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={navOpen}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[color:var(--color-ink)] transition-colors hover:bg-[color:var(--color-bubble)]"
+          >
+            <MenuIcon className="h-7 w-7" />
+          </button>
+
           <Link
             href="/"
             aria-label={siteName}
@@ -127,38 +155,36 @@ export function MobileHeader({
            * lives there, with the OS keyboard docked against a
            * sheet that's built around the input. No focus on this
            * element, no inline suggestion modal, no race with the
-           * keyboard. */}
+           * keyboard.
+           *
+           * `ml-1` adds a hair of breathing room past the standard
+           * `gap-2`, separating the brand cluster (hamburger +
+           * logo) from the discovery surface. The right-side
+           * boundary still uses the row gap, so the bar sits a
+           * bit closer to the cart than the logo — that asymmetry
+           * is intentional and matches what the eye reads as "two
+           * groups with a primary action between them". */}
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            aria-label="Search products, brands, and more"
+            aria-label={urlQuery ? `Search: ${urlQuery}` : SEARCH_PLACEHOLDER}
             aria-expanded={searchOpen}
             className={cn(
               SEARCH_BAR_SURFACE_CLASSES,
-              "flex min-w-0 flex-1 items-center gap-2 px-4 text-left",
+              "ml-2 flex min-w-0 flex-1 items-center gap-2 px-4 text-left",
               "active:bg-[color:var(--color-bubble)]",
-              "text-[color:var(--color-ink-muted)]",
+              /* Label colour follows desktop's placeholder-vs-value
+               * convention: muted grey when we're rendering the
+               * placeholder, full ink when a real query is on
+               * screen. The eye reads it the same way it reads the
+               * desktop input. */
+              urlQuery
+                ? "text-[color:var(--color-ink)]"
+                : "text-[color:var(--color-ink-muted)]",
             )}
           >
             <SearchIcon className="h-5 w-5 shrink-0 text-[color:var(--color-ink-secondary)]" />
-            <span className="truncate">Search products, brands, and more</span>
-          </button>
-
-          {/* Right-side icon cluster — hamburger sits *before* the
-           *  cart so the two round buttons read as a visual pair
-           *  in the top-right corner, with the cart anchored to
-           *  the screen edge. Both render at `h-10 w-10`: the cart
-           *  is fixed by `<CartTrigger>`'s `icon-bubble h-10 w-10`,
-           *  the hamburger matches it on purpose for a clean line
-           *  of identical hit areas. */}
-          <button
-            type="button"
-            onClick={() => setNavOpen(true)}
-            aria-label="Open menu"
-            aria-expanded={navOpen}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[color:var(--color-ink)] transition-colors hover:bg-[color:var(--color-bubble)]"
-          >
-            <MenuIcon className="h-6 w-6" />
+            <span className="truncate">{urlQuery || SEARCH_PLACEHOLDER}</span>
           </button>
 
           <CartTrigger initialCount={initialCartCount} />
