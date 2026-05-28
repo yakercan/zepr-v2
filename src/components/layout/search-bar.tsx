@@ -16,6 +16,7 @@ import {
   CloseIcon,
   SearchIcon,
 } from "@/components/ui/icons";
+import { SEARCH_BAR_SURFACE_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 /** Shared layout for the Clear (×) and Submit (→) buttons inside the
@@ -179,7 +180,8 @@ export function SearchBar() {
           placeholder="Search products, brands, and more"
           autoComplete="off"
           className={cn(
-            "h-10 w-full rounded-full bg-[color:var(--color-surface-muted)] pl-9 pr-15 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none transition-colors",
+            SEARCH_BAR_SURFACE_CLASSES,
+            "w-full pl-9 pr-15 placeholder:text-[color:var(--color-ink-muted)]",
             // Hover === focus visually: white fill + 2px ink ring. Makes
             // the input look "ready" the moment the cursor touches it,
             // and removes the tiny visual jump that used to happen on

@@ -15,6 +15,7 @@ import {
   CloseIcon,
   SearchIcon,
 } from "@/components/ui/icons";
+import { SEARCH_BAR_SURFACE_CLASSES } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 
 /**
@@ -72,7 +73,6 @@ export function MobileSearchSheet({
   const router = useRouter();
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasValue = value.length > 0;
 
   /* Desktop short-circuit (same pattern as `<Sheet>` and the nav
    * drawer) — keeps the sheet from being stuck open if the
@@ -205,26 +205,34 @@ export function MobileSearchSheet({
                  * return key's label to "Search", matching the
                  * sheet's intent. Cheap WCAG-aligned polish. */
                 enterKeyHint="search"
+                /* Resting style mirrors the mobile header trigger
+                 * and the desktop bar — `SEARCH_BAR_SURFACE_CLASSES`
+                 * is the single source of truth for the bar's
+                 * idle look. Focus promotes to the same white +
+                 * 2px ink ring the desktop bar uses on hover/focus,
+                 * so the field reads "engaged" the moment the OS
+                 * keyboard pops. */
                 className={cn(
-                  "h-10 w-full rounded-full bg-[color:var(--color-surface-muted)] pl-9 pr-3 text-sm text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink-muted)] outline-none transition-colors",
+                  SEARCH_BAR_SURFACE_CLASSES,
+                  "w-full pl-9 pr-3 placeholder:text-[color:var(--color-ink-muted)]",
                   "focus:bg-white focus:ring-2 focus:ring-[color:var(--color-ink)]",
                 )}
               />
             </div>
 
-            {/* Submit — visible only when there's a non-empty
-             *  query so the row stays clean on first focus.
-             *  Brand-orange to match the desktop bar's submit
-             *  affordance. */}
-            {hasValue && (
-              <button
-                type="submit"
-                aria-label="Search"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[color:var(--color-brand)] transition-colors hover:bg-[color:var(--color-bubble)] hover:text-[color:var(--color-brand-hover)]"
-              >
-                <ArrowRightIcon className="h-4 w-4" />
-              </button>
-            )}
+            {/* Submit — always rendered, regardless of input
+             *  value, so the right edge of the row stays visually
+             *  stable from open → typing → submit. Empty submit
+             *  routes to `/search` (no `?q=`), which lands the
+             *  shopper on the search surface itself. Brand-orange
+             *  matches the desktop bar's submit affordance. */}
+            <button
+              type="submit"
+              aria-label="Search"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[color:var(--color-brand)] transition-colors hover:bg-[color:var(--color-bubble)] hover:text-[color:var(--color-brand-hover)]"
+            >
+              <ArrowRightIcon className="h-4 w-4" />
+            </button>
           </form>
 
           {/* Suggestions surface — re-uses the desktop search

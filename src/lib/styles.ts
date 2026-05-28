@@ -21,6 +21,37 @@
 import { cn } from "@/lib/utils";
 
 /**
+ * Resting (idle) visual surface of the storefront's search bar —
+ * pill-shaped, soft grey fill, ink text, no border. Used by:
+ *
+ *   - the desktop `<SearchBar>` input's default state (before
+ *     hover/focus promote it to a white + ink-ring look).
+ *   - the mobile-header search-bar trigger, which is a `<button>`
+ *     styled to look like the desktop bar's resting state but
+ *     opens the full-height `<MobileSearchSheet>` on tap instead
+ *     of focusing in place.
+ *   - the input inside `<MobileSearchSheet>` at rest.
+ *
+ * Keeping all three surfaces on one constant means a redesign of
+ * the bar (radius, fill, text colour) tracks everywhere from a
+ * single edit — and an out-of-sync visual between the header
+ * trigger, the sheet input, and the desktop bar becomes
+ * unreachable.
+ *
+ * Layout-ish utilities (padding, width, flex/grid orchestration)
+ * are intentionally excluded so each surface composes its own
+ * geometry on top of this base — the desktop input reserves
+ * `pl-9 pr-15` for its left icon + right-button cluster, the
+ * mobile trigger uses `flex gap-2 px-4`, and the sheet input has
+ * yet another mix.
+ */
+export const SEARCH_BAR_SURFACE_CLASSES = cn(
+  "h-10 rounded-full bg-[color:var(--color-surface-muted)]",
+  "text-sm text-[color:var(--color-ink)]",
+  "outline-none transition-colors",
+);
+
+/**
  * "Selectable surface" outline — soft grey 2px border at rest,
  * snaps to ink on hover. Shared by:
  *
