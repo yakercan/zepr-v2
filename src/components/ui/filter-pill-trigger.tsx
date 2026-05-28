@@ -20,6 +20,11 @@ export interface FilterPillTriggerProps {
   isOpen: boolean;
   hasSelection: boolean;
   onToggle: () => void;
+  /** Optional key for `<ScrollRow>` smooth-centering. Stamped
+   *  onto the button as `data-scroll-row-key`; pair with a
+   *  matching `activeKey` on the enclosing `<ScrollRow>` and
+   *  the trigger auto-centres when it becomes the active pill. */
+  scrollKey?: string;
 }
 
 export function FilterPillTrigger({
@@ -27,6 +32,7 @@ export function FilterPillTrigger({
   isOpen,
   hasSelection,
   onToggle,
+  scrollKey,
 }: FilterPillTriggerProps) {
   return (
     <button
@@ -34,6 +40,7 @@ export function FilterPillTrigger({
       onClick={onToggle}
       aria-expanded={isOpen}
       aria-haspopup="dialog"
+      data-scroll-row-key={scrollKey}
       className={cn(
         pillClasses(isOpen || hasSelection, "outline"),
         "flex items-center gap-1.5",

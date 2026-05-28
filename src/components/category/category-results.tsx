@@ -5,6 +5,7 @@ import {
 } from "@/components/products/product-grid";
 import { ViewMoreButton } from "@/components/products/view-more-button";
 import { SearchFilters } from "@/components/search/search-filters";
+import { ScrollRow } from "@/components/ui/scroll-row";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthState } from "@/lib/auth/session";
 import { getCurrentFavoritedIds } from "@/lib/favorites/queries";
@@ -136,11 +137,15 @@ function NoResults() {
 export function CategoryResultsSkeleton() {
   return (
     <div className="flex flex-col gap-6" aria-busy>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Same `<ScrollRow>` the live filter row uses, so the
+       *  placeholders scroll edge-to-edge on mobile instead of
+       *  wrapping onto a second line and the post-suspense swap
+       *  to real pills doesn't reflow. */}
+      <ScrollRow>
         <Skeleton className="h-11 w-48 rounded-full" />
         <Skeleton className="h-11 w-24 rounded-full" />
         <Skeleton className="h-11 w-20 rounded-full" />
-      </div>
+      </ScrollRow>
       <ProductGridSkeleton count={PRODUCTS_PAGE_SIZE} />
     </div>
   );

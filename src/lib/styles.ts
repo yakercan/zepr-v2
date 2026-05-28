@@ -260,7 +260,13 @@ export const MEDIA_OVERLAY_BUBBLE_CLASSES =
  */
 const PILL_BASE_CLASSES = cn(
   "shrink-0 rounded-full border-2 border-transparent px-5 py-2.5",
-  "text-sm font-semibold leading-none",
+  /* `whitespace-nowrap` is non-negotiable on pills — `leading-none`
+   * pancakes wrapped lines flush on top of each other, so a single
+   * label breaking onto two lines reads as a stack of unstyled
+   * fragments (`Sort | by: | Best | Sellers`). The pill must always
+   * stay a single horizontal token; if it doesn't fit, the parent
+   * row scrolls instead. */
+  "whitespace-nowrap text-sm font-semibold leading-none",
   "focus-visible:outline-none focus-visible:ring-2",
   "focus-visible:ring-[color:var(--color-ink)] focus-visible:ring-offset-2",
   "focus-visible:ring-offset-[color:var(--color-page)]",

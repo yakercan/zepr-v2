@@ -12,6 +12,7 @@ import { FilterBarPanel } from "@/components/ui/filter-bar-panel";
 import { FilterPill } from "@/components/ui/filter-pill";
 import { FilterPillTrigger } from "@/components/ui/filter-pill-trigger";
 import { CheckIcon } from "@/components/ui/icons";
+import { ScrollRow } from "@/components/ui/scroll-row";
 import { pillClasses } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { SearchFacets } from "@/types/product";
@@ -313,9 +314,9 @@ export function SearchFilters({
       aria-label="Search filters"
       className="relative"
     >
-      <div
+      <ScrollRow
         ref={pillRowRef}
-        className="flex flex-wrap items-center gap-2"
+        activeKey={openLargeFilter ?? openSmallFilter ?? null}
       >
         {/* -------------- Sort by (small, close-on-pick) -------------- */}
         {/* `hasSelection` is permanently `true` here: Sort by
@@ -325,9 +326,11 @@ export function SearchFilters({
             never true. */}
         <FilterPill
           label={sortLabel}
+          title="Sort by"
           isOpen={openSmallFilter === "sort"}
           hasSelection
           onToggle={() => toggleSmall("sort")}
+          scrollKey="sort"
         >
           <ul className="flex flex-col">
             {SORT_OPTIONS.map((opt) => {
@@ -373,6 +376,7 @@ export function SearchFilters({
             isOpen={openLargeFilter === "category"}
             hasSelection={committedSubcategories.length > 0}
             onToggle={() => toggleLarge("category")}
+            scrollKey="category"
           />
         )}
 
@@ -386,6 +390,7 @@ export function SearchFilters({
               committedPriceMax !== undefined
             }
             onToggle={() => toggleLarge("price")}
+            scrollKey="price"
           />
         )}
 
@@ -400,9 +405,10 @@ export function SearchFilters({
             isOpen={openLargeFilter === "size"}
             hasSelection={committedSizes.length > 0}
             onToggle={() => toggleLarge("size")}
+            scrollKey="size"
           />
         )}
-      </div>
+      </ScrollRow>
 
       <FilterBarPanel
         isOpen={openLargeFilter !== null}

@@ -5,6 +5,7 @@ import {
 } from "@/components/products/product-grid";
 import { ViewMoreButton } from "@/components/products/view-more-button";
 import { SearchFilters } from "@/components/search/search-filters";
+import { ScrollRow } from "@/components/ui/scroll-row";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthState } from "@/lib/auth/session";
 import { getCurrentFavoritedIds } from "@/lib/favorites/queries";
@@ -156,14 +157,16 @@ function NoResults({ query }: { query: string }) {
 export function SearchResultsSkeleton() {
   return (
     <div className="flex flex-col gap-6" aria-busy>
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Pill-shaped placeholders sized to roughly match
-         *  "Sort by: …" + three more triggers. */}
+      {/* Mirrors the live filter row's layout via the same
+       *  `<ScrollRow>` primitive — on mobile the placeholders
+       *  scroll edge-to-edge instead of wrapping onto a second
+       *  line, so the swap to real pills doesn't reflow. */}
+      <ScrollRow>
         <Skeleton className="h-11 w-48 rounded-full" />
         <Skeleton className="h-11 w-28 rounded-full" />
         <Skeleton className="h-11 w-24 rounded-full" />
         <Skeleton className="h-11 w-20 rounded-full" />
-      </div>
+      </ScrollRow>
       <ProductGridSkeleton count={PRODUCTS_PAGE_SIZE} />
     </div>
   );

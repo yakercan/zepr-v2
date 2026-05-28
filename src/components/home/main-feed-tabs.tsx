@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useOptimistic, useTransition } from "react";
+import { ScrollRow } from "@/components/ui/scroll-row";
 import { ViewAllLink } from "@/components/ui/view-all-link";
 import {
   DEFAULT_MAIN_FEED_TAB,
@@ -95,11 +96,12 @@ export function MainFeedTabs() {
    * below is the only visual cue users need. Dimming the strip
    * also dimmed the just-selected pill, which read as a flash. */
   return (
-    <div
+    <ScrollRow
       role="tablist"
       aria-label="Product feed sort"
       aria-busy={isPending}
-      className="flex flex-wrap items-center gap-2"
+      activeKey={active}
+      trailing={<ViewAllLink href={viewAllHref} />}
     >
       {MAIN_FEED_TABS.map((tab) => {
         const isActive = active === tab.id;
@@ -111,17 +113,13 @@ export function MainFeedTabs() {
             aria-selected={isActive}
             tabIndex={isActive ? 0 : -1}
             onClick={() => handleSelect(tab.id)}
+            data-scroll-row-key={tab.id}
             className={pillClasses(isActive, "outline")}
           >
             {tab.label}
           </button>
         );
       })}
-      {/* `ml-auto` pins the link to the right edge of the row;
-       *  `flex-wrap` above lets it drop to a new line on narrow
-       *  viewports where the pills already wrap, and `ml-auto`
-       *  keeps it right-justified there too. */}
-      <ViewAllLink href={viewAllHref} className="ml-auto" />
-    </div>
+    </ScrollRow>
   );
 }
