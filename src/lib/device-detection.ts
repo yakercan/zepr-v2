@@ -36,13 +36,26 @@ export function resolveDeviceMode(
   return { mode: parseUserAgent(userAgent ?? ""), source: "ua" };
 }
 
-/** Conservative UA sniff — only flags clear phone/tablet signals.
- *  Anything else (including all desktop UAs and unknown clients) falls
- *  through to `desktop`. The client refiner will correct narrow-window
- *  desktops via `matchMedia` on first paint. */
+/** Conservative UA sniff — only flags clear phone / tablet signals.
+ *  Anything else (including all desktop UAs and the iPadOS-pretending-
+ *  to-be-Mac UA, which is indistinguishable from real macOS Safari)
+ *  falls through to `desktop`. The client refiner catches those via
+ *  `matchMedia('(hover: none) and (pointer: coarse)')` on first paint.
+ *
+ *  Token roster:
+ *    - `iPhone | iPod` — Apple phones.
+ *    - `Android` (any) — Android phones *and* tablets (Android tablet
+ *      UAs often omit the `Mobile` token, so we accept the base
+ *      platform string on its own).
+ *    - `Tablet` — explicit tablet marker from Firefox Mobile / Kindle
+ *      Fire / generic Android builders.
+ *    - `Silk` — Amazon Fire tablets.
+ *    - `Mobile.+Firefox` — Firefox phone build.
+ *    - `Opera M(obi|ini)` — Opera mobile / mini.
+ *    - `webOS` — legacy Palm / LG TVs in a phone-shaped layout. */
 function parseUserAgent(ua: string): DeviceMode {
   const isMobile =
-    /Android.+Mobile|iPhone|iPod|iPad|Mobile.+Firefox|Opera M(obi|ini)|webOS/i.test(
+    /Android|iPhone|iPod|iPad|Tablet|Silk|Mobile.+Firefox|Opera M(obi|ini)|webOS/i.test(
       ua,
     );
   return isMobile ? "mobile" : "desktop";

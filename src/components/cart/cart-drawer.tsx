@@ -211,19 +211,22 @@ function CartDrawerDesktop({
 }
 
 /**
- * Mobile cart drawer — bottom sheet with a peek + full ladder.
+ * Mobile cart drawer — right-anchored sheet wrapping the same
+ * cart body the desktop drawer renders.
  *
- *   - **Peek (50% of viewport)** is the resting state. Lets the
- *     shopper glance at the just-added line without losing
- *     spatial context of the page underneath.
- *   - **Full (95%)** is for reviewing the cart end to end and
- *     getting to checkout. Drag up from peek to promote, drag
- *     down past the close threshold to dismiss.
+ *   - **Direction matches desktop.** Slides in from the right edge,
+ *     full viewport height, max width 420px (same clamp as the
+ *     desktop drawer's `max-w-[420px]`). The shopper's mental
+ *     model — "cart lives on the right" — carries verbatim across
+ *     breakpoints.
+ *   - **Vaul still owns the gestures.** Drag right to dismiss,
+ *     native scroll inside the body, safe-area-aware footer.
+ *     That's the *only* thing the mobile branch needs over the
+ *     desktop's custom slide-transform.
  *
- * The body's scrollable line list, the sticky footer with the
- * checkout CTA, and the loading overlay are reused from the
- * desktop branch — only the chrome (panel + drag handle + snap
- * behaviour) differs between the two surfaces.
+ * Body, footer, loading overlay, and empty-state are reused
+ * verbatim from the desktop branch — single source of truth for
+ * how a cart "looks" once you're inside the drawer.
  */
 function CartDrawerMobile({
   open,
@@ -238,18 +241,18 @@ function CartDrawerMobile({
       onOpenChange={(next) => {
         if (!next) closeCart();
       }}
+      direction="right"
       title={
         <span className="inline-flex items-center">
           Your cart
           <CartBadge />
         </span>
       }
-      snapPoints={[0.5, 0.95]}
       footer={
         lines.length > 0 ? (
-          /* Footer slot already supplies the border-t and surface
-           * bg, so we strip those from `<CartFooter>` here to
-           * avoid doubling them up. */
+          /* Sheet's footer slot already supplies the border-t and
+           * surface bg, so we strip those from `<CartFooter>` here
+           * to avoid doubling them up. */
           <CartFooter
             subtotalCents={subtotalCents}
             currency={currency}
@@ -258,7 +261,17 @@ function CartDrawerMobile({
         ) : undefined
       }
     >
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Body wrapper:
+       *  - `relative` is the anchor for `<LoadingOverlay>`'s
+       *    `absolute inset-0`, so the overlay covers exactly the
+       *    cart body (matching the desktop drawer).
+       *  - `flex h-full flex-col` propagates the sheet's body
+       *    height into children so `<CartEmpty>` can claim
+       *    `flex-1` and vertically centre its message when the
+       *    cart is empty. Without this the wrapper collapses to
+       *    its content height and the empty state stacks at the
+       *    top of the panel. */}
+      <div className="relative flex h-full flex-col">
         {lines.length === 0 ? (
           <CartEmpty />
         ) : (

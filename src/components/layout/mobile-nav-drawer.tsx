@@ -109,9 +109,11 @@ export function MobileNavDrawer({
             /* Left-anchored, full-height. Width clamps generously
              * so the list never gets squashed on phones and stays
              * usable on tablets without ballooning past a tap-and-
-             * a-half. */
+             * a-half. Rounded only on the inboard (right) edge —
+             * same chrome the `<Sheet direction="left">` primitive
+             * applies so cart and menu read as one family. */
             "fixed inset-y-0 left-0 flex w-[88vw] max-w-sm flex-col",
-            "border-r border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
+            "rounded-r-2xl border border-l-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
             "outline-none",
             "shadow-[12px_0_40px_-12px_rgba(0,0,0,0.18)]",
           )}
@@ -353,7 +355,7 @@ function CategoryDrillRow({
           style={{ zIndex: "calc(var(--z-sheet) + 20)" }}
           className={cn(
             "fixed inset-y-0 left-0 flex w-[88vw] max-w-sm flex-col",
-            "border-r border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
+            "rounded-r-2xl border border-l-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
             "outline-none",
             "shadow-[12px_0_40px_-12px_rgba(0,0,0,0.18)]",
           )}

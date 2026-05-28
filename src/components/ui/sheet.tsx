@@ -63,12 +63,23 @@ import { cn } from "@/lib/utils";
  * (dev `?device=` override, refiner mode flips) without a page
  * reload.
  */
+/** Which viewport edge the sheet slides in from. Bottom is the
+ *  storefront's default — it's the conventional mobile drawer
+ *  position for filters, modals, etc. `right` mirrors the desktop
+ *  cart drawer's anchor for visual continuity; `left` is for
+ *  hamburger-style nav drawers. `top` is for full-width search /
+ *  notification surfaces. */
+export type SheetDirection = "bottom" | "right" | "left" | "top";
+
 export interface SheetProps {
   /** Open / closed state — controlled component. */
   open: boolean;
   /** Called with the next open state. Wire to the same setter
    *  the original `<Modal>` used. */
   onOpenChange: (open: boolean) => void;
+  /** Which viewport edge the sheet slides in from. Defaults to
+   *  `bottom`. */
+  direction?: SheetDirection;
   /** Accessible title rendered visually at the top of the sheet
    *  body (also used by screen readers via `Drawer.Title`).
    *
@@ -122,6 +133,7 @@ export interface SheetProps {
 export function Sheet({
   open,
   onOpenChange,
+  direction = "bottom",
   title,
   description,
   titleMode = "visible",
@@ -138,10 +150,74 @@ export function Sheet({
    * up the sheet. */
   if (isDesktop) return null;
 
+  /* Per-direction chrome bundle. Each direction needs a different
+   * combination of:
+   *
+   *   - anchor + size  : which edge to pin to + viewport dimension
+   *                       the panel claims along the axis Vaul
+   *                       doesn't move (full width for bottom/top,
+   *                       full height for left/right).
+   *   - corner radius  : rounded only on the *inboard* side so the
+   *                       outboard edge stays flush with the
+   *                       viewport.
+   *   - drop shadow    : cast away from the anchor edge.
+   *   - drag handle    : pinned hairline; orientation + position
+   *                       follows the gesture axis.
+   *
+   * Handle is only rendered for bottom + top sheets — side drawers
+   * lift the gesture affordance with a slim border instead, which
+   * is the convention every iOS-style sliding sidebar uses. */
+  const chrome = {
+    bottom: {
+      panel: cn(
+        "fixed inset-x-0 bottom-0 mt-24 flex max-h-[96%] flex-col",
+        "rounded-t-2xl border border-b-0",
+        "shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.18)]",
+      ),
+      handle: "mx-auto !mt-2.5 !h-1 !w-9",
+      showHandle: true,
+    },
+    top: {
+      panel: cn(
+        "fixed inset-x-0 top-0 mb-24 flex max-h-[96%] flex-col",
+        "rounded-b-2xl border border-t-0",
+        "shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)]",
+      ),
+      handle: "mx-auto !mb-2.5 !mt-0 !h-1 !w-9",
+      showHandle: true,
+    },
+    right: {
+      /* Side-drawer width is `88vw` capped at `max-w-sm` (384px).
+       * Same clamp as the mobile nav drawer so cart and menu
+       * read as one family — narrower than the desktop drawer's
+       * 420px sidebar but a phone has less viewport to spare,
+       * and "leave 12vw of the underlying page visible behind
+       * the panel" is the convention every iOS-style drawer
+       * uses. */
+      panel: cn(
+        "fixed inset-y-0 right-0 flex w-[88vw] max-w-sm flex-col",
+        "rounded-l-2xl border border-r-0",
+        "shadow-[-12px_0_40px_-12px_rgba(0,0,0,0.18)]",
+      ),
+      handle: "",
+      showHandle: false,
+    },
+    left: {
+      panel: cn(
+        "fixed inset-y-0 left-0 flex w-[88vw] max-w-sm flex-col",
+        "rounded-r-2xl border border-l-0",
+        "shadow-[12px_0_40px_-12px_rgba(0,0,0,0.18)]",
+      ),
+      handle: "",
+      showHandle: false,
+    },
+  }[direction];
+
   return (
     <Drawer.Root
       open={open}
       onOpenChange={onOpenChange}
+      direction={direction}
       snapPoints={snapPoints}
       handleOnly={handleOnly}
     >
@@ -164,26 +240,23 @@ export function Sheet({
           aria-describedby={undefined}
           style={{ zIndex: "var(--z-sheet)" }}
           className={cn(
-            /* Pinned to the viewport bottom; rounded only on
-             * the top corners; height grows with content (or
-             * snaps via `snapPoints`). `max-h-[96%]` keeps
-             * a sliver of the underlying page peeking through
-             * so the shopper never loses spatial context. */
-            "fixed inset-x-0 bottom-0 mt-24 flex max-h-[96%] flex-col",
-            "rounded-t-2xl border border-b-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
+            chrome.panel,
+            "border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
             "outline-none",
-            /* Soft shadow lifting the sheet off the dimmed
-             * page underneath. Mirrors the modal's drop
-             * shadow at a slightly lower spread (the sheet
-             * is anchored to the viewport edge, so there's
-             * no "floating above center" to telegraph). */
-            "shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.18)]",
           )}
         >
-          {/* Drag handle. Vaul ships a default; we tighten
-              the dimensions and tint so it reads as our
-              hairline rather than the library's stock pill. */}
-          <Drawer.Handle className="mx-auto !mt-2.5 !h-1 !w-9 !bg-[color:var(--color-border-strong)]" />
+          {/* Drag handle (bottom + top only — side drawers don't
+              use one). Vaul ships a default; we tighten the
+              dimensions and tint so it reads as our hairline
+              rather than the library's stock pill. */}
+          {chrome.showHandle && (
+            <Drawer.Handle
+              className={cn(
+                chrome.handle,
+                "!bg-[color:var(--color-border-strong)]",
+              )}
+            />
+          )}
 
           {/* Title strip. Either visible (most cases) or
               announce-only (search / filter sheets that

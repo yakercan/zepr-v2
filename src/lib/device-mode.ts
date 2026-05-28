@@ -30,6 +30,16 @@ export const DEVICE_COOKIE_MAX_AGE_DAYS = 365;
  *  to be a phone. Matches Tailwind's `md` breakpoint. */
 export const MOBILE_MAX_WIDTH_PX = 768;
 
+/** Media query that's true when the *primary* input mechanism is a
+ *  finger (no hover capability + coarse pointer). Catches phones and
+ *  tablets — including iPads that pretend to be Macs in their UA —
+ *  while leaving touch-screen laptops (which also have a mouse and
+ *  therefore report `hover: hover`) on desktop. Used by the client
+ *  refiner to promote tablets to `mobile` regardless of viewport
+ *  width. */
+export const TOUCH_PRIMARY_MEDIA_QUERY =
+  "(hover: none) and (pointer: coarse)";
+
 /** Minimum width clamp applied to `<html>` when device mode is
  *  `desktop`. Below this the OS shows a horizontal scrollbar instead
  *  of components collapsing — every desktop layout in the app can

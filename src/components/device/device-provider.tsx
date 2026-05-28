@@ -13,6 +13,7 @@ import {
   DEVICE_COOKIE,
   DEVICE_COOKIE_MAX_AGE_DAYS,
   MOBILE_MAX_WIDTH_PX,
+  TOUCH_PRIMARY_MEDIA_QUERY,
   type DeviceContext as DeviceContextValue,
   type DeviceMode,
 } from "@/lib/device-mode";
@@ -117,22 +118,46 @@ function DeviceModeRefiner({ state, setState }: RefinerProps) {
       return;
     }
 
-    const mq = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH_PX}px)`);
+    /* Two signals, evaluated in priority order:
+     *
+     *   1. `touchMq` — true when the device's *primary* input is a
+     *      finger (no hover, coarse pointer). Phones and tablets
+     *      all match, including iPads that ship a Mac UA, while
+     *      touch-screen laptops with a mouse stay on the desktop
+     *      branch (they report `hover: hover`).
+     *   2. `widthMq` — fallback narrow-window check for tiny
+     *      desktop windows / dev-tools resize / shrunk Chrome.
+     *
+     * Touch wins: a wide-viewport iPad in landscape (1366px) is
+     * still a touch device and should pick up the bottom-sheet UX,
+     * not the desktop dropdowns. */
+    const touchMq = window.matchMedia(TOUCH_PRIMARY_MEDIA_QUERY);
+    const widthMq = window.matchMedia(
+      `(max-width: ${MOBILE_MAX_WIDTH_PX}px)`,
+    );
 
     const applyMode = (source: DeviceContextValue["source"]) => {
-      const liveMode: DeviceMode = mq.matches ? "mobile" : "desktop";
+      const liveMode: DeviceMode =
+        touchMq.matches || widthMq.matches ? "mobile" : "desktop";
       if (liveMode === modeRef.current) return;
       writeDeviceCookie(liveMode);
       setState({ mode: liveMode, source });
     };
 
+    /* Always run on mount when the source was a UA guess — we want
+     * to correct iPad-as-Mac on the very first paint without
+     * waiting for a viewport change event. */
     if (state.source === "ua") {
       applyMode("cookie");
     }
 
     const onChange = () => applyMode("cookie");
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    touchMq.addEventListener("change", onChange);
+    widthMq.addEventListener("change", onChange);
+    return () => {
+      touchMq.removeEventListener("change", onChange);
+      widthMq.removeEventListener("change", onChange);
+    };
   }, [state.source, setState]);
 
   return null;
