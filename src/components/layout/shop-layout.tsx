@@ -6,6 +6,7 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { CartLoginHandoff } from "@/components/cart/cart-login-handoff";
 import { CartMetaHydrator } from "@/components/cart/cart-meta-hydrator";
 import { BfcacheRefresh } from "@/components/layout/bfcache-refresh";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { env } from "@/env";
 import { getAttribution } from "@/lib/attribution/cookie";
@@ -103,7 +104,7 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
       <CartMetaHydrator mode={mode} checkoutDomain={checkoutDomain} />
       <SiteHeader />
       <main className="flex-1">{children}</main>
-      {/* <SiteFooter /> — TBD */}
+      <SiteFooter />
       <CartDrawer />
       <CartLoginHandoff pending={cartHandoffPending} />
       <AttributionHydrator attribution={attribution} />

@@ -8,7 +8,7 @@ import { env } from "@/env";
  */
 export const site = {
   name: "Zepr",
-  tagline: "Shop trends. Bundle & save.",
+  tagline: "Shop Trends & Explore Deals.",
   description:
     "Discover innovative, trending products. Bundle deals, viral favorites, and a faster way to shop.",
   domain: "zepr.com",
