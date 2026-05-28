@@ -1,14 +1,11 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ProductViewTracker } from "@/components/analytics/view-trackers";
-import {
-  ProductAccordion,
-  ProductAccordionItem,
-} from "@/components/products/product-accordion";
 import { ProductLayout } from "@/components/products/product-layout";
 import { ProductReviews } from "@/components/products/product-reviews";
 import { ProductSectionSkeleton } from "@/components/products/product-section";
 import { RelatedProductsSection } from "@/components/products/related-products-section";
+import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { RatingChip } from "@/components/ui/rating-chip";
 import { RichText } from "@/components/ui/rich-text";
@@ -122,21 +119,21 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <Breadcrumb items={breadcrumbItems} className="mb-4" />
 
       {/* Additional PDP accordion sections drop in here as more
-       *  <ProductAccordionItem>s alongside "Details" + "Reviews".
-       *  Each one is fetched server-side at the top of the route
-       *  and gated by simple booleans so the markup stays a flat
+       *  <AccordionItem>s alongside "Details" + "Reviews". Each
+       *  one is fetched server-side at the top of the route and
+       *  gated by simple booleans so the markup stays a flat
        *  list of conditional `&&` items. */}
       <ProductLayout
         product={product}
         extraLeft={
-          <ProductAccordion>
+          <Accordion>
             {product.descriptionHtml && (
-              <ProductAccordionItem title="Details" defaultOpen>
+              <AccordionItem title="Details" defaultOpen>
                 <RichText html={product.descriptionHtml} />
-              </ProductAccordionItem>
+              </AccordionItem>
             )}
             {showReviews && (
-              <ProductAccordionItem
+              <AccordionItem
                 title="Reviews"
                 titleAside={
                   reviewsCount > 0 && reviewsSummary ? (
@@ -155,7 +152,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   authState={authState}
                   canWriteReview={canWriteReview}
                 />
-              </ProductAccordionItem>
+              </AccordionItem>
             )}
             {/* Legal disclaimer — last in the stack. Hidden when
              *  the merchant didn't set `custom.legal_disclaimer`
@@ -166,11 +163,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
              *  it doesn't overwhelm the more shopper-relevant
              *  sections above it. */}
             {product.legalDisclaimerHtml && (
-              <ProductAccordionItem title="Disclaimer">
+              <AccordionItem title="Disclaimer">
                 <RichText html={product.legalDisclaimerHtml} />
-              </ProductAccordionItem>
+              </AccordionItem>
             )}
-          </ProductAccordion>
+          </Accordion>
         }
       />
 

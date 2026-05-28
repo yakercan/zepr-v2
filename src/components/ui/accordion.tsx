@@ -5,13 +5,13 @@ import { SmoothCaretIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 
 /**
- * Collapsible-section group used below the PDP gallery to host
- * the long-form, scannable parts of a product page:
+ * Generic collapsible-section group.
  *
- *   - Details          (round 2 — wired up now)
- *   - Customer reviews (later round)
- *   - Legal disclaimer (later round, only when present)
- *   - Shipping / returns, FAQ, …
+ * Originally introduced on the PDP for "Details / Reviews /
+ * Disclaimer"; lifted to `ui/` so the FAQ page (and anything
+ * else with a "scannable index of expandable rows" shape — order
+ * details, settings, etc.) can speak the same visual + a11y
+ * dialect without forking the primitive.
  *
  * Visual model:
  *
@@ -39,16 +39,16 @@ import { cn } from "@/lib/utils";
  *
  * Composition pattern:
  *
- *     <ProductAccordion>
- *       <ProductAccordionItem title="Details" defaultOpen>
+ *     <Accordion>
+ *       <AccordionItem title="Details" defaultOpen>
  *         <RichText html={…} />
- *       </ProductAccordionItem>
- *       <ProductAccordionItem title="Reviews">
+ *       </AccordionItem>
+ *       <AccordionItem title="Reviews">
  *         …
- *       </ProductAccordionItem>
- *     </ProductAccordion>
+ *       </AccordionItem>
+ *     </Accordion>
  */
-export function ProductAccordion({ children }: { children: ReactNode }) {
+export function Accordion({ children }: { children: ReactNode }) {
   return (
     <div className="divide-y divide-[color:var(--color-border)]">
       {children}
@@ -56,7 +56,7 @@ export function ProductAccordion({ children }: { children: ReactNode }) {
   );
 }
 
-export interface ProductAccordionItemProps {
+export interface AccordionItemProps {
   title: string;
   /** Optional content rendered inline to the right of the title
    *  (before the caret). Lets a section attach quick stats
@@ -70,12 +70,12 @@ export interface ProductAccordionItemProps {
   children: ReactNode;
 }
 
-export function ProductAccordionItem({
+export function AccordionItem({
   title,
   titleAside,
   defaultOpen,
   children,
-}: ProductAccordionItemProps) {
+}: AccordionItemProps) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const panelId = `accordion-panel-${useId()}`;
 

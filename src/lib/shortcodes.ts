@@ -87,15 +87,27 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
 };
 
 /**
- * Legacy route redirects — old Shopify-storefront paths that the
- * v2 storefront serves under different URLs. Lives alongside
- * `SHORTCODE_REDIRECTS` because both feed the same Next.js
- * `redirects()` table; kept as a separate map because the intent
- * is different (canonicalising legacy URLs that may exist in
- * external links, Google's index, email signatures, etc.) and
- * the entry's lifecycle is too — these are forever-redirects we
- * never repurpose, in contrast to marketing shortcodes which
- * occasionally get re-pointed.
+ * Canonical / legacy route redirects — paths the v2 storefront
+ * doesn't serve directly but that should still land somewhere
+ * sensible. Two flavours live here:
+ *
+ *   1. **Legacy CMS pages** (`/pages/<handle>`) — the old Shopify
+ *      storefront rendered Contact / FAQ / etc. through Sanity-
+ *      backed CMS templates. The URLs survive in old email
+ *      signatures, printed material, Google's index, third-party
+ *      deep links. Each one hops to the corresponding v2 app
+ *      route.
+ *   2. **Canonical-shorthand routes** — bare paths a shopper or
+ *      external linker might reasonably type expecting an index
+ *      page that v2 doesn't ship (e.g. `/products` → `/search`,
+ *      since browsing in v2 is the search surface, not a
+ *      separate products index).
+ *
+ * Lives alongside `SHORTCODE_REDIRECTS` because both feed the
+ * same Next.js `redirects()` table; kept as a separate map
+ * because the entry's lifecycle is different — these are
+ * forever-redirects we never repurpose, in contrast to marketing
+ * shortcodes which occasionally get re-pointed.
  *
  * Keys are the *source* path (must start with `/`), values the
  * canonical destination. Both ends are validated by Next at build
@@ -103,17 +115,36 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
  * search engines coalesce the old URL into the new one and
  * browsers can cache the hop.
  *
+ * **Matching is exact.** `source: "/products"` matches only
+ * `/products`, not `/products/<handle>` — so the PDP route at
+ * `app/products/[handle]/page.tsx` keeps working untouched. Don't
+ * add `:slug` or `:slug*` patterns here without thinking carefully
+ * about which app routes you'd intercept.
+ *
  * Adding a redirect: only do this when there's a known existing
- * link (legacy storefront, printed material, third-party deep
- * link) pointing at a URL the v2 storefront doesn't serve. Every
- * entry adds one rule the routing layer evaluates per request —
- * cheap individually, but the table shouldn't be a junk drawer.
+ * link or expected typing pattern pointing at a URL the v2
+ * storefront doesn't serve. Every entry adds one rule the routing
+ * layer evaluates per request — cheap individually, but the table
+ * shouldn't be a junk drawer.
  */
 export const LEGACY_REDIRECTS: Readonly<Record<string, string>> = {
-  /* Old Shopify-storefront contact page (`/pages/<handle>` is
-   * the legacy CMS-page convention). Sends the legacy URL to
-   * the canonical `/contact` route — the deep-linkable
-   * destination support uses in email signatures + footer
-   * links. */
+  /* Old Shopify-storefront content pages (`/pages/<handle>` is
+   * the legacy CMS-page convention). Both `contact` and `faq`
+   * used to render through Sanity-backed CMS templates; in v2
+   * they live as dedicated app routes. The legacy URLs survive
+   * in old email signatures / printed material / Google's index
+   * — these redirects keep every old link a one-hop trip to the
+   * new home. */
   "/pages/contact": "/contact",
+  "/pages/faq": "/faq",
+  /* Canonical-shorthand: v2 doesn't have a standalone "products
+   * index" page — browsing happens through `/search` (Salespace
+   * powers both the bare landing state and queried results). A
+   * shopper who types `/products` in the address bar, or follows
+   * an old link expecting that URL, lands on the surface that
+   * actually does what they want. Bare path on both sides on
+   * purpose — `/products/<handle>` continues to render the PDP
+   * because Next's redirect matcher only fires on exact source
+   * equality without a `:slug` pattern. */
+  "/products": "/search",
 };

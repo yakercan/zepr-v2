@@ -129,10 +129,10 @@ function DiscoverItems() {
       <DropdownItem href="/returns" icon={<ReturnIcon />}>
         Return Request
       </DropdownItem>
-      <DropdownItem href="/pages/contact" icon={<ContactIcon />}>
+      <DropdownItem href="/contact" icon={<ContactIcon />}>
         Contact
       </DropdownItem>
-      <DropdownItem href="/pages/faq" icon={<FAQIcon />}>
+      <DropdownItem href="/faq" icon={<FAQIcon />}>
         FAQ
       </DropdownItem>
     </>
