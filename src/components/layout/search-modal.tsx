@@ -65,9 +65,23 @@ export interface SearchModalProps {
   /** Called when the user picks a suggestion or product. Should
    *  blur the input on the caller side so this modal unmounts. */
   onClose: () => void;
+  /**
+   * Strip the floating chrome (absolute positioning, rounded
+   * border, shadow, max-height cap) so the suggestions render as
+   * a plain in-flow block. Used by `<MobileSearchSheet>`, which
+   * already owns its own container chrome — the floating defaults
+   * are tuned for the desktop header bar and don't translate to
+   * a full-height mobile sheet.
+   */
+  embedded?: boolean;
 }
 
-export function SearchModal({ query, open, onClose }: SearchModalProps) {
+export function SearchModal({
+  query,
+  open,
+  onClose,
+  embedded = false,
+}: SearchModalProps) {
   const trimmed = query.trim();
   const debounced = useDebounced(trimmed, DEBOUNCE_MS);
   const { data, isLoading } = useSearchSuggestions(debounced);
@@ -89,17 +103,26 @@ export function SearchModal({ query, open, onClose }: SearchModalProps) {
       role="dialog"
       aria-label="Search suggestions"
       className={cn(
-        // Anchor flush against the header's bottom edge — same
-        // position the category / account dropdown panels land at.
-        // The form is h-10 inside an h-16 row, so its bottom sits
-        // (16 - 10) / 2 = 12px above the row's bottom edge. Bumping
-        // the panel's top by 12px lines it up with the header
-        // bottom. Hand-tuned rather than `self-stretch`'d because
-        // the input itself must stay h-10.
-        "absolute left-0 right-0 top-[calc(100%+12px)] z-40",
-        "max-h-[70vh] overflow-y-auto",
-        "rounded-2xl border border-[color:var(--color-border)]",
-        "bg-white shadow-lg shadow-black/10",
+        embedded
+          ? // In-flow variant — the parent (mobile search sheet)
+            // already owns the panel chrome, so we strip our own
+            // floating decorations and let the suggestions fill
+            // whatever block we land in.
+            "bg-[color:var(--color-surface)]"
+          : cn(
+              // Anchor flush against the header's bottom edge —
+              // same position the category / account dropdown
+              // panels land at. The form is h-10 inside an h-16
+              // row, so its bottom sits (16 - 10) / 2 = 12px above
+              // the row's bottom edge. Bumping the panel's top by
+              // 12px lines it up with the header bottom. Hand-
+              // tuned rather than `self-stretch`'d because the
+              // input itself must stay h-10.
+              "absolute left-0 right-0 top-[calc(100%+12px)] z-40",
+              "max-h-[70vh] overflow-y-auto",
+              "rounded-2xl border border-[color:var(--color-border)]",
+              "bg-white shadow-lg shadow-black/10",
+            ),
       )}
     >
       {showSkeleton && <ResultsSkeleton />}

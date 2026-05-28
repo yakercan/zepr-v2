@@ -75,6 +75,18 @@ const DEFAULT_SORT_LABEL = SORT_OPTIONS[0].label;
 
 type LargeFilterId = "category" | "price" | "size";
 
+/* Heading for the mobile sheet variant of the large filter
+ * panel. Desktop's inline panel sits below the pill that
+ * triggered it (the pill already labels the open filter), so
+ * the heading isn't surfaced there. On mobile the sheet
+ * replaces that spatial cue, so each filter needs its own
+ * title — kept in lockstep with the pill labels above. */
+const FILTER_TITLES: Record<LargeFilterId, string> = {
+  category: "Category",
+  price: "Price",
+  size: "Size",
+};
+
 interface StagedState {
   subcategory: string[];
   price_min: number | undefined;
@@ -398,6 +410,7 @@ export function SearchFilters({
         onReset={resetActiveLargeFilter}
         onApply={commitStaged}
         excludeRef={pillRowRef}
+        title={openLargeFilter ? FILTER_TITLES[openLargeFilter] : undefined}
       >
         {openLargeFilter === "category" && (
           <ChipGrid

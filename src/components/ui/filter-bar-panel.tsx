@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { useIsMobile } from "@/components/device/device-provider";
+import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,15 +44,37 @@ export interface FilterBarPanelProps {
   onReset: () => void;
   onApply: () => void;
   children: ReactNode;
+  /** Sheet heading on mobile. The desktop inline panel doesn't
+   *  surface a heading (the pill above it already labels the
+   *  open filter); on mobile the sheet replaces the spatial
+   *  affordance the pill provided, so it needs an explicit
+   *  title — caller passes "Category" / "Price" / "Size" / etc. */
+  title?: string;
   /** Optional ref to a region whose clicks should NOT count as
    *  "outside" the panel (typically the pill-row that triggered
    *  it). Without this, clicking a different pill would fire
    *  outside-click → close, then the click would bubble to the
-   *  pill → open — a redundant churn. */
+   *  pill → open — a redundant churn.
+   *
+   *  Only the desktop branch consults this — Vaul handles
+   *  outside-click on its own via the portal overlay. */
   excludeRef?: React.RefObject<HTMLElement | null>;
 }
 
-export function FilterBarPanel({
+export function FilterBarPanel(props: FilterBarPanelProps) {
+  const isMobile = useIsMobile();
+  return isMobile ? <FilterBarSheetMobile {...props} /> : <FilterBarInlineDesktop {...props} />;
+}
+
+/**
+ * Desktop branch — verbatim copy of the original inline-absolute
+ * panel. Lives below the pill row, owns its own outside-click
+ * and Escape handlers, and disappears entirely when closed. The
+ * `excludeRef` lets the caller exempt the pill-row from outside-
+ * click handling so clicking a different pill doesn't churn
+ * (close → open) in the same tick.
+ */
+function FilterBarInlineDesktop({
   isOpen,
   onClose,
   onReset,
@@ -94,27 +118,76 @@ export function FilterBarPanel({
       )}
     >
       <div className="p-4">{children}</div>
-      <div
+      <FilterFooter onReset={onReset} onApply={onApply} />
+    </div>
+  );
+}
+
+/**
+ * Mobile branch — bottom sheet at full-height (90% snap) so the
+ * shopper can sift through chip grids and price inputs without
+ * the inline-absolute panel's "can't see your previous results"
+ * problem on a 375px viewport. Reset and Show results stay
+ * sticky at the bottom via the sheet's footer slot so neither
+ * commit path ever scrolls off-screen.
+ */
+function FilterBarSheetMobile({
+  isOpen,
+  onClose,
+  onReset,
+  onApply,
+  children,
+  title,
+}: FilterBarPanelProps) {
+  return (
+    <Sheet
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={title ?? "Filters"}
+      snapPoints={[0.9]}
+      footer={<FilterFooter onReset={onReset} onApply={onApply} />}
+    >
+      <div className="px-4 py-4">{children}</div>
+    </Sheet>
+  );
+}
+
+/**
+ * Shared Reset / Show-results action row. Stays visually
+ * identical between desktop's inline panel footer and mobile's
+ * sticky sheet footer so the commit affordance reads as the
+ * same control on either surface.
+ */
+function FilterFooter({
+  onReset,
+  onApply,
+}: {
+  onReset: () => void;
+  onApply: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4",
+        "border-t border-[color:var(--color-border)] px-4 py-3",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onReset}
         className={cn(
-          "flex items-center justify-between gap-4",
-          "border-t border-[color:var(--color-border)] px-4 py-3",
+          "text-sm font-medium",
+          "text-[color:var(--color-ink-muted)]",
+          "transition-colors hover:text-[color:var(--color-ink)]",
         )}
       >
-        <button
-          type="button"
-          onClick={onReset}
-          className={cn(
-            "text-sm font-medium",
-            "text-[color:var(--color-ink-muted)]",
-            "transition-colors hover:text-[color:var(--color-ink)]",
-          )}
-        >
-          Reset
-        </button>
-        <button type="button" onClick={onApply} className="btn-primary">
-          Show results
-        </button>
-      </div>
+        Reset
+      </button>
+      <button type="button" onClick={onApply} className="btn-primary">
+        Show results
+      </button>
     </div>
   );
 }

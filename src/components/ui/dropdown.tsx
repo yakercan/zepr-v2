@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from "react";
+import { useIsMobile } from "@/components/device/device-provider";
 import { cn } from "@/lib/utils";
 import { Backdrop } from "@/components/ui/backdrop";
 import { ChevronDownIcon, ChevronRightIcon } from "@/components/ui/icons";
@@ -151,6 +152,13 @@ export function Dropdown({
   const [open, setOpen] = useState(false);
   const [activeSide, setActiveSide] = useState<ActiveSide | null>(null);
   const ref = useRef<HTMLDetailsElement>(null);
+  /* Mobile suppresses hover-intent open/close and row-hover side
+   * panel activation — taps drive everything instead. The dropdown
+   * surface itself stays click-functional (summary toggle, row
+   * navigation); only the hover heuristics are stripped so a
+   * touch-emitted synthetic mouseenter doesn't fire phantom opens
+   * or sticky side panels on iOS / Android Chrome. */
+  const isMobile = useIsMobile();
 
   // Two separate timers — `open` and `close` — so a re-entry into
   // the trigger after a brief mouseleave cancels the scheduled close
@@ -228,7 +236,10 @@ export function Dropdown({
   // Hover-intent on the outer <details> covers both the summary and
   // the panel (and, in sideMode, the side column too). Touch devices
   // skip these — clicking the summary uses the native toggle path.
+  // Both handlers no-op in mobile mode so synthetic mouseenter
+  // events from iOS / Android Chrome can't open the panel on tap.
   const onMouseEnter = () => {
+    if (isMobile) return;
     clearCloseTimer();
     if (open) return;
     openTimerRef.current = setTimeout(
@@ -237,6 +248,7 @@ export function Dropdown({
     );
   };
   const onMouseLeave = () => {
+    if (isMobile) return;
     clearOpenTimer();
     if (!open) return;
     closeTimerRef.current = setTimeout(
@@ -424,6 +436,12 @@ export function DropdownItem({
   const close = useDropdownClose();
   const side = useContext(DropdownSideContext);
   const sideEnabled = side !== null && Boolean(sidePanel);
+  /* Same rationale as in `<Dropdown>`: skip the row-hover side panel
+   * activation on mobile so a tap can't trigger a "hovered" state
+   * via a synthetic mouseenter from iOS / Android. The default
+   * `setActiveIfNone` registration still runs so the side panel
+   * isn't blank — the first item just stays as the resting view. */
+  const isMobile = useIsMobile();
 
   const key =
     itemKey ?? href ?? (typeof children === "string" ? children : null);
@@ -440,6 +458,7 @@ export function DropdownItem({
     sideEnabled && key !== null && side?.activeKey === key;
 
   const handleEnter = () => {
+    if (isMobile) return;
     if (!sideEnabled || !key || !side) return;
     side.setActive(key, sidePanel);
   };

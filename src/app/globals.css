@@ -1,17 +1,42 @@
 @import "tailwindcss";
 
 /*
- * Touch-aware "hover" variant.
+ * Device-mode paired variants — `touch:` and `desktop:`.
  *
- * Tailwind's stock `hover:` only fires on devices that report a real
- * hover capability, which means "reveal on touch" patterns (a cart
- * badge that animates in, a press feedback overlay) just don't show
- * up on phones. `touch:` is the inverse — it activates only on
- * `(hover: none)` devices — so we can pair the two without forking
- * call sites into two components.
+ * Both are anchored to the SSR-resolved `html[data-device]`
+ * attribute (see `device-detection.ts` + `device-provider.tsx`)
+ * rather than the browser's `(hover: none)` media query. Two
+ * reasons:
+ *
+ *   1. `(hover: none)` is unreliable on hybrid hardware — touch
+ *      laptops, iPads in keyboard-and-trackpad mode, Samsung
+ *      DeX, anything with a pen. Some of those report `hover:
+ *      none` even when the user is actively using a precise
+ *      pointer; others report `hover: hover` for fingers.
+ *   2. `data-device` is the gate's source of truth. It flips
+ *      cleanly via cookie / dev override / refiner — so
+ *      everything we author against this attribute stays in
+ *      lockstep with the rest of the mobile branch (cart sheet,
+ *      mobile nav, hover suppression, etc.).
+ *
+ * Use:
+ *
+ *   `desktop:hover:bg-foo`  — hover style applied on desktop only
+ *   `touch:opacity-100`     — value applied on mobile/touch only
+ *
+ * Pair them when you want different treatments at the call site
+ * without forking the component (`desktop:opacity-0 desktop:group-
+ * hover:opacity-100 touch:opacity-100` → reveal-on-hover desktop,
+ * always-visible touch).
  */
 @custom-variant touch {
-  @media (hover: none) {
+  &:where(html[data-device="mobile"] *) {
+    @slot;
+  }
+}
+
+@custom-variant desktop {
+  &:where(html[data-device="desktop"] *) {
     @slot;
   }
 }
@@ -200,6 +225,45 @@
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
+
+  /* Z-index ladder.
+   *
+   * Single source of truth for layering across the app. Until
+   * Phase 3 of the mobile gate rollout introduced the Vaul-backed
+   * `<Sheet>`, z-index values were scattered as arbitrary
+   * `z-[100]` / `z-[60]` / `z-50` utilities across `<Modal>`,
+   * `<CartDrawer>`, `<Backdrop>`, `<SiteHeader>`, and the
+   * lightbox — workable in isolation but a moving target as new
+   * overlay types arrived (sheets that can open over modals,
+   * modals that can spawn confirm-modals on top, etc.).
+   *
+   * The ladder is monotonic by overlay class, with 10-unit
+   * gaps so each tier has room to host both its backdrop (the
+   * even tier ten below) and its panel (the named tier). Reference
+   * the tokens from JSX via `z-[var(--z-sheet)]` (or via
+   * `style={{ zIndex: "var(--z-sheet)" }}` when JSX literals are
+   * required); change a number here and every overlay tracks.
+   *
+   *   --z-header              50      site header (sticky)
+   *   --z-cart-drawer         70      cart drawer panel (desktop)
+   *   --z-modal-base         110      default modal panel
+   *   --z-modal-preview      130      preview-tier modal panel
+   *                                   (variant pick, lightbox)
+   *   --z-modal-confirm      150      confirm-tier modal panel
+   *                                   (destructive prompts)
+   *   --z-sheet              170      bottom sheet (mobile)
+   *
+   * Backdrops sit at `(panel - 10)` by convention — see the
+   * `<Backdrop>` and `<Modal>` source for the existing pattern.
+   * The `<Sheet>` primitive layers them automatically through
+   * Vaul's portal so callers never have to think about it.
+   */
+  --z-header: 50;
+  --z-cart-drawer: 70;
+  --z-modal-base: 110;
+  --z-modal-preview: 130;
+  --z-modal-confirm: 150;
+  --z-sheet: 170;
 
   /* Page-level layout tokens.
    *

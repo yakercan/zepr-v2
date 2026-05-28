@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
+import { DeviceDevTools } from "@/components/device/device-dev-tools";
 import { DeviceProvider } from "@/components/device/device-provider";
 import { ShopLayout } from "@/components/layout/shop-layout";
 import { site } from "@/config/site";
@@ -54,6 +55,11 @@ export default async function RootLayout({
       <body className="min-h-full" suppressHydrationWarning>
         <DeviceProvider initial={device}>
           <ShopLayout>{children}</ShopLayout>
+          {/* Dev-only device-mode indicator + ?device=… query
+              override consumer. Tree-shaken out of production via
+              the literal `process.env.NODE_ENV === "development"`
+              check below — zero runtime cost in shipped code. */}
+          {process.env.NODE_ENV === "development" && <DeviceDevTools />}
         </DeviceProvider>
       </body>
     </html>

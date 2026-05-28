@@ -159,7 +159,13 @@ export function FavoriteButton({
           "hover:bg-black/35",
           /* Hidden by default, fades in on whole-card hover. */
           "opacity-0 group-hover:opacity-100",
-          /* …unless already favorited — then always visible. */
+          /* On mobile there's no hover to reveal it — and a
+           * saved-items affordance you can't tap is just clutter.
+           * The `touch:` variant (anchored to `html[data-device=
+           * "mobile"]`) forces the heart fully visible at rest. */
+          "touch:opacity-100",
+          /* …unless already favorited — then always visible on
+           * desktop too. */
           favorited && "opacity-100",
           /* Heart colour: white at rest, brand-secondary (pink)
            * on hover. When favorited the secondary tint is

@@ -1,0 +1,248 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { Drawer } from "vaul";
+import { useIsDesktop } from "@/components/device/device-provider";
+import { cn } from "@/lib/utils";
+
+/**
+ * Mobile bottom-sheet primitive.
+ *
+ * Thin wrapper over [Vaul](https://vaul.emilkowal.ski/) that gives
+ * the storefront a single, design-locked drawer surface to migrate
+ * mobile overlays into. Anything that lives in a `<Modal>` on
+ * desktop and benefits from a drag-to-dismiss / multi-snap drawer
+ * feel on touch should render `<Sheet>` instead when
+ * `useIsMobile()` is true — see the cart drawer, filter panel,
+ * size-chart modal etc. for the migration template.
+ *
+ * # Design dialect
+ *
+ * The wrapper bakes in our token-driven look so callers don't
+ * have to re-style every overlay:
+ *
+ *   - Rounded-2xl top corners, square bottom.
+ *   - Surface bg + hairline border from `--color-surface` /
+ *     `--color-border`.
+ *   - Hairline drag handle pinned to the top, ink-secondary
+ *     coloured, ~36×4px (Vaul's `Handle` default is fine for
+ *     touch but a touch too wide; we tone it down via the
+ *     classname).
+ *   - Overlay tint matches our shared `<Backdrop>` (black/40)
+ *     with a soft fade.
+ *   - Z-index ladder driven by the `--z-sheet` token in
+ *     `globals.css`, so sheets always sit one tier above any
+ *     coexisting `<Modal>`s.
+ *
+ * # Surface area
+ *
+ * Intentionally tiny — almost every consumer should be able to
+ * write:
+ *
+ * ```tsx
+ * <Sheet open={open} onOpenChange={setOpen} title="Cart">
+ *   {body}
+ * </Sheet>
+ * ```
+ *
+ * For drawers that want a peek / full ladder (cart, filters),
+ * pass `snapPoints={[…]}` — Vaul handles the rest. The first
+ * snap point becomes the resting state on open; drag past
+ * `closeThreshold` (default 0.25) to dismiss.
+ *
+ * # Desktop short-circuit
+ *
+ * On `data-device="desktop"` we return `null` *before* mounting
+ * Vaul's portal. That means a caller can render `<Sheet>` and
+ * `<Modal>` side by side (one for each branch) without worrying
+ * about double-rendering, focus competition, or scroll-lock
+ * fights — only the matching branch ever attaches to the DOM.
+ *
+ * Note: the short-circuit reads from the same `DeviceProvider`
+ * context the rest of the gate uses, so it tracks live changes
+ * (dev `?device=` override, refiner mode flips) without a page
+ * reload.
+ */
+export interface SheetProps {
+  /** Open / closed state — controlled component. */
+  open: boolean;
+  /** Called with the next open state. Wire to the same setter
+   *  the original `<Modal>` used. */
+  onOpenChange: (open: boolean) => void;
+  /** Accessible title rendered visually at the top of the sheet
+   *  body (also used by screen readers via `Drawer.Title`).
+   *
+   *  `ReactNode` rather than `string` so headings that pair
+   *  inline visual chrome with their text — the cart's
+   *  animated `<CartBadge>` next to "Your cart", a filter
+   *  sheet's "Filters · 3 applied" count tag — can compose the
+   *  heading without a sibling element scrolling away from it. */
+  title: ReactNode;
+  /** Optional descriptive sub-line under the title (also fed to
+   *  `Drawer.Description` for assistive tech). */
+  description?: string;
+  /** Visual + screen-reader-only?
+   *
+   *  - **`"visible"`** (default) — title + optional description
+   *    render as a sticky header above the body, with the same
+   *    border-bottom hairline our modals use.
+   *  - **`"sr-only"`** — title still announced, but no visible
+   *    chrome. Useful when the body brings its own header
+   *    (filter sheet, search sheet) and a stacked one would
+   *    look redundant.
+   */
+  titleMode?: "visible" | "sr-only";
+  /** Snap-point ladder. Numbers are 0–1 fractions of viewport
+   *  height (e.g. `[0.5, 0.95]` for peek + full); strings are
+   *  raw CSS lengths (e.g. `["320px", "100%"]`). Omit for a
+   *  single-snap "fills as much as the content needs" sheet. */
+  snapPoints?: (number | string)[];
+  /** When true, only the drag handle is grabbable for dragging —
+   *  the rest of the body scrolls. Defaults to `false` so the
+   *  whole header strip drags by default; turn on for sheets
+   *  whose body is meant to feel like a normal scrollable page
+   *  (e.g. cart line list). */
+  handleOnly?: boolean;
+  /** Inner body classes. The wrapper owns the chrome; consumers
+   *  add their own padding / layout rules here. */
+  className?: string;
+  /** Sheet body. */
+  children: ReactNode;
+  /** Optional sticky footer pinned to the bottom of the sheet
+   *  *outside* the scrollable body. Use for sheets whose primary
+   *  CTA needs to stay reachable while the body scrolls (cart
+   *  → checkout, filter → apply, media-form → submit). The
+   *  caller owns its own border / padding; the wrapper just
+   *  guarantees the footer never scrolls with the body and that
+   *  it respects the device safe-area on iOS via
+   *  `pb-[env(safe-area-inset-bottom)]`. */
+  footer?: ReactNode;
+}
+
+export function Sheet({
+  open,
+  onOpenChange,
+  title,
+  description,
+  titleMode = "visible",
+  snapPoints,
+  handleOnly = false,
+  className,
+  children,
+  footer,
+}: SheetProps) {
+  const isDesktop = useIsDesktop();
+  /* Desktop branch: render nothing. Callers pair this with a
+   * `<Modal>` rendered behind a `useIsMobile()` check, so the
+   * desktop path picks up the modal and the mobile path picks
+   * up the sheet. */
+  if (isDesktop) return null;
+
+  return (
+    <Drawer.Root
+      open={open}
+      onOpenChange={onOpenChange}
+      snapPoints={snapPoints}
+      handleOnly={handleOnly}
+    >
+      <Drawer.Portal>
+        <Drawer.Overlay
+          /* Backdrop tint matches our shared `<Backdrop>` so
+           * sheets and modals share a consistent dim
+           * affordance. Vaul handles the fade timing. */
+          className="fixed inset-0 bg-black/40"
+          style={{ zIndex: "calc(var(--z-sheet) - 10)" }}
+        />
+        <Drawer.Content
+          /* `aria-describedby={undefined}` opts out of the Radix
+           * Dialog "missing Description" warning entirely — we
+           * always render a `<Drawer.Description>` below this
+           * node, but spelling it out at the content level
+           * makes the contract obvious and silences edge cases
+           * where the description is provided but Radix hasn't
+           * picked up the association yet during fast refresh. */
+          aria-describedby={undefined}
+          style={{ zIndex: "var(--z-sheet)" }}
+          className={cn(
+            /* Pinned to the viewport bottom; rounded only on
+             * the top corners; height grows with content (or
+             * snaps via `snapPoints`). `max-h-[96%]` keeps
+             * a sliver of the underlying page peeking through
+             * so the shopper never loses spatial context. */
+            "fixed inset-x-0 bottom-0 mt-24 flex max-h-[96%] flex-col",
+            "rounded-t-2xl border border-b-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
+            "outline-none",
+            /* Soft shadow lifting the sheet off the dimmed
+             * page underneath. Mirrors the modal's drop
+             * shadow at a slightly lower spread (the sheet
+             * is anchored to the viewport edge, so there's
+             * no "floating above center" to telegraph). */
+            "shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.18)]",
+          )}
+        >
+          {/* Drag handle. Vaul ships a default; we tighten
+              the dimensions and tint so it reads as our
+              hairline rather than the library's stock pill. */}
+          <Drawer.Handle className="mx-auto !mt-2.5 !h-1 !w-9 !bg-[color:var(--color-border-strong)]" />
+
+          {/* Title strip. Either visible (most cases) or
+              announce-only (search / filter sheets that
+              bring their own header). */}
+          {titleMode === "visible" ? (
+            <header className="flex flex-col gap-1 border-b border-[color:var(--color-border)] px-5 pb-3 pt-4">
+              <Drawer.Title className="text-base font-semibold text-[color:var(--color-ink)]">
+                {title}
+              </Drawer.Title>
+              {description ? (
+                <Drawer.Description className="text-sm text-[color:var(--color-ink-secondary)]">
+                  {description}
+                </Drawer.Description>
+              ) : (
+                /* Radix Dialog (Vaul's underlying primitive) warns
+                 * if no `<Description>` is present in the tree.
+                 * When the consumer hasn't supplied one, we drop
+                 * an sr-only placeholder so the contract holds
+                 * without forcing a visible sub-line. */
+                <Drawer.Description className="sr-only">
+                  {/* Title can be a ReactNode (e.g. cart badge);
+                   * we ignore it here and just give assistive tech
+                   * a stable announcement. */}
+                  Bottom sheet
+                </Drawer.Description>
+              )}
+            </header>
+          ) : (
+            <>
+              <Drawer.Title className="sr-only">{title}</Drawer.Title>
+              <Drawer.Description className="sr-only">
+                {description ?? "Bottom sheet"}
+              </Drawer.Description>
+            </>
+          )}
+
+          {/* Body. Caller owns padding + layout rules; we just
+              guarantee it scrolls when its own height exceeds
+              the sheet's. Snap-point sheets need this so
+              dragging past the first snap reveals more
+              content rather than letting overflow leak below
+              the safe-area. */}
+          <div className={cn("flex-1 overflow-y-auto", className)}>
+            {children}
+          </div>
+
+          {/* Sticky footer slot — pinned outside the scrollable
+              body so the primary CTA stays reachable as the
+              line list / filter set / form scrolls. The padding-
+              bottom safe-area-inset means the CTA clears the
+              iOS home-indicator without the caller having to
+              wire it. */}
+          {footer && (
+            <div className="border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)] pb-[env(safe-area-inset-bottom,0px)]">
+              {footer}
+            </div>
+          )}
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}

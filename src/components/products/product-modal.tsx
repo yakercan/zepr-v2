@@ -10,12 +10,14 @@ import {
 } from "react";
 
 import { getProductDetailAction } from "@/app/products/actions";
+import { useIsMobile } from "@/components/device/device-provider";
 import { BuyActions } from "@/components/products/buy-actions";
 import { DeliveryBadge } from "@/components/products/delivery-badge";
 import { ProductGallery } from "@/components/products/product-gallery";
 import { VariantPicker } from "@/components/products/variant-picker";
 import { Modal } from "@/components/ui/modal";
 import { Price } from "@/components/ui/price";
+import { Sheet } from "@/components/ui/sheet";
 import {
   cascadeSelect,
   defaultSelection,
@@ -271,6 +273,129 @@ export function ProductModal({
       : 0;
   const isDiscounted = discountPct > 0;
 
+  const isMobile = useIsMobile();
+
+  /* Body content — same JSX in both surfaces. Captured as a
+   * variable so the Modal branch can wire its overflow-aware
+   * border-top, and the Sheet branch can pass it straight into
+   * its scrollable slot without thinking about it. */
+  const bodyContent =
+    status === "error" ? (
+      <ErrorState onClose={onClose} />
+    ) : !detail ? (
+      <BodySkeleton product={product} />
+    ) : (
+      <>
+        <ProductGallery
+          media={detail.media}
+          title={detail.title}
+          syncedIndex={syncedGalleryIndex}
+        />
+
+        {/* Title links through to the full PDP — same hover
+         *  dialect as the cart-row title so the affordance
+         *  reads consistently ("title turns brand orange →
+         *  product page"). The modal closes on navigate
+         *  because the next surface owns the chrome. */}
+        <Link
+          href={`/products/${detail.handle}`}
+          onClick={onClose}
+          className="text-lg font-bold leading-snug text-[color:var(--color-ink)] transition-colors hover:text-[color:var(--color-brand)] md:text-xl"
+        >
+          {detail.title}
+        </Link>
+
+        <DeliveryBadge
+          deliveryTime={detail.deliveryTime}
+          priceCents={priceMinCents}
+        />
+
+        <div className="flex flex-wrap items-baseline gap-3">
+          <Price
+            cents={priceMinCents}
+            currency={currency}
+            discounted={isDiscounted}
+            className="text-2xl"
+          />
+          {hasPriceRange && (
+            <>
+              <span
+                className="text-base text-[color:var(--color-ink-muted)]"
+                aria-hidden
+              >
+                –
+              </span>
+              <Price
+                cents={priceMaxCents}
+                currency={currency}
+                discounted={isDiscounted}
+                className="text-2xl"
+              />
+            </>
+          )}
+          {isDiscounted && compareAtCents && (
+            <>
+              <Price
+                cents={compareAtCents}
+                currency={currency}
+                variant="compare"
+                className="text-base"
+              />
+              <DiscountBadge percent={discountPct} />
+            </>
+          )}
+        </div>
+
+        <VariantPicker
+          options={detail.options}
+          variants={detail.variants}
+          selection={selection}
+          onSelect={handleSelect}
+          sizeChart={detail.sizeChart}
+        />
+      </>
+    );
+
+  /* Footer content shared between Modal + Sheet. Error state
+   * has its own dismiss button inside the body, so we render
+   * the footer only on the loading and success paths. */
+  const footerContent =
+    status === "error" ? null : detail ? (
+      <BuyActions
+        product={detail}
+        selectedVariant={selectedVariant}
+        onAdded={onClose}
+        showInstallmentBadge={false}
+      />
+    ) : (
+      <FooterSkeleton />
+    );
+
+  if (isMobile) {
+    /* Mobile bottom-sheet branch. `<Sheet>` owns its own
+     * scroll container + sticky footer slot — no overflow-
+     * border logic needed because the chrome already keeps
+     * the CTAs anchored to the safe-area floor regardless
+     * of body length. */
+    return (
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) onClose();
+        }}
+        title="Quick add"
+        className="px-5 py-4"
+        footer={
+          footerContent ? (
+            <div className="px-5 py-4">{footerContent}</div>
+          ) : undefined
+        }
+      >
+        <div className="flex flex-col gap-5">{bodyContent}</div>
+      </Sheet>
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -298,86 +423,8 @@ export function ProductModal({
           ref={bodyRef}
           className="min-h-0 flex-1 overflow-y-auto"
         >
-          <div
-            ref={contentRef}
-            className="flex flex-col gap-5 p-5"
-          >
-            {status === "error" ? (
-              <ErrorState onClose={onClose} />
-            ) : !detail ? (
-              <BodySkeleton product={product} />
-            ) : (
-              <>
-                <ProductGallery
-                  media={detail.media}
-                  title={detail.title}
-                  syncedIndex={syncedGalleryIndex}
-                />
-
-                {/* Title links through to the full PDP — same
-                 *  hover dialect as the cart-row title so the
-                 *  affordance reads consistently ("title turns
-                 *  brand orange → product page"). The modal
-                 *  closes on navigate because the next surface
-                 *  owns the chrome. */}
-                <Link
-                  href={`/products/${detail.handle}`}
-                  onClick={onClose}
-                  className="text-lg font-bold leading-snug text-[color:var(--color-ink)] transition-colors hover:text-[color:var(--color-brand)] md:text-xl"
-                >
-                  {detail.title}
-                </Link>
-
-                <DeliveryBadge
-                  deliveryTime={detail.deliveryTime}
-                  priceCents={priceMinCents}
-                />
-
-                <div className="flex flex-wrap items-baseline gap-3">
-                  <Price
-                    cents={priceMinCents}
-                    currency={currency}
-                    discounted={isDiscounted}
-                    className="text-2xl"
-                  />
-                  {hasPriceRange && (
-                    <>
-                      <span
-                        className="text-base text-[color:var(--color-ink-muted)]"
-                        aria-hidden
-                      >
-                        –
-                      </span>
-                      <Price
-                        cents={priceMaxCents}
-                        currency={currency}
-                        discounted={isDiscounted}
-                        className="text-2xl"
-                      />
-                    </>
-                  )}
-                  {isDiscounted && compareAtCents && (
-                    <>
-                      <Price
-                        cents={compareAtCents}
-                        currency={currency}
-                        variant="compare"
-                        className="text-base"
-                      />
-                      <DiscountBadge percent={discountPct} />
-                    </>
-                  )}
-                </div>
-
-                <VariantPicker
-                  options={detail.options}
-                  variants={detail.variants}
-                  selection={selection}
-                  onSelect={handleSelect}
-                  sizeChart={detail.sizeChart}
-                />
-              </>
-            )}
+          <div ref={contentRef} className="flex flex-col gap-5 p-5">
+            {bodyContent}
           </div>
         </div>
 
@@ -391,7 +438,7 @@ export function ProductModal({
          *  load. The skeleton branch swaps in a CTA-stack
          *  placeholder so the footer's height matches what's
          *  coming, no jump when `detail` lands. */}
-        {status !== "error" && (
+        {footerContent && (
           <div
             className={cn(
               "shrink-0 px-5 py-4",
@@ -399,16 +446,7 @@ export function ProductModal({
                 "border-t border-[color:var(--color-border)]",
             )}
           >
-            {detail ? (
-              <BuyActions
-                product={detail}
-                selectedVariant={selectedVariant}
-                onAdded={onClose}
-                showInstallmentBadge={false}
-              />
-            ) : (
-              <FooterSkeleton />
-            )}
+            {footerContent}
           </div>
         )}
       </div>

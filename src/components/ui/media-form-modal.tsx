@@ -5,11 +5,13 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
   useTransition,
 } from "react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/components/device/device-provider";
 import {
   LoadingOverlay,
   type LoadingOverlayState,
@@ -19,6 +21,7 @@ import {
   type MediaPickerConfig,
 } from "@/components/ui/media-picker";
 import { Modal, type ModalLayer } from "@/components/ui/modal";
+import { Sheet } from "@/components/ui/sheet";
 
 /**
  * Shared submit-modal scaffold for reviews, returns, contact, and
@@ -247,6 +250,118 @@ export function MediaFormModal({
       ? children({ pending, success, disabled })
       : children;
 
+  const isMobile = useIsMobile();
+  /* Stable id so the submit button in the sheet's footer slot
+   * (rendered outside the form element) can still be linked to
+   * the form via `form="…"`. `useId()` keeps it unique even
+   * when multiple media-form modals mount in the same tree. */
+  const formId = useId();
+
+  /* Form body — shared verbatim across desktop and mobile.
+   * The desktop modal wraps it in its own overflow-aware scroll
+   * container (and tracks `bodyOverflows` for the footer's top
+   * border); the mobile sheet skips that bookkeeping since the
+   * sheet primitive owns its own scroll behaviour. */
+  const formBody = (
+    <>
+      {childContent}
+
+      {media && (
+        <MediaPicker
+          files={files}
+          onChange={setFiles}
+          onError={setError}
+          disabled={disabled}
+          maxAttachments={media.maxAttachments}
+          maxPhotoBytes={media.maxPhotoBytes}
+          maxVideoBytes={media.maxVideoBytes}
+          label={media.label}
+          required={media.required}
+        />
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          className="rounded-md bg-[color:var(--color-danger-soft)] px-3 py-2 text-sm text-[color:var(--color-danger)]"
+        >
+          {error}
+        </p>
+      )}
+    </>
+  );
+
+  const submitDisabled =
+    disabled ||
+    disableSubmit ||
+    (media?.required === true && files.length === 0);
+
+  const actionRow = (
+    <>
+      <button
+        type="button"
+        onClick={handleClose}
+        disabled={disabled}
+        className="link-muted"
+      >
+        {cancelLabel}
+      </button>
+      <button
+        type="submit"
+        form={formId}
+        /* Media-required is enforced internally: when the
+         *  picker is mandatory and empty, the submit button
+         *  stays disabled. Keeps the call site from having
+         *  to re-derive the same condition off file state
+         *  it doesn't own. */
+        disabled={submitDisabled}
+        className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-brand-hover)] disabled:bg-[color:var(--color-border-strong)]"
+      >
+        {submitLabel}
+      </button>
+    </>
+  );
+
+  if (isMobile) {
+    /* Mobile bottom sheet. The action row rides the sheet's
+     * footer slot (safe-area-inset padded), the form body
+     * scrolls inside the body slot, and the LoadingOverlay
+     * sits inside the body's relative wrapper to cover the
+     * fields during pending / success flash. The buttons stay
+     * reachable through the overlay (disabled state already
+     * blocks interaction), giving the shopper a way to
+     * dismiss without dragging if they need it. */
+    return (
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) handleClose();
+        }}
+        title={title}
+        className="px-5 py-5"
+        footer={
+          <div className="flex items-center justify-end gap-3 px-5 py-3">
+            {actionRow}
+          </div>
+        }
+      >
+        <form
+          id={formId}
+          onSubmit={handleSubmit}
+          className="relative flex flex-col gap-5"
+          noValidate
+        >
+          {formBody}
+          <LoadingOverlay
+            state={overlayState}
+            loadingLabel={loadingLabel}
+            successLabel={successLabel}
+          />
+        </form>
+      </Sheet>
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -257,6 +372,7 @@ export function MediaFormModal({
       className={className}
     >
       <form
+        id={formId}
         onSubmit={handleSubmit}
         /* The form is the panel's internal layout column —
          *  header (from `<Modal>`) above, scrollable body in
@@ -284,30 +400,7 @@ export function MediaFormModal({
             ref={contentRef}
             className="flex flex-col gap-5 p-5 md:p-6"
           >
-            {childContent}
-
-            {media && (
-              <MediaPicker
-                files={files}
-                onChange={setFiles}
-                onError={setError}
-                disabled={disabled}
-                maxAttachments={media.maxAttachments}
-                maxPhotoBytes={media.maxPhotoBytes}
-                maxVideoBytes={media.maxVideoBytes}
-                label={media.label}
-                required={media.required}
-              />
-            )}
-
-            {error && (
-              <p
-                role="alert"
-                className="rounded-md bg-[color:var(--color-danger-soft)] px-3 py-2 text-sm text-[color:var(--color-danger)]"
-              >
-                {error}
-              </p>
-            )}
+            {formBody}
           </div>
         </div>
 
@@ -325,30 +418,7 @@ export function MediaFormModal({
               "border-t border-[color:var(--color-border)]",
           )}
         >
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={disabled}
-            className="link-muted"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="submit"
-            /* Media-required is enforced internally: when the
-             *  picker is mandatory and empty, the submit button
-             *  stays disabled. Keeps the call site from having
-             *  to re-derive the same condition off file state
-             *  it doesn't own. */
-            disabled={
-              disabled ||
-              disableSubmit ||
-              (media?.required === true && files.length === 0)
-            }
-            className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-brand)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--color-brand-hover)] disabled:bg-[color:var(--color-border-strong)]"
-          >
-            {submitLabel}
-          </button>
+          {actionRow}
         </div>
       </form>
 

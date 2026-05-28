@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 
+import { useIsMobile } from "@/components/device/device-provider";
 import { Modal } from "@/components/ui/modal";
+import { Sheet } from "@/components/ui/sheet";
 import { parseSizeTable, type SizeChart } from "@/lib/size-chart";
 import { pillClasses } from "@/lib/styles";
 import { cn } from "@/lib/utils";
@@ -84,10 +86,15 @@ export function SizeChartModal({ open, onClose, chart }: SizeChartModalProps) {
   const headerRow = rows[0];
   const bodyRows = rows.slice(1);
 
-  return (
-    <Modal open={open} onClose={onClose} title="Size Chart" className="max-w-lg">
-      <div className="flex flex-col gap-5 p-5">
-        {showToggle && (
+  const isMobile = useIsMobile();
+
+  /* Shared body — table-heavy content the desktop modal pads
+   * inside its own padding box. The mobile sheet body inherits
+   * the sheet's body padding via `className`, so the inner
+   * wrapper here only owns the flex layout. */
+  const body = (
+    <>
+      {showToggle && (
           /* Inline pill toggle — same outline dialect as the
            * variant chips. `inline-flex` keeps the row's width to
            * its content (two pills + 8px gap) rather than
@@ -168,7 +175,27 @@ export function SizeChartModal({ open, onClose, chart }: SizeChartModalProps) {
             </table>
           </div>
         )}
-      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) onClose();
+        }}
+        title="Size Chart"
+        className="flex flex-col gap-5 px-5 py-4"
+      >
+        {body}
+      </Sheet>
+    );
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Size Chart" className="max-w-lg">
+      <div className="flex flex-col gap-5 p-5">{body}</div>
     </Modal>
   );
 }

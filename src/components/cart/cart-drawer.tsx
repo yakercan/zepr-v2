@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useIsMobile } from "@/components/device/device-provider";
 import { Backdrop } from "@/components/ui/backdrop";
 import { CloseIcon } from "@/components/ui/icons";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Sheet } from "@/components/ui/sheet";
 import { CartBadge } from "@/components/cart/cart-badge";
 import { CartEmpty } from "@/components/cart/cart-empty";
 import { CartFooter } from "@/components/cart/cart-footer";
@@ -18,6 +20,7 @@ import {
   useCartPending,
   useCartSubtotalCents,
 } from "@/lib/cart/store";
+import type { CartLine } from "@/types/cart";
 import {
   useBodyScrollLock,
   useEscapeClose,
@@ -70,14 +73,56 @@ export function CartDrawer() {
   const lines = useCartLines();
   const subtotalCents = useCartSubtotalCents();
   const pending = useCartPending();
+  const isMobile = useIsMobile();
 
   /* Currency token comes from the first line — when the cart is empty
    * we don't render the footer, so the fallback is just defensive. */
   const currency = lines[0]?.currency ?? "USD";
 
-  /* Body scroll lock + Escape close — shared primitives, so both
-   * the cart drawer and any future Modal speak the same dialect.
-   * Implementation lives in `use-overlay-behaviors.ts`. */
+  if (isMobile) {
+    return (
+      <CartDrawerMobile
+        open={open}
+        lines={lines}
+        subtotalCents={subtotalCents}
+        currency={currency}
+        pending={pending}
+      />
+    );
+  }
+
+  return (
+    <CartDrawerDesktop
+      open={open}
+      lines={lines}
+      subtotalCents={subtotalCents}
+      currency={currency}
+      pending={pending}
+    />
+  );
+}
+
+interface CartChromeProps {
+  open: boolean;
+  lines: readonly CartLine[];
+  subtotalCents: number;
+  currency: string;
+  pending: boolean;
+}
+
+/**
+ * Desktop side-anchored cart drawer — the original right-edge
+ * sheet preserved verbatim for the desktop branch. Slides in
+ * from the right at `max-w-[420px]` over the existing backdrop,
+ * with the legacy keyboard-focus / scroll-lock plumbing.
+ */
+function CartDrawerDesktop({
+  open,
+  lines,
+  subtotalCents,
+  currency,
+  pending,
+}: CartChromeProps) {
   useBodyScrollLock(open);
   useEscapeClose(open, closeCart);
 
@@ -141,17 +186,7 @@ export function CartDrawer() {
            *  styling as the modal-form surfaces, so the in-flight
            *  feedback reads consistently across the app. */}
           <div className="relative flex min-h-0 flex-1 flex-col">
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-              {lines.length === 0 ? (
-                <CartEmpty />
-              ) : (
-                <ul className="flex flex-col divide-y divide-[color:var(--color-border)] px-5">
-                  {lines.map((line) => (
-                    <CartLineRow key={line.id} line={line} />
-                  ))}
-                </ul>
-              )}
-            </div>
+            <CartScrollableLines lines={lines} />
             {lines.length > 0 && (
               /* The drawer's footer reads as a sticky bottom slab
                * — `border-t` separates it from the scrolling line
@@ -172,6 +207,92 @@ export function CartDrawer() {
         document.body,
       )}
     </>
+  );
+}
+
+/**
+ * Mobile cart drawer — bottom sheet with a peek + full ladder.
+ *
+ *   - **Peek (50% of viewport)** is the resting state. Lets the
+ *     shopper glance at the just-added line without losing
+ *     spatial context of the page underneath.
+ *   - **Full (95%)** is for reviewing the cart end to end and
+ *     getting to checkout. Drag up from peek to promote, drag
+ *     down past the close threshold to dismiss.
+ *
+ * The body's scrollable line list, the sticky footer with the
+ * checkout CTA, and the loading overlay are reused from the
+ * desktop branch — only the chrome (panel + drag handle + snap
+ * behaviour) differs between the two surfaces.
+ */
+function CartDrawerMobile({
+  open,
+  lines,
+  subtotalCents,
+  currency,
+  pending,
+}: CartChromeProps) {
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) closeCart();
+      }}
+      title={
+        <span className="inline-flex items-center">
+          Your cart
+          <CartBadge />
+        </span>
+      }
+      snapPoints={[0.5, 0.95]}
+      footer={
+        lines.length > 0 ? (
+          /* Footer slot already supplies the border-t and surface
+           * bg, so we strip those from `<CartFooter>` here to
+           * avoid doubling them up. */
+          <CartFooter
+            subtotalCents={subtotalCents}
+            currency={currency}
+            className="bg-[color:var(--color-surface)]"
+          />
+        ) : undefined
+      }
+    >
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {lines.length === 0 ? (
+          <CartEmpty />
+        ) : (
+          <ul className="flex flex-col divide-y divide-[color:var(--color-border)] px-5">
+            {lines.map((line) => (
+              <CartLineRow key={line.id} line={line} />
+            ))}
+          </ul>
+        )}
+        <LoadingOverlay state={pending ? "loading" : null} />
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * Scrollable line list shared by both the desktop drawer and
+ * any future surface that wants the same "scroll the cart lines
+ * with an empty-state fallback" composition. Kept module-local
+ * for now — extract to its own file if a third surface needs it.
+ */
+function CartScrollableLines({ lines }: { lines: readonly CartLine[] }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {lines.length === 0 ? (
+        <CartEmpty />
+      ) : (
+        <ul className="flex flex-col divide-y divide-[color:var(--color-border)] px-5">
+          {lines.map((line) => (
+            <CartLineRow key={line.id} line={line} />
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

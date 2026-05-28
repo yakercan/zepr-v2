@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/components/device/device-provider";
 import {
   MediaLightbox,
   type LightboxMediaItem,
@@ -414,6 +415,12 @@ function GalleryThumbs({
   title: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  /* Hover-to-preview is desktop-only. On mobile a synthetic
+   * mouseenter from a tap would race the click handler — both fire
+   * `onSelect(i)`, which is harmless functionally but kicks off two
+   * crossfade animations in a row. Cleaner to bind `onMouseEnter`
+   * only when we're sure there's a real pointer in play. */
+  const isMobile = useIsMobile();
 
   /* When the active thumb falls outside the viewport (e.g. the
    * shopper steps through via the main viewer's prev / next
@@ -457,9 +464,10 @@ function GalleryThumbs({
             onClick={() => onSelect(i)}
             /* Hover-to-preview — legacy storefront idiom. Lets a
              *  shopper scan the full gallery with no clicks.
-             *  Touch devices ignore `mouseenter` and fall back to
-             *  tap (which fires `onClick`). */
-            onMouseEnter={() => onSelect(i)}
+             *  Skipped entirely on mobile so a tap can't fire both
+             *  the synthetic mouseenter and the click in succession
+             *  (which would queue back-to-back crossfades). */
+            onMouseEnter={isMobile ? undefined : () => onSelect(i)}
             className={cn(
               "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg",
               "border-2 transition-colors duration-150",

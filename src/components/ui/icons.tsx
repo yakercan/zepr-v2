@@ -391,6 +391,20 @@ export function CloseIcon({ className }: IconProps) {
   );
 }
 
+/** Three-line "hamburger" — the mobile header's nav trigger. Two
+ *  half-length bars stack above a full bar for the slightly more
+ *  contemporary "elephant" silhouette; keeps it visually distinct
+ *  from a generic kebab or settings glyph. */
+export function MenuIcon({ className }: IconProps) {
+  return (
+    <svg {...svgProps(className)}>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </svg>
+  );
+}
+
 /** "Open in new tab" arrow — used by the tiered-offers companion
  *  card so a shopper can inspect a bundled product without losing
  *  their current cart configuration. */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, type MouseEvent, type ReactNode } from "react";
+import { useIsMobile } from "@/components/device/device-provider";
 import { PlayIcon } from "@/components/ui/icons";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import {
@@ -58,6 +59,13 @@ export function ProductCardMedia({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasVideo = Boolean(product.hover_video_url);
+  /* On mobile there's no "hover" to drive — and a synthetic
+   * mouseenter from iOS Safari on first tap would briefly play the
+   * video before the navigation fires, which feels glitchy. Drop
+   * the handlers entirely; the primary image is what the shopper
+   * sees, and the product detail page carries the canonical media. */
+  const isMobile = useIsMobile();
+  const hoverInteractive = hasVideo && !isMobile;
 
   function handleEnter(_e: MouseEvent<HTMLDivElement>) {
     // play() returns a promise; swallow rejection silently. If
@@ -75,8 +83,8 @@ export function ProductCardMedia({
   return (
     <div
       className={MEDIA_STAGE_CLASSES}
-      onMouseEnter={hasVideo ? handleEnter : undefined}
-      onMouseLeave={hasVideo ? handleLeave : undefined}
+      onMouseEnter={hoverInteractive ? handleEnter : undefined}
+      onMouseLeave={hoverInteractive ? handleLeave : undefined}
     >
       <ShimmerImage
         src={product.image_url}

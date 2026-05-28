@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ExternalLinkIcon, InfoIcon } from "@/components/ui/icons";
+import { InfoTooltip } from "@/components/products/info-tooltip";
+import { ExternalLinkIcon } from "@/components/ui/icons";
 
 /**
  * PDP trust strip — the three "feel safe buying here" badges
@@ -107,49 +108,6 @@ function Badge({ icon, title, body, action, tooltip }: BadgeProps) {
         <p className="text-sm text-[color:var(--color-ink-muted)]">{body}</p>
       </div>
     </div>
-  );
-}
-
-/* ---------- Tooltip ---------- */
-
-/**
- * Hover/focus tooltip used by the 30-day guarantee badge to
- * surface the full policy without devouring vertical space in
- * the buy column.
- *
- * Pure CSS — the trigger is a `<button>` (so keyboard focus
- * reveals the panel via `group-focus-within`) and the panel is
- * an absolutely-positioned sibling that's reachable through
- * `group-hover` / `group-focus-within`. No JS state to manage,
- * no portal needed (the buy column isn't inside any
- * `overflow:hidden` parent in the PDP layout).
- */
-function InfoTooltip({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        aria-label={`More about ${title}`}
-        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[color:var(--color-ink-muted)] transition-colors hover:bg-[color:var(--color-bubble)] hover:text-[color:var(--color-success)] focus:bg-[color:var(--color-bubble)] focus:text-[color:var(--color-success)] focus:outline-none"
-      >
-        <InfoIcon className="h-4 w-4" />
-      </button>
-      <span
-        role="tooltip"
-        className="invisible absolute bottom-full right-0 z-30 mb-2 w-64 max-w-[calc(100vw-2rem)] -translate-y-0.5 rounded-lg border border-[color:var(--color-border)] bg-white p-3 text-xs leading-relaxed text-[color:var(--color-ink-muted)] opacity-0 shadow-lg shadow-black/10 transition-all duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100"
-      >
-        <span className="mb-1 block font-semibold text-[color:var(--color-ink)]">
-          {title}
-        </span>
-        {description}
-      </span>
-    </span>
   );
 }
 

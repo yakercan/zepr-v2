@@ -5,6 +5,7 @@ import { CartTrigger } from "@/components/cart/cart-trigger";
 import { AccountDropdown } from "@/components/layout/account-dropdown";
 import { CategoriesDropdown } from "@/components/layout/categories-dropdown";
 import { FavoritesBadge } from "@/components/layout/favorites-badge";
+import { MobileHeader } from "@/components/layout/mobile-header";
 import { SearchBar } from "@/components/layout/search-bar";
 import { BestSellersIcon, FireIcon } from "@/components/ui/icons";
 import { DEFAULT_CATEGORIES } from "@/config/categories";
@@ -21,6 +22,8 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  * taxonomy at request time (cached for an hour at the edge via
  * Next's fetch cache) and renders the whole bar in one round.
  *
+ * # Desktop chrome
+ *
  * Background fades from translucent-blur to opaque-white on either
  * `:hover` of the header itself OR `:has(details[open])` when any
  * dropdown inside is open. The CSS lives in `.site-header` /
@@ -30,6 +33,17 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  * single source of caret + click-outside + Escape behavior. Categories
  * uses `sideMode` to mount a subcategory grid in the right column when
  * a category row is hovered; Account uses the simple stacked layout.
+ *
+ * # Mobile swap
+ *
+ * On `data-device="mobile"` the desktop header hides (via
+ * `desktop:flex` / `touch:hidden` on its root) and the bundled
+ * `<MobileHeader>` takes over with a hamburger + logo + search
+ * + cart layout. The two subtrees are rendered together (no JS
+ * branch at this level) so the server can fetch the taxonomy +
+ * cart + auth once and feed both — the inactive subtree just
+ * never reaches the user thanks to the `display:none` carried
+ * by the touch/desktop variants.
  */
 export async function SiteHeader() {
   /* Fan-out every server read in parallel — taxonomy is the heavy
@@ -58,7 +72,54 @@ export async function SiteHeader() {
     env.SHOPIFY_CHECKOUT_DOMAIN ?? env.SHOPIFY_STOREFRONT_DOMAIN;
 
   return (
-    <header className="site-header sticky top-0 z-50 border-b border-[color:var(--color-border)]">
+    <>
+      <DesktopSiteHeader
+        categories={categories}
+        favoritedIds={favoritedIds}
+        initialCart={initialCart}
+      />
+      <MobileHeader
+        categories={categories}
+        isLoggedIn={authState.isLoggedIn}
+        initialCartCount={initialCart?.totalQuantity ?? 0}
+        siteName={site.name}
+      />
+      {/* `CartHydrator` is a side-effect-only island — no UI of
+       *  its own, just seeds the client cart store from the
+       *  server snapshot and pins the checkout permalink config.
+       *  Mounted outside the desktop / mobile branches so both
+       *  surfaces share the same hydration; previously it was
+       *  nested inside the desktop header, which left the mobile
+       *  cart store unprimed. */}
+      <CartHydrator
+        mode={authState.isLoggedIn ? "server" : "guest"}
+        initialCart={initialCart}
+        checkoutDomain={checkoutDomain}
+      />
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Desktop header                                                      */
+/* ------------------------------------------------------------------ */
+
+interface DesktopSiteHeaderProps {
+  categories: readonly TaxonomyCategory[];
+  favoritedIds: ReadonlySet<string>;
+  initialCart: Awaited<ReturnType<typeof getCurrentCart>>;
+}
+
+function DesktopSiteHeader({
+  categories,
+  favoritedIds,
+  initialCart,
+}: DesktopSiteHeaderProps) {
+  return (
+    <header
+      className="site-header sticky top-0 border-b border-[color:var(--color-border)] touch:hidden"
+      style={{ zIndex: "var(--z-header)" }}
+    >
       <div className="page-container flex h-16 items-center gap-4">
         <Logo />
 
@@ -109,11 +170,6 @@ export async function SiteHeader() {
           <AccountDropdown />
 
           <CartTrigger initialCount={initialCart?.totalQuantity ?? 0} />
-          <CartHydrator
-            mode={authState.isLoggedIn ? "server" : "guest"}
-            initialCart={initialCart}
-            checkoutDomain={checkoutDomain}
-          />
         </div>
       </div>
     </header>
