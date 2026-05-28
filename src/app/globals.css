@@ -438,8 +438,15 @@
     color: #ffffff;
   }
 
+  /* Hover only fires on actionable buttons. Without the
+   * `:not(:disabled):not([aria-disabled="true"])` filter the
+   * pointer would brighten a *disabled* button back to brand-
+   * orange the moment it crossed it — masking the "form not
+   * ready yet" affordance and contradicting the disabled grey.
+   * No `cursor: not-allowed` on disabled by design; the visual
+   * fill alone carries the unavailable state. */
   @media (hover: hover) and (pointer: fine) {
-    .btn-primary:hover {
+    .btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
       background-color: var(--color-brand-hover);
     }
   }
@@ -492,8 +499,11 @@
     border-color: var(--color-border-strong);
   }
 
+  /* Mirror of the `.btn-primary` filter — hover only applies to
+   * actionable buttons so a disabled outline button doesn't snap
+   * its border to ink when the pointer crosses it. */
   @media (hover: hover) and (pointer: fine) {
-    .btn-secondary:hover {
+    .btn-secondary:hover:not(:disabled):not([aria-disabled="true"]) {
       border-color: var(--color-ink);
     }
   }
@@ -524,8 +534,15 @@
     cursor: pointer;
   }
 
+  /* Same disabled-aware filter as the button hovers above. The
+   * `cursor: default` swap on disabled is `.link-muted`-specific
+   * because a muted link with `pointer` cursor while greyed-out
+   * reads as broken — the buttons keep `pointer` since the
+   * shopper expects clickable controls to "look clickable" once
+   * the form is complete, and the disabled fill carries the
+   * unavailable state on its own. */
   @media (hover: hover) and (pointer: fine) {
-    .link-muted:hover {
+    .link-muted:hover:not(:disabled):not([aria-disabled="true"]) {
       color: var(--color-ink);
     }
   }

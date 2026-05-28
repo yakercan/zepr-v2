@@ -77,6 +77,37 @@ export const env = createEnv({
     /* ----- Forms / email / SMS ----- */
     HCAPTCHA_SECRET_KEY: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
+    /** "From" header on outbound transactional email — must live
+     *  on a domain verified in the Resend dashboard. Conventionally
+     *  `"Brand Name <support@example.com>"` so inbox previews show
+     *  a friendly name rather than the bare address.
+     *  Optional at boot so deploys without contact-form wiring
+     *  don't fail validation; the contact action returns a graceful
+     *  "temporarily unavailable" error when missing. */
+    CONTACT_FROM_EMAIL: z.string().optional(),
+    /** Destination inbox for the contact form. Set to whatever
+     *  support address actually reads incoming messages — could be
+     *  a shared inbox, a helpdesk ingest address, or a personal
+     *  email during early-stage soft launch. Same optional posture
+     *  as `CONTACT_FROM_EMAIL`. */
+    CONTACT_TO_EMAIL: z.string().email().optional(),
+    /** "From" header on outbound *customer-facing* transactional
+     *  email — thank-you auto-reply after a contact submission,
+     *  and the canonical sender for any future order-status /
+     *  password-reset flows.
+     *
+     *  Kept separate from `CONTACT_FROM_EMAIL` on purpose:
+     *
+     *    - `contact@…` is the address support sees inbound from
+     *      ("a customer submitted the contact form").
+     *    - `notifications@…` is the address the customer sees
+     *      inbound from us ("Zepr replied / confirmed").
+     *
+     *  Two roles, two from-lines, easier inbox-side filtering and
+     *  reputation isolation. Optional — when unset, the contact
+     *  action skips the thank-you reply gracefully (notification
+     *  to support still goes through). */
+    NOTIFICATIONS_FROM_EMAIL: z.string().optional(),
     TWILIO_ACCOUNT_SID: z.string().optional(),
     TWILIO_AUTH_TOKEN: z.string().optional(),
     TWILIO_SERVICE_SID: z.string().optional(),
@@ -119,6 +150,9 @@ export const env = createEnv({
 
     HCAPTCHA_SECRET_KEY: process.env.HCAPTCHA_SECRET_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    CONTACT_FROM_EMAIL: process.env.CONTACT_FROM_EMAIL,
+    CONTACT_TO_EMAIL: process.env.CONTACT_TO_EMAIL,
+    NOTIFICATIONS_FROM_EMAIL: process.env.NOTIFICATIONS_FROM_EMAIL,
     TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
     TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
     TWILIO_SERVICE_SID: process.env.TWILIO_SERVICE_SID,

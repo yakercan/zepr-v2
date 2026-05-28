@@ -8,7 +8,7 @@ import bundleAnalyzer from "@next/bundle-analyzer";
  */
 import "./src/env";
 
-import { SHORTCODE_REDIRECTS } from "./src/lib/shortcodes";
+import { LEGACY_REDIRECTS, SHORTCODE_REDIRECTS } from "./src/lib/shortcodes";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -99,25 +99,37 @@ const nextConfig: NextConfig = {
   },
 
   /**
-   * Marketing short links: `/<code>` → the canonical page for
-   * that campaign (PDP, category, etc.). The map lives in
-   * `src/lib/shortcodes.ts` so adding / editing is a one-line
-   * data change; we expand it into Next's redirect table here.
+   * Two redirect tables, both compiled into Next's edge redirect
+   * layer — the rule fires before any RSC, middleware, or page
+   * renders (zero JS per visit) and the original query string
+   * survives the hop, so attribution params like `?utm_source=ig`
+   * carry through.
    *
-   * `permanent: true` emits a 308 (modern equivalent of 301).
-   * Next.js's redirect layer fires at the routing edge before
-   * any RSC, middleware, or page renders — zero JS per visit
-   * — and preserves the original query string on the
-   * destination, so attribution params like `?utm_source=ig`
-   * survive the hop. See `shortcodes.ts` for the "when not to
-   * use `permanent: true`" caveat.
+   *   - `SHORTCODE_REDIRECTS` — marketing short links (`/101` →
+   *     PDP). Source is a bare code, prefixed with `/` here.
+   *   - `LEGACY_REDIRECTS`    — legacy Shopify route paths
+   *     (`/pages/contact` → `/contact`). Source is already a
+   *     full path; passed through verbatim.
+   *
+   * Both use `permanent: true` (308, the modern equivalent of
+   * 301) so search engines coalesce the old URL into the new
+   * one and browsers can cache the hop. See `shortcodes.ts` for
+   * the "when not to use `permanent: true`" caveat (marketing
+   * re-pointings).
    */
   async redirects() {
-    return Object.entries(SHORTCODE_REDIRECTS).map(([code, destination]) => ({
-      source: `/${code}`,
-      destination,
-      permanent: true,
-    }));
+    return [
+      ...Object.entries(SHORTCODE_REDIRECTS).map(([code, destination]) => ({
+        source: `/${code}`,
+        destination,
+        permanent: true,
+      })),
+      ...Object.entries(LEGACY_REDIRECTS).map(([source, destination]) => ({
+        source,
+        destination,
+        permanent: true,
+      })),
+    ];
   },
 
   /**

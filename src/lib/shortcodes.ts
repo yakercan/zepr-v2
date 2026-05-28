@@ -85,3 +85,35 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
   "143": "/products/portable-clip-on-cooling-fan",
   "144": "/products/batwing-sleeve-trench-coat",
 };
+
+/**
+ * Legacy route redirects — old Shopify-storefront paths that the
+ * v2 storefront serves under different URLs. Lives alongside
+ * `SHORTCODE_REDIRECTS` because both feed the same Next.js
+ * `redirects()` table; kept as a separate map because the intent
+ * is different (canonicalising legacy URLs that may exist in
+ * external links, Google's index, email signatures, etc.) and
+ * the entry's lifecycle is too — these are forever-redirects we
+ * never repurpose, in contrast to marketing shortcodes which
+ * occasionally get re-pointed.
+ *
+ * Keys are the *source* path (must start with `/`), values the
+ * canonical destination. Both ends are validated by Next at build
+ * time; `permanent: true` (308) is applied in `next.config.ts` so
+ * search engines coalesce the old URL into the new one and
+ * browsers can cache the hop.
+ *
+ * Adding a redirect: only do this when there's a known existing
+ * link (legacy storefront, printed material, third-party deep
+ * link) pointing at a URL the v2 storefront doesn't serve. Every
+ * entry adds one rule the routing layer evaluates per request —
+ * cheap individually, but the table shouldn't be a junk drawer.
+ */
+export const LEGACY_REDIRECTS: Readonly<Record<string, string>> = {
+  /* Old Shopify-storefront contact page (`/pages/<handle>` is
+   * the legacy CMS-page convention). Sends the legacy URL to
+   * the canonical `/contact` route — the deep-linkable
+   * destination support uses in email signatures + footer
+   * links. */
+  "/pages/contact": "/contact",
+};
