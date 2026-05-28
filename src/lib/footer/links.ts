@@ -67,7 +67,7 @@ export const SHOP_LINKS: ReadonlyArray<FooterLink> = [
 export const HELP_LINKS: ReadonlyArray<FooterLink> = [
   { href: "/account", label: "My Account" },
   { href: "/account/orders", label: "Orders & Returns" },
-  { href: "/contact", label: "Contact Us" },
+  { href: "/contact", label: "Contact" },
   { href: "/faq", label: "FAQs" },
 ];
 

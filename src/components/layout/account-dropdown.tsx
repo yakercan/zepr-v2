@@ -19,22 +19,22 @@ import { cn } from "@/lib/utils";
  * happily accepts server-rendered children, so all the auth-
  * dependent content stays on the server.
  *
- * Branching:
+ * Layout — one flat vertical list for both states, same width,
+ * same padding. Branching is just the *content*:
  *
- *   - **guest**     — primary "Sign in / Register" CTA wired to
- *                     `/account/login`, then a "DISCOVER" section
- *                     (Wishlist, Order Tracking, Returns, Contact,
- *                     FAQ).
- *   - **signed-in** — two columns: "MY ACCOUNT" (Dashboard,
- *                     Profile, Orders, My Addresses, Logout) and
- *                     "HELP & INFO" (Wishlist, Tracking, Returns,
- *                     Contact, FAQ).
+ *   - **guest**     — primary "Sign in / Register" CTA wired
+ *                     to `/account/login`, then Orders & Returns
+ *                     · Contact · FAQs.
+ *   - **signed-in** — Dashboard · Orders & Returns · My
+ *                     Addresses · Contact · FAQs, then a hair-
+ *                     line and the Logout row (the destructive
+ *                     action gets its own visual section so it
+ *                     doesn't sit flush with the nav items).
  *
- * Every `/account/*` link is live today (Dashboard, Profile
- * anchor, Orders list, Addresses CRUD, Logout). The
- * `DiscoverItems` group (Favorites, Order Tracking, Returns,
- * Contact, FAQ) is still partly placeholder — those pages land
- * in later steps.
+ * `/account/orders` is shown to guests too — the route's auth
+ * guard bounces unauthenticated traffic through `/account/login`
+ * with the original URL preserved as `returnTo`, so the click
+ * still lands in the right place.
  */
 export async function AccountDropdown() {
   const { isLoggedIn } = await getAuthState();
@@ -42,7 +42,7 @@ export async function AccountDropdown() {
   return (
     <Dropdown
       align="right"
-      panelClassName={isLoggedIn ? "w-[28rem] p-2" : "w-[20rem] p-3"}
+      panelClassName="w-[20rem] p-2"
       ariaLabel="Account"
       trigger={
         <>
@@ -70,13 +70,19 @@ export async function AccountDropdown() {
 
 function AccountPanelGuest() {
   return (
-    <div className="flex flex-col gap-2">
-      <Link href="/account/login" className="btn-primary w-full">
+    <div className="flex flex-col">
+      <Link href="/account/login" className="btn-primary mb-2 w-full">
         Sign in / Register
       </Link>
-
-      <SectionHeader>Discover</SectionHeader>
-      <DiscoverItems />
+      <DropdownItem href="/account/orders" icon={<OrdersIcon />}>
+        Orders & Returns
+      </DropdownItem>
+      <DropdownItem href="/contact" icon={<ContactIcon />}>
+        Contact
+      </DropdownItem>
+      <DropdownItem href="/faq" icon={<FAQIcon />}>
+        FAQs
+      </DropdownItem>
     </div>
   );
 }
@@ -87,64 +93,27 @@ function AccountPanelGuest() {
 
 function AccountPanelLoggedIn() {
   return (
-    <div className="grid grid-cols-2 gap-1">
-      <div>
-        <SectionHeader>My Account</SectionHeader>
-        <DropdownItem href="/account" icon={<DashIcon />}>
-          Dashboard
-        </DropdownItem>
-        <DropdownItem href="/account#details" icon={<ProfileIcon />}>
-          Profile
-        </DropdownItem>
-        <DropdownItem href="/account/orders" icon={<OrdersIcon />}>
-          Orders
-        </DropdownItem>
-        <DropdownItem href="/account/addresses" icon={<AddressIcon />}>
-          My Addresses
-        </DropdownItem>
-        <AccountLogoutItem />
-      </div>
-
-      <div>
-        <SectionHeader>Help & Info</SectionHeader>
-        <DiscoverItems />
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Shared item groups                                                  */
-/* ------------------------------------------------------------------ */
-
-function DiscoverItems() {
-  return (
-    <>
-      <DropdownItem href="/favorites" icon={<WishlistIcon />}>
-        Favorites
+    <div className="flex flex-col">
+      <DropdownItem href="/account" icon={<DashIcon />}>
+        Dashboard
       </DropdownItem>
-      <DropdownItem href="/order-tracking" icon={<TrackingIcon />}>
-        Order Tracking
+      <DropdownItem href="/account/orders" icon={<OrdersIcon />}>
+        Orders & Returns
       </DropdownItem>
-      <DropdownItem href="/returns" icon={<ReturnIcon />}>
-        Return Request
+      <DropdownItem href="/account/addresses" icon={<AddressIcon />}>
+        My Addresses
       </DropdownItem>
       <DropdownItem href="/contact" icon={<ContactIcon />}>
         Contact
       </DropdownItem>
       <DropdownItem href="/faq" icon={<FAQIcon />}>
-        FAQ
+        FAQs
       </DropdownItem>
-    </>
-  );
-}
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-1 mt-1 border-b border-[color:var(--color-border)] px-3 py-1.5">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--color-ink-muted)]">
-        {children}
-      </h3>
+      <div
+        aria-hidden
+        className="my-1 border-t border-[color:var(--color-border)]"
+      />
+      <AccountLogoutItem />
     </div>
   );
 }
@@ -177,14 +146,6 @@ function DashIcon({ className }: SvgProps) {
   );
 }
 
-function ProfileIcon({ className }: SvgProps) {
-  return (
-    <svg {...SVG_BASE_PROPS} className={cn(ICON_CLASS, className)}>
-      <path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z" />
-    </svg>
-  );
-}
-
 function OrdersIcon({ className }: SvgProps) {
   return (
     <svg {...SVG_BASE_PROPS} className={cn(ICON_CLASS, className)}>
@@ -198,30 +159,6 @@ function AddressIcon({ className }: SvgProps) {
     <svg {...SVG_BASE_PROPS} className={cn(ICON_CLASS, className)}>
       <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" />
       <path d="M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-    </svg>
-  );
-}
-
-function WishlistIcon({ className }: SvgProps) {
-  return (
-    <svg {...SVG_BASE_PROPS} className={cn(ICON_CLASS, className)}>
-      <path d="M4.318 6.318a4.5 4.5 0 0 0 0 6.364L12 20.364l7.682-7.682a4.5 4.5 0 0 0-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 0 0-6.364 0z" />
-    </svg>
-  );
-}
-
-function TrackingIcon({ className }: SvgProps) {
-  return (
-    <svg {...SVG_BASE_PROPS} className={cn(ICON_CLASS, className)}>
-      <path d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z" />
-    </svg>
-  );
-}
-
-function ReturnIcon({ className }: SvgProps) {
-  return (
-    <svg {...SVG_BASE_PROPS} className={cn(ICON_CLASS, className)}>
-      <path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6" />
     </svg>
   );
 }
