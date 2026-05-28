@@ -123,13 +123,36 @@ export function AddToCartButton({
           the card-level Link in React's tree. A single
           `onClick={stopPropagation}` here intercepts every
           click from inside the modal before it can escape and
-          trigger the navigation. Zero layout impact (span is
-          inline and empty in DOM terms once Vaul portals its
-          children out). The `<button>` above already
+          trigger the navigation. The `<button>` above already
           stop-propagates its own click; this is the same
-          discipline applied to everything the modal owns. */}
+          discipline applied to everything the modal owns.
+        
+          # Why `display: contents` is load-bearing
+        
+          The span is rendered as a *sibling* of the button
+          inside the card's flex row (`flex items-end
+          justify-between`). Its visible children all go
+          through `createPortal` to `document.body`, so the
+          span itself is empty in DOM-flow terms — but as a
+          plain inline element it would still count as a
+          flex item with 0 width, which `justify-between`
+          then treats as an extra "end" anchor. That pushes
+          the Add-to-Cart button into the *middle* of the row
+          instead of pinning it to the right edge where the
+          design lives.
+        
+          `display: contents` removes the span from its
+          parent's box tree (it no longer participates in
+          flex / grid / inline layout at all) while keeping
+          the element in the DOM, so React's event delegation
+          still finds the `onClick` and the stopPropagation
+          still fires. Best of both: events are intercepted,
+          layout is undisturbed. */}
       {needsModal && (
-        <span onClick={(e) => e.stopPropagation()}>
+        <span
+          onClick={(e) => e.stopPropagation()}
+          className="contents"
+        >
           <ProductModal
             product={product}
             open={modalOpen}

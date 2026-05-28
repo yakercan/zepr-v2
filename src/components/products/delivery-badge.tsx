@@ -83,7 +83,17 @@ export function DeliveryBadge({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5",
+        // Phones (< md) get a tighter horizontal rhythm — `gap-2`
+        // between the truck/shipping/divider-medal segments instead
+        // of `gap-3` — plus a slightly tighter inline+block padding.
+        // The buy-form panel on a 360–390px viewport doesn't have
+        // room for the full 12px desktop gap to read; tightening
+        // by 4px keeps the whole badge on one wrap row more often
+        // and prevents the "Arrives …" date span from getting
+        // pinched against the trailing divider. Desktop keeps the
+        // original gap-3 / px-3 / py-2.5 for full breathing room.
+        "flex flex-wrap items-center gap-2 rounded-lg border px-2.5 py-2",
+        "md:gap-3 md:px-3 md:py-2.5",
         "border-[color:var(--color-success-soft-border)] bg-[color:var(--color-success-soft)]",
         "text-[color:var(--color-success)]",
         className,
@@ -108,10 +118,13 @@ export function DeliveryBadge({
        *  as one `inline-flex` unit so the parent badge's
        *  `flex-wrap` can drop the entire group to a new row on
        *  narrow surfaces (mobile sheet) without orphaning the
-       *  divider from its medal. The unit itself uses the same
-       *  `gap-3` as the parent so spacing reads continuous when
-       *  everything fits on one row. */}
-      <span className="inline-flex items-center gap-3">
+       *  divider from its medal. The inner gap *intentionally*
+       *  tracks the parent's responsive gap (`gap-2` < md,
+       *  `gap-3` md+) so spacing reads continuous when everything
+       *  fits on one row — if the inner used a fixed gap-3 on
+       *  phones, the credit block would look noticeably looser
+       *  than the row it sits on. */}
+      <span className="inline-flex items-center gap-2 md:gap-3">
         <span
           aria-hidden
           className="h-8 w-px bg-[color:var(--color-success-soft-border)]"

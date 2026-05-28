@@ -18,9 +18,26 @@ import { cn } from "@/lib/utils";
  * 1360px page-container — keeps tile width around ~220px at every
  * breakpoint, which is where card typography starts feeling natural
  * without the image collapsing.
+ *
+ * # Gap rhythm
+ *
+ * - **Mobile (< md):** `gap-x-3 gap-y-6` = 12 / 24px. The 12px
+ *   horizontal gap is *intentionally* the same as the mobile page
+ *   gutter (see `--page-gutter-px` override in globals.css), so a
+ *   2-col row reads as evenly-paced columns flush with the page
+ *   bleed: `[12, card, 12, card, 12]`. The 24px vertical gives
+ *   each row enough air without going so generous that the page
+ *   feels under-populated on a short phone screen.
+ * - **md+ desktop:** `md:gap-x-5 md:gap-y-8` = 20 / 32px. Looser
+ *   because the page-gutter widens to 24px on desktop and the
+ *   cards themselves are sitting in 3–5 column rows, so the eye
+ *   wants a touch more breathing room between tiles.
+ *
+ * The whole shape is a single string so `ProductGridSkeleton`
+ * inherits it for free and post-fetch swaps stay reflow-free.
  */
 export const PRODUCT_GRID_CLASS =
-  "grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
+  "grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 md:gap-x-5 md:gap-y-8 lg:grid-cols-4 xl:grid-cols-5";
 
 export interface ProductGridProps {
   children: ReactNode;

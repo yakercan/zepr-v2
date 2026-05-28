@@ -229,13 +229,22 @@ export function ProductCard({
               />
             )}
           </div>
-          {/* `-mr-1 -mb-1` tucks the pill closer to the card's
+          {/* `-mr-0.5 -mb-1` tucks the pill closer to the card's
               bottom-right corner without affecting the row's flex
-              metrics. The bubble is now larger than the price
-              text-block, so leaving it centered on the row's
-              padding box made the card read with extra white
-              space; pulling it 4px into the gutter rebalances the
-              composition without disturbing siblings. */}
+              metrics. The bubble reads as the larger object in the
+              row vs. the price text-block, so leaving it centered
+              on the row's padding box made the card read with extra
+              white space; pulling it 2px right + 4px down rebalances
+              the composition without disturbing siblings.
+            
+              Sibling note: `<AddToCartButton>` *also* renders a
+              portaled `<ProductModal>` wrapped in a
+              `display: contents` span. That span deliberately
+              generates no boxes — without it, the flex row's
+              `justify-between` would treat the empty modal-wrapper
+              as a third item at the end and push *this* button into
+              the middle of the row. See add-to-cart-button.tsx for
+              the full reasoning. */}
           <AddToCartButton
             product={product}
             className="-mr-0.5 -mb-1"

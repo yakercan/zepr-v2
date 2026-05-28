@@ -280,7 +280,15 @@
    * so any layout that wants to align with the page bleed uses one
    * className and inherits both at once. Don't hand-roll
    * `mx-auto max-w-[…] px-…` combinations elsewhere — change a token
-   * here and every page tracks. */
+   * here and every page tracks.
+   *
+   * `--page-gutter-px` is *responsive* by token, not by class: the
+   * `@media (width < 48rem)` block right after `@theme` retunes it
+   * to 1rem on phones (anything below Tailwind's `md` breakpoint).
+   * Every consumer — `.page-container`, the `ScrollRow` full-bleed
+   * math, arbitrary `var(--page-gutter-px)` references — picks up
+   * the smaller value automatically. That keeps the gutter narrative
+   * single-sourced: one knob, one definition, two reads. */
   --page-max-px: 1400px;
   --page-gutter-px: 1.5rem;
 
@@ -312,6 +320,32 @@
    * entrance / exit clean against a fixed full-bleed canvas. */
   --animate-fade-in: fade-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fade-out: fade-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Mobile gutter retune. Below Tailwind's `md` breakpoint (48rem /
+ * 768px — phones in portrait and most in landscape) the 24px desktop
+ * gutter eats too much of an already narrow viewport: every
+ * horizontal pixel given to margin is one not spent on the product
+ * grid, the price column, or the action pill. Drop it to 12px so the
+ * content has more room to breathe while still keeping a visible
+ * left/right safety strip.
+ *
+ * 12px was picked deliberately to *match* the mobile grid column
+ * gap (`gap-x-3` in `PRODUCT_GRID_CLASS`). That gives a perfectly
+ * even horizontal rhythm on phones — `[gutter, card, gap, card,
+ * gutter]` is `[12, ?, 12, ?, 12]`, so the eye reads the row as
+ * "two cards with consistent breathing on all four sides" rather
+ * than "two cards floating in an asymmetric frame".
+ *
+ * Done as a token override (not a `md:` utility on `.page-container`)
+ * so the new value flows through everything that reads
+ * `var(--page-gutter-px)` — the page container, `ScrollRow`'s
+ * full-bleed math, any one-off arbitrary value — with zero per-site
+ * audit. Single source of truth, single line of change. */
+@media (width < 48rem) {
+  :root {
+    --page-gutter-px: 0.75rem;
+  }
 }
 
 @keyframes shimmer {
