@@ -36,7 +36,7 @@ export default function FaqPage() {
         <h1 className="text-2xl font-semibold leading-tight text-[color:var(--color-ink)] md:text-3xl">
           Frequently asked questions
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[color:var(--color-ink-muted)] md:text-base">
+        <p className="mt-2 text-sm text-[color:var(--color-ink-muted)] md:text-base">
           Quick answers to the questions we hear most. Can&rsquo;t find what
           you&rsquo;re looking for? <FooterContactLink />.
         </p>

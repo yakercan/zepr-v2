@@ -56,7 +56,7 @@ export default async function ContactPage() {
         <h1 className="text-2xl font-semibold leading-tight text-[color:var(--color-ink)] md:text-3xl">
           Contact us
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[color:var(--color-ink-muted)] md:text-base">
+        <p className="mt-2 text-sm text-[color:var(--color-ink-muted)] md:text-base">
           Questions about an order, a product, or anything else — drop us a
           note and we&rsquo;ll get back to you shortly.
         </p>
