@@ -442,6 +442,7 @@ export function BuyForm({
         variants={product.variants}
         selection={selection}
         onSelect={handleSelect}
+        sizeChart={product.sizeChart}
       />
 
       {offersActive && selectedVariant && (

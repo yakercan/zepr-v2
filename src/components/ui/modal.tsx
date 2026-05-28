@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -28,10 +30,17 @@ import { cn } from "@/lib/utils";
  * design:
  *
  *   1. **Stackable.** A modal can open another modal (e.g. a confirm
- *      dialog *inside* the variant picker). The `layer` prop picks
- *      the z-index tier so each level sits cleanly above the last.
- *      The tiers sit well above the header (z-50) and the cart
- *      drawer (z-[60]/[70]) so all three can coexist.
+ *      dialog *inside* the variant picker, or the size-chart modal
+ *      opened from inside the product modal). Stacking is automatic
+ *      — every `<Modal>` reads its parent's depth via React context
+ *      and assigns itself one tier above, so each level paints its
+ *      own backdrop *over* the parent panel and its own panel
+ *      *over* its backdrop. The `layer` prop is still accepted for
+ *      callers that want to pin a specific tier regardless of depth
+ *      (`<ConfirmDialog>` uses `layer="confirm"` so a confirm step
+ *      always renders at the top, no matter how deeply nested it
+ *      was triggered). The tiers sit well above the header (z-50)
+ *      and the cart drawer (z-[60]/[70]) so all three can coexist.
  *   2. **Animated in *and* out.** Closing instantly is jarring —
  *      the panel rides a 150ms fade-out + tiny scale-down while the
  *      backdrop opacity-fades in sync, then the whole DOM tree
@@ -90,6 +99,37 @@ const LAYER_Z = {
 } as const;
 
 /**
+ * Map nesting depth → stacking tier.
+ *
+ * Depth 0 (outermost modal on the page) lands on `"base"`; depth 1
+ * (a modal opened from inside another) lands on `"preview"`; depth
+ * 2 and beyond clamp to `"confirm"` — three tiers is the practical
+ * ceiling and a 4th-level dialog stacking on a 3rd-level confirm is
+ * a UX smell we don't want to silently support.
+ *
+ * Mirrored by `LAYER_Z` so the depth→tier→z-index path stays
+ * single-table: change a tier here and the colour-coded tiers
+ * still read top-to-bottom in `LAYER_Z`.
+ */
+const DEPTH_TO_LAYER: readonly ModalLayer[] = ["base", "preview", "confirm"];
+
+/**
+ * Depth of the current modal subtree. Default `-1` so the
+ * outermost `<Modal>` lands on `parentDepth + 1 === 0` (the base
+ * tier). Each `<Modal>` re-provides this with its own depth so
+ * nested children read the correct parent value.
+ *
+ * Context propagates through React tree, not DOM tree — which is
+ * exactly what we need here. `createPortal` rehomes the modal
+ * panel to `document.body` for stacking-context isolation, but
+ * the portaled children are still React-tree descendants of the
+ * Modal component, so a child `<Modal>` inside `children` sees
+ * its parent's depth value normally without anyone having to
+ * plumb it manually through props.
+ */
+const ModalDepthContext = createContext<number>(-1);
+
+/**
  * Easing + duration for the panel's content-driven size animation.
  * Same cubic-bezier curve the enter / exit keyframes use so a
  * height shrink that fires alongside a close fade reads as one
@@ -109,9 +149,15 @@ export interface ModalProps {
    *  omitted, only the absolute-positioned close button is rendered
    *  in the panel's top-right corner. */
   title?: string;
-  /** Stacking tier. Defaults to `"base"`. Use `"preview"` when this
-   *  modal is opened from inside another modal so it visually sits
-   *  on top instead of beside its parent. */
+  /** Stacking tier override. By default the modal auto-stacks
+   *  one tier above its parent via context — depth 0 → `"base"`,
+   *  depth 1 → `"preview"`, depth 2+ → `"confirm"` — so a modal
+   *  opened from inside another modal sits cleanly on top of its
+   *  parent's panel without any caller wiring. Pass this prop
+   *  only to pin a specific tier regardless of context depth
+   *  (`<ConfirmDialog>` pins `"confirm"` so confirm steps always
+   *  render at the top, even when triggered from a `"preview"`-
+   *  level dialog). */
   layer?: ModalLayer;
   /** Tailwind sizing on the panel — most call sites pass a width
    *  cap like `max-w-md` or `max-w-2xl`. Layout / padding stays the
@@ -131,11 +177,21 @@ export function Modal({
   onClose,
   children,
   title,
-  layer = "base",
+  layer,
   className,
   hideClose = false,
   ariaLabel,
 }: ModalProps) {
+  /* Auto-stack via context. Parent depth is `-1` at the root
+   * (default context value), so the first `<Modal>` on the page
+   * lands at depth 0 → `"base"`. A nested `<Modal>` reads its
+   * parent's depth and lands one tier above. Explicit `layer`
+   * wins for callers that need to pin a specific tier (see
+   * `<ConfirmDialog>`). */
+  const parentDepth = useContext(ModalDepthContext);
+  const myDepth = parentDepth + 1;
+  const effectiveLayer: ModalLayer =
+    layer ?? DEPTH_TO_LAYER[Math.min(myDepth, DEPTH_TO_LAYER.length - 1)]!;
   /* DOM-presence flag. Goes true on open, stays true through the
    * exit animation, drops to false after `onAnimationEnd` fires. */
   const [mounted, setMounted] = useState<boolean>(open);
@@ -320,10 +376,15 @@ export function Modal({
   const isClient = useIsClient();
   if (!isClient || !mounted) return null;
 
-  const zPair = LAYER_Z[layer];
+  const zPair = LAYER_Z[effectiveLayer];
 
   return (
-    <>
+    /* Provide our depth to anything rendered below — including
+     * inside the portaled children. Context follows the React
+     * tree, so a `<Modal>` inside `children` (even though it
+     * portal-rehomes into `document.body`) still sees this
+     * value and stacks itself one tier above. */
+    <ModalDepthContext.Provider value={myDepth}>
       {/* Shared coverHeader backdrop — same primitive the cart
           drawer uses. Per-layer z-index passed via `className` so
           tailwind-merge replaces the component's default `z-[60]`
@@ -394,7 +455,7 @@ export function Modal({
         </div>,
         document.body,
       )}
-    </>
+    </ModalDepthContext.Provider>
   );
 }
 

@@ -374,6 +374,7 @@ export function ProductModal({
                   variants={detail.variants}
                   selection={selection}
                   onSelect={handleSelect}
+                  sizeChart={detail.sizeChart}
                 />
               </>
             )}

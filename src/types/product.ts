@@ -1,4 +1,5 @@
 import type { ParsedOffers } from "@/lib/offers";
+import type { SizeChart } from "@/lib/size-chart";
 
 /**
  * Salespace search-API product types — kept intentionally minimal.
@@ -340,6 +341,19 @@ export interface ProductDetail {
    *  every product has the metafield set; the badge falls
    *  back to a safe default range when missing. */
   deliveryTime?: string;
+
+  /** Pair of `custom.size_inches` / `custom.size_cm`
+   *  metafields, each holding a pipe-delimited, newline-rowed
+   *  size table authored in Shopify admin. Either or both
+   *  sides may be populated.
+   *
+   *  Carried as the raw strings — parsing lives in
+   *  `lib/size-chart.ts` so the trigger gate and the modal
+   *  body can't drift on the metafield's whitespace rules.
+   *  Undefined when neither metafield is set; the variant
+   *  picker uses `hasSizeChart()` to decide whether to render
+   *  the "Size guide" link beside the Size option. */
+  sizeChart?: SizeChart;
 
   /** Resolved legal-disclaimer HTML — derived at the fetcher
    *  boundary by running the merchant's `custom.legal_disclaimer`

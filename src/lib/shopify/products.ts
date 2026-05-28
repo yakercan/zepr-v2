@@ -134,6 +134,12 @@ const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
       legalDisclaimer: metafield(namespace: "custom", key: "legal_disclaimer") {
         value
       }
+      sizeInches: metafield(namespace: "custom", key: "size_inches") {
+        value
+      }
+      sizeCm: metafield(namespace: "custom", key: "size_cm") {
+        value
+      }
     }
   }
 `;
@@ -229,6 +235,12 @@ interface RawProduct {
    *  picks a hardcoded HTML body off this value's leading text.
    *  Null when the section should be hidden. */
   legalDisclaimer: { value: string } | null;
+  /** `custom.size_inches` / `custom.size_cm` metafields — raw
+   *  pipe-delimited, newline-rowed size charts. Either or both
+   *  may be `null` when the merchant hasn't filled in that
+   *  unit. Parsing lives in `lib/size-chart.ts`. */
+  sizeInches: { value: string } | null;
+  sizeCm: { value: string } | null;
 }
 
 interface ProductByHandleResponse {
@@ -541,6 +553,17 @@ function normaliseProduct(raw: RawProduct): ProductDetail {
     options: parseOptions(raw.options),
     variants: parseVariants(raw.variants.nodes),
     deliveryTime: raw.deliveryTime?.value?.trim() || undefined,
+    /* Carry the raw size-chart strings through unchanged —
+     * parsing is the modal's job. Collapse to `undefined` when
+     * both sides are empty so the variant picker's
+     * `hasSizeChart()` gate reads as a clean nullish check. */
+    sizeChart:
+      raw.sizeInches?.value?.trim() || raw.sizeCm?.value?.trim()
+        ? {
+            inches: raw.sizeInches?.value ?? null,
+            cm: raw.sizeCm?.value ?? null,
+          }
+        : undefined,
     offers: parseOffersMetafield(raw.offers?.value),
     /* Resolve to HTML at the fetcher boundary so the PDP route
      * just renders the result through `<RichText>`. The resolver
