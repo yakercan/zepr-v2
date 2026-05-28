@@ -18,9 +18,13 @@ import { cn } from "@/lib/utils";
  *   - **Shipping headline** — always rendered. Two-line "Free
  *     Shipping / Arrives …" when the product clears the free-
  *     shipping threshold; a single arrival line otherwise.
- *   - **Credit-for-delay** — separated by a thin green divider.
- *     Hides under `sm` (along with the divider) so narrow
- *     surfaces like the variant-picker modal don't wrap.
+ *   - **Credit-for-delay** — separated by a thin green divider,
+ *     grouped into one inline-flex unit so the separator stays
+ *     glued to the medal icon if the badge wraps onto two lines.
+ *     Shown on every surface (page, modal, mobile sheet) — the
+ *     "$5 for late delivery" promise is part of the same trust
+ *     beat as the arrival date, hiding it on narrow surfaces
+ *     would split the message in half.
  *
  * Dates render synchronously — server-rendered HTML carries the
  * final "Arrives …" string straight to the first paint, so there
@@ -100,17 +104,20 @@ export function DeliveryBadge({
         </span>
       )}
 
-      <span
-        aria-hidden
-        className="hidden h-8 w-px bg-[color:var(--color-success-soft-border)] sm:block"
-      />
-      <ZeprIcon
-        src={ZEPR_ICONS.medal}
-        size={20}
-        className="hidden sm:inline-block"
-      />
-      <span className="hidden text-sm font-medium sm:inline">
-        {CREDIT_AMOUNT_LABEL}
+      {/* Credit-for-delay block — divider + medal + label live
+       *  as one `inline-flex` unit so the parent badge's
+       *  `flex-wrap` can drop the entire group to a new row on
+       *  narrow surfaces (mobile sheet) without orphaning the
+       *  divider from its medal. The unit itself uses the same
+       *  `gap-3` as the parent so spacing reads continuous when
+       *  everything fits on one row. */}
+      <span className="inline-flex items-center gap-3">
+        <span
+          aria-hidden
+          className="h-8 w-px bg-[color:var(--color-success-soft-border)]"
+        />
+        <ZeprIcon src={ZEPR_ICONS.medal} size={20} />
+        <span className="text-sm font-medium">{CREDIT_AMOUNT_LABEL}</span>
       </span>
     </div>
   );

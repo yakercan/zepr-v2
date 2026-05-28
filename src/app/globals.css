@@ -399,19 +399,6 @@
     min-width: 1280px;
   }
 
-  /*
-   * iOS Safari auto-zooms when a form control's computed `font-size`
-   * is below 16px at focus time. Bump every text-shaped input on
-   * mobile mode to 16px so the heuristic is satisfied — for typical
-   * compact UI (`text-sm` = 14px) that's a ~14% visual increase, which
-   * also happens to improve readability on a phone.
-   */
-  html[data-device="mobile"] input,
-  html[data-device="mobile"] textarea,
-  html[data-device="mobile"] select {
-    font-size: 16px;
-  }
-
   button,
   [role="button"] {
     cursor: pointer;
@@ -431,6 +418,31 @@
       -webkit-tap-highlight-color: transparent;
     }
   }
+}
+
+/*
+ * iOS Safari auto-zooms when a form control's computed `font-size`
+ * is below 16px at focus time — there's no JS hook, the browser
+ * decides based on the rendered size at focus and pans the
+ * viewport in. We bump every text-shaped input on mobile to 16px
+ * so the heuristic is satisfied. For our typical compact UI
+ * (`text-sm` = 14px) that's a ~14% visual increase, which also
+ * improves readability on a phone.
+ *
+ * Why this rule is *unlayered* (not inside `@layer base`):
+ * Tailwind's `utilities` layer always wins over `base` in the
+ * cascade regardless of selector specificity. Since most inputs in
+ * the codebase carry a Tailwind text-size utility (`text-sm` via
+ * the shared `formInputClasses`), a base-layer 16px rule would be
+ * silently shadowed and iOS would still zoom. Unlayered styles
+ * sit *above* every layer per CSS spec, so this declaration wins
+ * over `text-sm`, `text-xs`, and anything else a consumer paints
+ * onto an input — no `!important` needed, no per-input bumps.
+ */
+html[data-device="mobile"] input,
+html[data-device="mobile"] textarea,
+html[data-device="mobile"] select {
+  font-size: 16px;
 }
 
 @utility scrollbar-hide {

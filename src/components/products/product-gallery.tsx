@@ -27,8 +27,8 @@ import type { ProductMedia } from "@/types/product";
 const MEDIA_DURATION_CLASS = "duration-200";
 
 /**
- * Product media gallery — images + videos with a vertical
- * thumbnail rail flush against the top of the main viewer.
+ * Product media gallery — images + videos with a thumbnail rail
+ * whose orientation flips by device.
  *
  * Reusable across surfaces:
  *
@@ -36,6 +36,9 @@ const MEDIA_DURATION_CLASS = "duration-200";
  *   - Variant-pick modal     (smaller main view, same UX)
  *
  * Width-fluid — adapts to whatever container gives it space.
+ *
+ * **Desktop** — rail sits as a vertical column to the left of the
+ * main viewer, flush against its top edge:
  *
  *     ┌──┐  ┌─[<]──────────[>]──────┐
  *     │t1│  │                       │
@@ -47,10 +50,27 @@ const MEDIA_DURATION_CLASS = "duration-200";
  *     │t4│  └───────────────────────┘
  *     └──┘
  *
- * Rail overflow: native vertical scroll (wheel + touch +
+ * **Mobile** — rail sits as a horizontal row *below* the main
+ * viewer. Vertical thumbs on a 375px viewport would steal width
+ * from the main image (already the most important pixel on the
+ * page); below-viewer thumbs let the main image claim the full
+ * column width and turn the rail into a one-finger horizontal
+ * scrub:
+ *
+ *     ┌─[<]──────────[>]──────┐
+ *     │                       │
+ *     │   main viewer         │
+ *     │   (image | video)     │
+ *     │                       │
+ *     └───────────────────────┘
+ *     ┌──┐┌──┐┌──┐┌──┐
+ *     │t1││t2││t3││t4│ ←──→ overflow-x-auto
+ *     └──┘└──┘└──┘└──┘
+ *
+ * Rail overflow on either axis: native scroll (wheel + touch +
  * trackpad). Scrollbar chrome is hidden so the rail reads cleanly
  * against the page; the visual hint that more thumbs exist is the
- * last thumbnail being clipped at the rail's bottom edge.
+ * last thumbnail being clipped at the rail's edge.
  *
  * Main viewer overlays:
  *
@@ -166,8 +186,24 @@ export function ProductGallery({
   return (
     <div
       className={cn(
-        "grid gap-3",
-        hasThumbs ? "grid-cols-[64px_1fr]" : "grid-cols-1",
+        "gap-3",
+        /* Layout switches per device when thumbs exist:
+         *
+         *   - **Desktop** — 2-column grid (`64px` rail + `1fr`
+         *     main). JSX order = layout order, thumbs land in
+         *     col 1, main in col 2.
+         *   - **Mobile** — column flex with `flex-col-reverse`.
+         *     Thumbs render first in JSX (so the desktop grid
+         *     places them on the left); on mobile the reverse
+         *     flex flips that order so the main viewer sits on
+         *     top and the thumb rail drops to the bottom — no
+         *     duplicated JSX branches, just a one-class flip.
+         *
+         * Single-media products skip the rail entirely and stay
+         * on a 1-col grid in both modes. */
+        hasThumbs
+          ? "touch:flex touch:flex-col-reverse desktop:grid desktop:grid-cols-[64px_1fr]"
+          : "grid grid-cols-1",
         className,
       )}
     >
@@ -425,32 +461,54 @@ function GalleryThumbs({
   /* When the active thumb falls outside the viewport (e.g. the
    * shopper steps through via the main viewer's prev / next
    * buttons), nudge the rail so the thumb is in view. `nearest`
-   * so a thumb already visible isn't moved. */
+   * on *both* axes so it works for the desktop vertical rail and
+   * the mobile horizontal rail without branching — the unused
+   * axis is a no-op since `nearest` only scrolls when the element
+   * is actually off-screen. */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const thumb = el.children[activeIndex] as HTMLElement | undefined;
-    thumb?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    thumb?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "smooth",
+    });
   }, [activeIndex]);
 
-  /* Height plumbing: outer `relative` wrapper is a zero-intrinsic-
-   * height cell that grid stretches to the row's height (driven
-   * by the main viewer's `aspect-square`). The inner scroll
-   * container is `absolute inset-0` so it fills that height
-   * without ever contributing back to the row's intrinsic size.
-   * Net effect: the rail can never push the row taller than the
-   * media square — it just scrolls when the thumbs would overflow. */
+  /* Layout per device:
+   *
+   *   - **Desktop** — outer `relative` is a zero-intrinsic-height
+   *     cell that the grid row stretches to the main viewer's
+   *     `aspect-square` height. The inner scroller is
+   *     `absolute inset-0` so it fills that height without ever
+   *     contributing back to the row's intrinsic size — the rail
+   *     can never push the row taller than the media square.
+   *   - **Mobile** — outer flips to `display: contents`, removing
+   *     itself from layout entirely. The inner scroller then
+   *     participates as a *direct flex child* of the parent
+   *     gallery's `flex-col-reverse` layout: a normal horizontal
+   *     row of thumbs sitting below the main viewer, with the
+   *     parent column claiming its full width. No absolute
+   *     positioning, no synthetic height plumbing. */
   return (
-    <div className="relative">
+    <div className="relative touch:contents">
     <div
       ref={scrollRef}
       role="tablist"
       aria-label="Product media"
       className={cn(
-        "absolute inset-0 flex flex-col gap-2 overflow-y-auto",
-        // Hide native scrollbars — wheel / touch / trackpad
-        // scrolling still works, just without the chrome bar.
+        "flex gap-2",
+        // Hide native scrollbars on either axis — wheel /
+        // touch / trackpad scrolling still works without the
+        // chrome bar.
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        // Desktop: absolute-positioned vertical scroller inside
+        // the outer `relative` cell.
+        "desktop:absolute desktop:inset-0 desktop:flex-col desktop:overflow-y-auto",
+        // Mobile: static, full-width horizontal scroller in the
+        // parent column's bottom row.
+        "touch:overflow-x-auto",
       )}
     >
       {media.map((item, i) => {
