@@ -124,12 +124,22 @@ function FilterBarInlineDesktop({
 }
 
 /**
- * Mobile branch — bottom sheet at full-height (90% snap) so the
- * shopper can sift through chip grids and price inputs without
- * the inline-absolute panel's "can't see your previous results"
- * problem on a 375px viewport. Reset and Show results stay
- * sticky at the bottom via the sheet's footer slot so neither
- * commit path ever scrolls off-screen.
+ * Mobile branch — bottom sheet sized to the body's content
+ * (capped at the sheet's own `max-h-[96%]`). Reset and Show
+ * results stay pinned in the sticky footer so neither commit
+ * path ever scrolls off-screen.
+ *
+ * No `snapPoints` here on purpose. Vaul positions snap-pointed
+ * sheets by translating the panel up from a 100%-below-the-fold
+ * resting state — with a `[0.9]` snap, that translation only
+ * pulls 90% of the panel into view, so the bottom 10% (which is
+ * where the sticky footer lives) stays clipped under the
+ * viewport. Letting the sheet content-size matches the cart
+ * drawer's behaviour: short panels (a 3-option price filter)
+ * stay short, long ones (a 30-option category list) fill nearly
+ * the whole screen via `max-h-[96%]` and overflow inside the
+ * scrollable body, and the footer is *always* visible at the
+ * bottom of the panel.
  */
 function FilterBarSheetMobile({
   isOpen,
@@ -146,10 +156,13 @@ function FilterBarSheetMobile({
         if (!next) onClose();
       }}
       title={title ?? "Filters"}
-      snapPoints={[0.9]}
       footer={<FilterFooter onReset={onReset} onApply={onApply} />}
     >
-      <div className="px-4 py-4">{children}</div>
+      {/* No top padding — the sheet's header strip already owns
+       *  the divider's bottom edge, so any `pt-*` here would
+       *  read as an empty gap below the hairline. `pb-4` keeps
+       *  breathing room above the footer's own border-top. */}
+      <div className="px-4 pb-4">{children}</div>
     </Sheet>
   );
 }

@@ -232,7 +232,12 @@ function FilterPillSheet({
         }}
         title={title ?? label}
       >
-        <div className="px-4 py-2">{children}</div>
+        {/* No top padding — the sheet's header strip owns the
+         *  divider just above; the option list's own per-row
+         *  `py-2` provides the breathing room. `pb-2` keeps
+         *  the last option from sitting flush against the
+         *  bottom edge of the sheet (no footer on Sort by). */}
+        <div className="px-2 pb-2">{children}</div>
       </Sheet>
     </>
   );
