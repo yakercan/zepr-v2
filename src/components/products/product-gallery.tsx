@@ -1,7 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { useIsMobile } from "@/components/device/device-provider";
 import {
   MediaLightbox,
@@ -25,6 +33,105 @@ import type { ProductMedia } from "@/types/product";
  * motions read as one; tailwind-merge collapses the duplicate
  * `duration-*` to the latter value. */
 const MEDIA_DURATION_CLASS = "duration-200";
+
+/* How far the finger has to travel horizontally before we treat
+ * a touch gesture as a navigation swipe rather than a tap. 50px
+ * is the same threshold native iOS / Material galleries settle
+ * on — small enough that a deliberate swipe registers without
+ * effort, big enough that an accidental scroll-induced drift
+ * doesn't trigger a page-through. */
+const SWIPE_THRESHOLD_PX = 50;
+
+/**
+ * Single-pointer horizontal swipe detector for the gallery's
+ * main viewer. Returns handler props the caller spreads onto
+ * the media-stage container; on mobile a touch swipe fires
+ * `onLeft` (= next) or `onRight` (= previous), exactly the same
+ * way native carousel galleries paginate.
+ *
+ * Why the explicit `enabled` gate (rather than just no-op'ing
+ * inside the handlers): we still want the handlers attached on
+ * the desktop branch's render path so React can re-use the same
+ * element across renders, but we want them functionally inert
+ * — desktop pages through with the on-canvas prev / next
+ * bubbles and the keyboard arrows handled by the lightbox; a
+ * mouse drag here would compete with the cursor-zoom intent.
+ *
+ * Three details that keep this from misfiring:
+ *
+ *   1. **Touch only** (`pointerType === "touch"`). Desktop
+ *      pointer drags reach this same code path when the dev-
+ *      tools "device" emulator is engaged; the guard keeps
+ *      ambient mouse input from page-throughing the gallery.
+ *   2. **Horizontal dominance** (`|dx| > |dy|`). Vertical
+ *      scrolls inside the product modal's scrollable body
+ *      would otherwise be reinterpreted as ambiguous swipes
+ *      whenever the user's finger drifted a few pixels
+ *      sideways while scrolling.
+ *   3. **Video opt-out.** `<video controls>` has its own
+ *      horizontal-drag gestures (seekbar scrub); intercepting
+ *      pointer events there would steal the seek interaction.
+ *      `target.closest("video")` skips the swipe whenever the
+ *      gesture starts inside any video subtree.
+ *
+ * After a real swipe fires we set `swipedRef.current` and catch
+ * the upcoming click event in capture phase — otherwise the
+ * `click` synthesized at touch end (when `dx` is small enough
+ * for the browser to also fire a click after a slow drag) would
+ * open the lightbox on top of the page we just navigated to.
+ */
+function usePointerSwipe({
+  onLeft,
+  onRight,
+  enabled,
+}: {
+  onLeft: (() => void) | undefined;
+  onRight: (() => void) | undefined;
+  enabled: boolean;
+}) {
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const swipedRef = useRef(false);
+
+  const onPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLElement>) => {
+      if (!enabled || e.pointerType !== "touch") return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("video")) return;
+      startRef.current = { x: e.clientX, y: e.clientY };
+      swipedRef.current = false;
+    },
+    [enabled],
+  );
+
+  const onPointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLElement>) => {
+      const start = startRef.current;
+      if (!start) return;
+      startRef.current = null;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+      if (Math.abs(dx) < Math.abs(dy)) return;
+      swipedRef.current = true;
+      if (dx < 0) onLeft?.();
+      else onRight?.();
+    },
+    [onLeft, onRight],
+  );
+
+  const onPointerCancel = useCallback(() => {
+    startRef.current = null;
+  }, []);
+
+  const onClickCapture = useCallback((e: ReactMouseEvent<HTMLElement>) => {
+    if (!swipedRef.current) return;
+    swipedRef.current = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, []);
+
+  return { onPointerDown, onPointerUp, onPointerCancel, onClickCapture };
+}
 
 /**
  * Product media gallery — images + videos with a thumbnail rail
@@ -89,6 +196,11 @@ const MEDIA_DURATION_CLASS = "duration-200";
  *   - Prev / next buttons step in order.
  *   - Stepping past the visible thumbs auto-scrolls the rail so
  *     the active thumb stays in view (`scrollIntoView`).
+ *   - **Touch swipe on the main viewer** (mobile only) — drag
+ *     left to step to the next media, drag right for the
+ *     previous. Threshold + horizontal-dominance gates keep
+ *     the gesture from misfiring on a slow vertical scroll.
+ *     See `usePointerSwipe` at the top of this file.
  *
  * Implementation notes:
  *
@@ -336,8 +448,20 @@ function GalleryMain({
    * behaviour as the lightbox. */
   const videoRefs = useActiveVideoControl(activeIndex);
 
+  /* Mobile-only touch swipe navigation. Left swipe = next media,
+   * right swipe = previous; `onPrev`/`onNext` are already
+   * undefined at the gallery's edges, so swiping past the first /
+   * last item is automatically a no-op without an extra branch
+   * here. */
+  const isMobile = useIsMobile();
+  const swipeProps = usePointerSwipe({
+    onLeft: onNext,
+    onRight: onPrev,
+    enabled: isMobile,
+  });
+
   return (
-    <div className={cn(MEDIA_STAGE_CLASSES, "rounded-2xl")}>
+    <div className={cn(MEDIA_STAGE_CLASSES, "rounded-2xl")} {...swipeProps}>
       {media.map((item, i) => {
         const isActive = i === activeIndex;
         const isOutgoing = !isActive && i === outgoingIndex;
