@@ -103,13 +103,14 @@ export function MobileHeader({
   return (
     <>
       <header
-        /* `xl:hidden` is the inverse of the desktop header's
-         * `max-xl:hidden`. Together they make the two headers
-         * mutually exclusive at the CSS layer (pure viewport, no JS
-         * branch at the SiteHeader level, correct on first paint) —
-         * no double-mount of CartTrigger / nav state. Below 1280px
-         * this header is shown; from 1280px up the desktop one is. */
-        className="sticky top-0 border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)] xl:hidden"
+        /* `xl-desktop:hidden` is the inverse of the desktop header's
+         * `hidden xl-desktop:block`. Together they make the two headers
+         * mutually exclusive at the CSS layer (correct on first paint,
+         * no JS branch at the SiteHeader level) — no double-mount of
+         * CartTrigger / nav state. This header shows unless the viewport
+         * is ≥1280px AND driven by a desktop pointer, so a touch tablet
+         * in landscape keeps the mobile header at any width. */
+        className="sticky top-0 border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)] xl-desktop:hidden"
         style={{ zIndex: "var(--z-header)" }}
       >
         <div className="flex h-14 items-center gap-2 px-3">

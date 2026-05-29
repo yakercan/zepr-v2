@@ -34,16 +34,18 @@ import type { TaxonomyCategory } from "@/types/taxonomy";
  * uses `sideMode` to mount a subcategory grid in the right column when
  * a category row is hovered; Account uses the simple stacked layout.
  *
- * # Viewport swap
+ * # Layout swap
  *
- * Below `xl` (1280px) the dense desktop header hides (via
- * `max-xl:hidden` on its root) and the bundled `<MobileHeader>`
- * takes over with a hamburger + logo + search + cart layout. The
- * two subtrees are rendered together (no JS branch at this level)
- * so the server can fetch the taxonomy + cart + auth once and feed
- * both — the inactive subtree is just hidden by CSS (`display:none`
- * via the `max-xl:hidden` / `xl:hidden` viewport classes), with the
- * correct one shown on the very first paint, no JS required.
+ * The dense desktop header only shows on a wide viewport driven by a
+ * desktop-class pointer (`hidden xl-desktop:block` on its root);
+ * otherwise the bundled `<MobileHeader>` takes over with a hamburger
+ * + logo + search + cart layout. Because the swap keys on the pointer
+ * as well as the width, a touch tablet in landscape keeps the mobile
+ * header at any size. The two subtrees are rendered together (no JS
+ * branch at this level) so the server can fetch the taxonomy + cart +
+ * auth once and feed both — the inactive subtree is just hidden by
+ * CSS (`display:none`), with the correct one shown on the very first
+ * paint, no JS required.
  */
 export async function SiteHeader() {
   /* Fan-out every server read in parallel — taxonomy is the heavy
@@ -117,7 +119,7 @@ function DesktopSiteHeader({
 }: DesktopSiteHeaderProps) {
   return (
     <header
-      className="site-header sticky top-0 border-b border-[color:var(--color-border)] max-xl:hidden"
+      className="site-header sticky top-0 hidden border-b border-[color:var(--color-border)] xl-desktop:block"
       style={{ zIndex: "var(--z-header)" }}
     >
       <div className="page-container flex h-16 items-center gap-4">

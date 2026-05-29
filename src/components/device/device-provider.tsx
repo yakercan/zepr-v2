@@ -64,14 +64,20 @@ function mediaQueryStore(query: string) {
   };
 }
 
-/* `1279.98px` mirrors Tailwind's `max-xl` boundary so this hook flips
- * on the exact pixel the header / layout breakpoints do. */
-const compactStore = mediaQueryStore("(max-width: 1279.98px)");
+/* Compact ⇔ "mobile layout": a narrow viewport OR any non-desktop
+ * pointer. The exact logical complement of the `*-desktop` CSS
+ * variants (`min-width: 1280px AND hover: hover AND pointer: fine`),
+ * so a touch device — an iPad in landscape included — is "compact" at
+ * any width and gets Vaul sheets, matching its CSS layout. `1279.98px`
+ * lands on Tailwind's `max-xl` boundary. */
+const compactStore = mediaQueryStore(
+  "(max-width: 1279.98px), (hover: none), (pointer: coarse)",
+);
 const touchStore = mediaQueryStore("(hover: none) and (pointer: coarse)");
 
-/** `true` below the `xl` breakpoint — the "mobile UI" / compact-layout
- *  mode where the mobile header is shown and overlays render as Vaul
- *  sheets. Structural gate. */
+/** `true` in the compact / "mobile layout" mode — a narrow viewport or
+ *  a touch device of any width — where the mobile header is shown and
+ *  overlays render as Vaul sheets. Structural gate. */
 export function useIsCompact(): boolean {
   return useSyncExternalStore(
     compactStore.subscribe,

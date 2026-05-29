@@ -77,10 +77,10 @@ import { cn } from "@/lib/utils";
  * around a portrait photo bubbles up through the layer's
  * non-handling div and hits the overlay's `onClose`.
  *
- * Z-index `z-[130]` — same tier as Modal's `"preview"` layer,
- * which is what this overlay effectively is. Sits above the
- * cart drawer (z-[60]/[70]), the site header (z-50), and any
- * base-layer modal that might be open beneath it.
+ * Z-index `--z-lightbox` (210) — the topmost overlay tier. It can
+ * be launched from inside a modal *or* a Vaul sheet (the product
+ * modal's gallery on a compact viewport), so it has to clear the
+ * sheet tiers (170 / elevated 190), not just the base modals.
  */
 
 export type LightboxMediaItem =
@@ -206,9 +206,23 @@ export function MediaLightbox({
       aria-modal="true"
       aria-label="Media viewer"
       onClick={onClose}
+      /* When the lightbox is launched from inside a Vaul sheet (the
+       * product modal on compact viewports), Vaul's `modal` mode pins
+       * `pointer-events: none` on `<body>` and re-enables it only on
+       * the drawer content — so this portal-to-`body` overlay, though
+       * painted on top via `--z-lightbox`, is pointer-transparent and
+       * every tap falls through to the drawer/overlay behind it. Two
+       * fixes restore interaction without touching Vaul's config:
+       *   1. `pointer-events-auto` (below) re-opts this subtree in, so
+       *      the close/nav buttons receive their clicks again.
+       *   2. Swallow `pointerdown` here so it never reaches Radix's
+       *      document-level outside-press listener — otherwise the
+       *      first tap on the lightbox reads as "outside the drawer"
+       *      and dismisses the sheet underneath us. */
+      onPointerDown={(e) => e.stopPropagation()}
       onAnimationEnd={handleAnimationEnd}
       className={cn(
-        "fixed inset-0 z-[130] flex items-center justify-center bg-black/85 p-4",
+        "pointer-events-auto fixed inset-0 z-[var(--z-lightbox)] flex items-center justify-center bg-black/85 p-4",
         /* Pure opacity fade — the lightbox already covers the
          * whole viewport, so the modal pair's scale + translate
          * would read as the canvas rubber-banding in from a
@@ -234,8 +248,16 @@ export function MediaLightbox({
       </button>
 
       {/* Canvas — viewport-fit container that hosts the stacked
-       *  media layers. Sized once, layers are absolute inside. */}
-      <div className="relative h-[85vh] w-[90vw] max-w-[90vw]">
+       *  media layers. Sized once, layers are absolute inside.
+       *
+       *  Below `md` the arrows drop to the bottom of the frame, so the
+       *  canvas can run the full `90vw`. From `md` up the arrows sit on
+       *  the vertical mid-edges (`left-4`/`right-4`, 3rem wide → they
+       *  span 1–4rem from each edge), so we inset the canvas to a 5rem
+       *  side gutter (`100vw - 10rem`). That leaves a clean ~1rem gap
+       *  between each arrow and the media instead of the arrows
+       *  overlapping the picture on narrower desktop widths. */}
+      <div className="relative h-[85vh] w-[90vw] md:w-[calc(100vw-10rem)]">
         {media.map((item, i) => {
           const isActive = i === activeIndex;
           const isOutgoing = !isActive && i === outgoingIndex;

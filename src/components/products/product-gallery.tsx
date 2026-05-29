@@ -285,6 +285,9 @@ export function ProductGallery({
       <div
         aria-hidden
         className={cn(
+          /* Mirror the live gallery's width cap so the empty state
+           * occupies the same footprint as a populated gallery. */
+          "mx-auto w-full max-w-[640px]",
           "aspect-square rounded-2xl bg-[color:var(--color-surface-muted)]",
           className,
         )}
@@ -301,22 +304,32 @@ export function ProductGallery({
     <div
       className={cn(
         "gap-3",
-        /* Layout switches on viewport width when thumbs exist:
+        /* Cap the gallery so it never balloons on a wide PDP column or
+         * a large modal — a square viewer past this width just wastes
+         * vertical space. `mx-auto` centres the leftover room (in the
+         * two-column desktop track and in the single-column mobile /
+         * modal panel alike); phones sit under the cap so it's a no-op
+         * there. Tune the one number to taste — keep the loading
+         * skeletons (gallery empty-state below + modal `BodySkeleton`)
+         * in sync so the panel doesn't reshape when media lands. */
+        "mx-auto w-full max-w-[640px]",
+        /* Layout switches between mobile and desktop when thumbs exist:
          *
-         *   - **`lg` and up** — 2-column grid (`64px` rail + `1fr`
-         *     main). JSX order = layout order, thumbs land in
-         *     col 1, main in col 2.
-         *   - **Below `lg`** — column flex with `flex-col-reverse`.
-         *     Thumbs render first in JSX (so the wide grid places
-         *     them on the left); narrow viewports flip that order
-         *     via the reverse flex so the main viewer sits on top
-         *     and the thumb rail drops to the bottom — no
-         *     duplicated JSX branches, just a one-class flip.
+         *   - **Desktop** (`lg-desktop`: ≥1024px + a desktop pointer) —
+         *     2-column grid (`64px` rail + `1fr` main). JSX order =
+         *     layout order, thumbs land in col 1, main in col 2.
+         *   - **Mobile** (base: phones, narrow windows, and touch
+         *     tablets at any width) — column flex with
+         *     `flex-col-reverse`. Thumbs render first in JSX (so the
+         *     desktop grid places them on the left); the reverse flex
+         *     flips that order so the main viewer sits on top and the
+         *     thumb rail drops to the bottom — no duplicated JSX
+         *     branches, just a one-class flip.
          *
-         * Single-media products skip the rail entirely and stay
-         * on a 1-col grid at every width. */
+         * Single-media products skip the rail entirely and stay on a
+         * 1-col grid everywhere. */
         hasThumbs
-          ? "max-lg:flex max-lg:flex-col-reverse lg:grid lg:grid-cols-[64px_1fr]"
+          ? "flex flex-col-reverse lg-desktop:grid lg-desktop:grid-cols-[64px_1fr]"
           : "grid grid-cols-1",
         className,
       )}
@@ -625,15 +638,15 @@ function GalleryThumbs({
     });
   }, [activeIndex]);
 
-  /* Layout per viewport:
+  /* Layout per mode:
    *
-   *   - **`lg`+** — outer `relative` is a zero-intrinsic-height
-   *     cell that the grid row stretches to the main viewer's
-   *     `aspect-square` height. The inner scroller is
+   *   - **Desktop** (`lg-desktop`) — outer `relative` is a
+   *     zero-intrinsic-height cell that the grid row stretches to the
+   *     main viewer's `aspect-square` height. The inner scroller is
    *     `absolute inset-0` so it fills that height without ever
    *     contributing back to the row's intrinsic size — the rail
    *     can never push the row taller than the media square.
-   *   - **Below `lg`** — outer flips to `display: contents`, removing
+   *   - **Mobile** (base) — outer stays `display: contents`, removing
    *     itself from layout entirely. The inner scroller then
    *     participates as a *direct flex child* of the parent
    *     gallery's `flex-col-reverse` layout: a normal horizontal
@@ -641,7 +654,7 @@ function GalleryThumbs({
    *     parent column claiming its full width. No absolute
    *     positioning, no synthetic height plumbing. */
   return (
-    <div className="relative max-lg:contents">
+    <div className="contents lg-desktop:relative lg-desktop:block">
     <div
       ref={scrollRef}
       role="tablist"
@@ -652,12 +665,12 @@ function GalleryThumbs({
         // touch / trackpad scrolling still works without the
         // chrome bar.
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        // `lg`+: absolute-positioned vertical scroller inside the
+        // Mobile (base): static, full-width horizontal scroller in
+        // the parent column's bottom row.
+        "overflow-x-auto",
+        // Desktop: absolute-positioned vertical scroller inside the
         // outer `relative` cell (the 64px left rail).
-        "lg:absolute lg:inset-0 lg:flex-col lg:overflow-y-auto",
-        // Below `lg`: static, full-width horizontal scroller in the
-        // parent column's bottom row.
-        "max-lg:overflow-x-auto",
+        "lg-desktop:absolute lg-desktop:inset-0 lg-desktop:flex-col lg-desktop:overflow-y-auto",
       )}
     >
       {media.map((item, i) => {

@@ -19,14 +19,14 @@ import { cn } from "@/lib/utils";
  *
  * # Behaviour
  *
- *   - **Wide viewport** (`md` / 768px and up): regular
- *     `flex flex-wrap items-center gap-2` row. The optional
+ *   - **Desktop** (`md-desktop`: ≥768px with a desktop pointer):
+ *     regular `flex flex-wrap items-center gap-2` row. The optional
  *     `trailing` slot lands on the right via `ml-auto` and drops
  *     to a new line cleanly when the pills wrap.
- *   - **Narrow viewport** (below `md`): single-row scroller
- *     that *bleeds out of the page-container's gutter* so the
- *     scroll track touches the screen edges. First / last items
- *     still align with the content above and below via inner
+ *   - **Mobile** (base — phones, narrow windows, touch tablets):
+ *     single-row scroller that *bleeds out of the page-container's
+ *     gutter* so the scroll track touches the screen edges. First /
+ *     last items still align with the content above and below via inner
  *     padding equal to the gutter. `scrollbar-hide` removes the
  *     visible track; `overscroll-behavior-x: contain` keeps the
  *     browser back-swipe gesture from hijacking horizontal pans.
@@ -145,24 +145,23 @@ export function ScrollRow({
       ref={setRef}
       {...rest}
       className={cn(
-        /* Desktop default — same wrap behaviour the row had
-         * before this primitive existed. */
-        "flex flex-wrap items-center gap-2",
-        /* Narrow-viewport override — full-bleed single-row scroller.
-         * Fires below `md` (768px), the same breakpoint where the
-         * trailing slot reveals, so the row either scrolls *or* wraps
-         * with a "View all" link, never both. */
-        "max-md:-mx-[var(--page-gutter-px)] max-md:flex-nowrap",
-        "max-md:overflow-x-auto max-md:overscroll-x-contain max-md:scrollbar-hide",
-        "max-md:px-[var(--page-gutter-px)]",
+        /* Mobile-first base — full-bleed single-row scroller that
+         * bleeds out to the screen edges. This is what phones, narrow
+         * windows, and touch tablets (at any width) get. */
+        "flex flex-nowrap items-center gap-2",
+        "-mx-[var(--page-gutter-px)] px-[var(--page-gutter-px)]",
+        "overflow-x-auto overscroll-x-contain scrollbar-hide",
         /* Belt-and-braces: force every direct child to refuse
-         * shrinking on the narrow-viewport scroller. Pills already opt
-         * in via `pillClasses`, but consumers like skeleton rows
-         * (which compose `<Skeleton>` placeholders directly) and
-         * any future caller that forgets `shrink-0` would
-         * otherwise collapse under flex's default `shrink: 1` and
-         * pancake their content. */
-        "max-md:[&>*]:shrink-0",
+         * shrinking in the scroller. Pills already opt in via
+         * `pillClasses`, but consumers like skeleton rows (which
+         * compose `<Skeleton>` placeholders directly) and any future
+         * caller that forgets `shrink-0` would otherwise collapse
+         * under flex's default `shrink: 1` and pancake their content. */
+        "[&>*]:shrink-0",
+        /* Desktop (`md-desktop`: ≥768px + a desktop pointer) — drop the
+         * full-bleed scroller back to a plain wrapping row. Keyed on
+         * the pointer too, so a touch tablet keeps the scroller. */
+        "md-desktop:mx-0 md-desktop:flex-wrap md-desktop:overflow-x-visible md-desktop:px-0",
         className,
       )}
     >
@@ -170,11 +169,11 @@ export function ScrollRow({
       {trailing && (
         /* `ml-auto` pushes the slot to the right on desktop and
          * naturally drops to a new flex line if the pills wrap.
-         * `hidden md:block` collapses it on phones — where the
-         * row scrolls horizontally and a right-anchored link
-         * would just get lost off-screen — and reveals it from
-         * tablet width (768px) up. */
-        <div className="ml-auto hidden md:block">{trailing}</div>
+         * Hidden by default — wherever the row scrolls horizontally a
+         * right-anchored link would just get lost off-screen — and
+         * revealed only in the desktop wrap mode (`md-desktop`), so it
+         * tracks the scroll-vs-wrap switch exactly. */
+        <div className="ml-auto hidden md-desktop:block">{trailing}</div>
       )}
     </div>
   );

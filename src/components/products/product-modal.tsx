@@ -499,7 +499,10 @@ function BodySkeleton({ product }: { product: SearchProduct }) {
     <>
       <div
         aria-hidden
-        className="aspect-square animate-pulse rounded-2xl bg-[color:var(--color-surface-muted)]"
+        /* Match `<ProductGallery>`'s width cap (mx-auto w-full
+         * max-w-[640px]) so the shimmer occupies the gallery's exact
+         * footprint and the panel doesn't reshape when media lands. */
+        className="mx-auto aspect-square w-full max-w-[640px] animate-pulse rounded-2xl bg-[color:var(--color-surface-muted)]"
       />
       <div className="h-6 w-3/4 animate-pulse rounded bg-[color:var(--color-surface-muted)]" />
       <div className="h-10 animate-pulse rounded-lg bg-[color:var(--color-surface-muted)]" />

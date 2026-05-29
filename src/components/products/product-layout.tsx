@@ -83,11 +83,13 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
   );
 
   return (
-    /* Responsive shell — mobile-first, driven purely by the viewport
-     * (`lg:` = width ≥ 64rem). Making the single-panel state the *base*
-     * and the two columns the `lg:` override keeps the two states
-     * mutually exclusive: below `lg` everything stacks in one panel,
-     * at `lg`+ it splits into two columns.
+    /* Responsive shell — mobile-first, driven by `lg-desktop`
+     * (width ≥ 64rem AND a desktop-class pointer). Making the
+     * single-panel state the *base* and the two columns the
+     * `lg-desktop:` override keeps the two states mutually exclusive:
+     * one stacked panel for phones, narrow windows, and touch tablets
+     * (an iPad in landscape included); two columns only on a wide
+     * pointer-driven desktop.
      *
      *   base (< lg) : ONE bordered panel (this element) holds
      *                 everything top-to-bottom — gallery → buy form →
@@ -101,13 +103,13 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
      * padding) but is `display:contents` at base. `contents` makes
      * the element generate no box — its border / fill / padding don't
      * paint and its children promote into THIS grid as direct items —
-     * so under lg the outer element is the only panel and the three
-     * sections stack as one column. At `lg` the groups become real
-     * boxes (their own panels) and the outer sheds its chrome
-     * (`lg:border-0 …`) down to a bare two-column grid.
+     * so in the mobile base the outer element is the only panel and
+     * the three sections stack as one column. On desktop the groups
+     * become real boxes (their own panels) and the outer sheds its
+     * chrome (`lg-desktop:border-0 …`) down to a bare two-column grid.
      *
      * Base order (gallery → buy form → accordion) is set with `order`
-     * utilities; `lg:order-none` hands back to DOM order (gallery then
+     * utilities; `lg-desktop:order-none` hands back to DOM order (gallery then
      * accordion inside the left panel). `min-w-0` lets long
      * description words wrap instead of stretching a track. */
     <div
@@ -115,9 +117,9 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
         PANEL_SURFACE_CLASSES,
         PDP_PANEL_PADDING,
         "grid grid-cols-1 gap-6",
-        "lg:grid-cols-[1.2fr_1fr] lg:items-start lg:gap-12",
+        "lg-desktop:grid-cols-[1.2fr_1fr] lg-desktop:items-start lg-desktop:gap-12",
         // Shed the single-panel chrome once the inner groups take over.
-        "lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0",
+        "lg-desktop:rounded-none lg-desktop:border-0 lg-desktop:bg-transparent lg-desktop:p-0",
       )}
     >
       {/* LEFT group — gallery + long-form copy. `contents` at base so
@@ -127,10 +129,10 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
         className={cn(
           PANEL_SURFACE_CLASSES,
           PDP_PANEL_PADDING,
-          "contents min-w-0 lg:flex lg:flex-col lg:gap-6",
+          "contents min-w-0 lg-desktop:flex lg-desktop:flex-col lg-desktop:gap-6",
         )}
       >
-        <div className="order-1 min-w-0 lg:order-none">
+        <div className="order-1 min-w-0 lg-desktop:order-none">
           <ProductGallery
             media={product.media}
             title={product.title}
@@ -138,7 +140,7 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
           />
         </div>
         {extraLeft && (
-          <div className="order-3 min-w-0 lg:order-none">{extraLeft}</div>
+          <div className="order-3 min-w-0 lg-desktop:order-none">{extraLeft}</div>
         )}
       </div>
 
@@ -147,10 +149,10 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
           (order-3) via the inner `order-2` wrapper.
        *
        *   lg+ : its own sticky panel beside the gallery.
-       *     - `lg:self-start` → take only the form's natural height
-       *       (grid items default to `stretch`, which would lock the
-       *       form to the full row height and break sticky).
-       *     - `lg:sticky lg:top-20` → cling to `5rem` (header is
+       *     - `lg-desktop:self-start` → take only the form's natural
+       *       height (grid items default to `stretch`, which would lock
+       *       the form to the full row height and break sticky).
+       *     - `lg-desktop:sticky lg-desktop:top-20` → cling to `5rem` (header is
        *       4rem + 1px border; 5rem leaves a small breathing gap).
        *       When the left column scrolls past its end the grid row
        *       ends, the sticky context releases, and the page slides
@@ -159,10 +161,10 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
         className={cn(
           PANEL_SURFACE_CLASSES,
           PDP_PANEL_PADDING,
-          "contents lg:block lg:sticky lg:top-20 lg:self-start",
+          "contents lg-desktop:block lg-desktop:sticky lg-desktop:top-20 lg-desktop:self-start",
         )}
       >
-        <div className="order-2 min-w-0 lg:order-none">
+        <div className="order-2 min-w-0 lg-desktop:order-none">
           <BuyForm product={product} onVariantChange={handleVariantChange} />
         </div>
       </div>

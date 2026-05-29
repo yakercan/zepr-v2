@@ -40,6 +40,41 @@
   }
 }
 
+/*
+ * Device-aware layout breakpoints — `md-desktop:` / `lg-desktop:` /
+ * `xl-desktop:`.
+ *
+ * A few structural switches (which header, gallery rail position,
+ * single vs two-column PDP, pill row scroll vs wrap) should treat a
+ * *touch* device as "mobile" no matter how wide it is — an iPad in
+ * landscape is ~1366px but still wants the mobile layout. These fire
+ * only when the viewport is wide enough AND the primary input is a
+ * desktop-class pointer (the same `hover: hover` + `pointer: fine`
+ * signal the `desktop:` variant uses), so tablets stay on the
+ * mobile-first base at every width.
+ *
+ * Authored mobile-first: write the compact layout as the unconditional
+ * base, then layer the desktop layout behind one of these. Pure CSS —
+ * resolved on the first paint, no JS, no UA, no server cost.
+ */
+@custom-variant md-desktop {
+  @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+    @slot;
+  }
+}
+
+@custom-variant lg-desktop {
+  @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+    @slot;
+  }
+}
+
+@custom-variant xl-desktop {
+  @media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
+    @slot;
+  }
+}
+
 @theme {
   --font-sans: "Helvetica Neue", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Arial, sans-serif, "Apple Color Emoji",
@@ -193,7 +228,7 @@
    *   --z-cart-drawer         70      cart drawer panel (desktop)
    *   --z-modal-base         110      default modal panel
    *   --z-modal-preview      130      preview-tier modal panel
-   *                                   (variant pick, lightbox)
+   *                                   (variant pick)
    *   --z-modal-confirm      150      confirm-tier modal panel
    *                                   (destructive prompts)
    *   --z-sheet              170      bottom sheet (mobile)
@@ -204,6 +239,12 @@
    *                                   backdrop (180) dims the parent
    *                                   sheet's panel (170) and its own
    *                                   panel (190) stacks on top.
+   *   --z-lightbox           210      fullscreen media viewer. The
+   *                                   topmost overlay: it can be
+   *                                   launched from inside any modal
+   *                                   *or* sheet (the product modal's
+   *                                   gallery), so it must clear even
+   *                                   an elevated sheet (190).
    *
    * Backdrops sit at `(panel - 10)` by convention — see the
    * `<Backdrop>` and `<Modal>` source for the existing pattern.
@@ -217,6 +258,7 @@
   --z-modal-confirm: 150;
   --z-sheet: 170;
   --z-sheet-elevated: 190;
+  --z-lightbox: 210;
 
   /* Page-level layout tokens.
    *
