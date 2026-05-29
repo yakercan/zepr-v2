@@ -569,6 +569,15 @@ html[data-device="mobile"] select {
     }
   }
 
+  /* Press feedback. `:hover` never fires on touch, so a tap would
+   * otherwise give zero confirmation; `:active` fires on finger-down
+   * (and on desktop click) and reuses the exact hover colour, so the
+   * press reads the same on every device. Same disabled filter as
+   * the hover so a greyed-out button stays inert under a tap. */
+  .btn-primary:active:not(:disabled):not([aria-disabled="true"]) {
+    background-color: var(--color-brand-hover);
+  }
+
   /*
    * Outline counterpart to `.btn-primary` — same pill shape, same
    * baseline, same focus / disabled story; just the soft grey 2px
@@ -624,6 +633,11 @@ html[data-device="mobile"] select {
     .btn-secondary:hover:not(:disabled):not([aria-disabled="true"]) {
       border-color: var(--color-ink);
     }
+  }
+
+  /* Touch / press mirror of the hover (see `.btn-primary:active`). */
+  .btn-secondary:active:not(:disabled):not([aria-disabled="true"]) {
+    border-color: var(--color-ink);
   }
 
   /*

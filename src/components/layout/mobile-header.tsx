@@ -172,7 +172,6 @@ export function MobileHeader({
             className={cn(
               SEARCH_BAR_SURFACE_CLASSES,
               "ml-2 flex min-w-0 flex-1 items-center gap-2 px-4 text-left",
-              "active:bg-[color:var(--color-bubble)]",
               /* Label colour follows desktop's placeholder-vs-value
                * convention: muted grey when we're rendering the
                * placeholder, full ink when a real query is on

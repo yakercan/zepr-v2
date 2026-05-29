@@ -64,9 +64,18 @@ export const SEARCH_BAR_SURFACE_CLASSES = cn(
  * a `border-[…]` utility AFTER this constant in the className
  * string — useful for the feed tabs' active state, which paints an
  * ink-on-ink border that disappears into the background.
+ *
+ * Carries an explicit `active:` mirror of the hover border so the
+ * product card confirms a tap on touch — `:hover` never fires on a
+ * finger, so the card snaps to the ink border on press exactly as a
+ * desktop hover does. The press lives on the card *frame* only,
+ * never on the media flourishes (zoom / swap) or the overlay icon
+ * bubbles inside it. This is the one place outside the primary /
+ * secondary buttons that carries touch feedback — nothing else
+ * (pills, thumbnails, icon buttons) does, by design.
  */
 export const SURFACE_OUTLINE_CLASSES =
-  "border-2 border-[color:var(--color-border-strong)] transition-colors duration-150 hover:border-[color:var(--color-ink)]";
+  "border-2 border-[color:var(--color-border-strong)] transition-colors duration-150 hover:border-[color:var(--color-ink)] active:border-[color:var(--color-ink)]";
 
 /**
  * Static "card" surface (bold) — rounded, soft grey 2px border,
@@ -148,6 +157,11 @@ export const MEDIA_STAGE_CLASSES =
  * image and on every media layer inside the gallery, so a shopper
  * who learns the affordance on a card sees the identical *shape*
  * of motion on the product page (only the duration shifts).
+ *
+ * Hover-only (no `active:` mirror): the lean-in zoom is a desktop
+ * pointer flourish, not a press affordance — a finger tap shouldn't
+ * jolt the image. Touch feedback lives on the discrete controls
+ * (border / fill mirrors), not on this transform.
  */
 export const MEDIA_HOVER_ZOOM_CLASSES =
   "h-full w-full object-cover transition-transform duration-300 ease-out group-hover/media:scale-[1.03]";
@@ -265,6 +279,14 @@ export function crossfadeLayerClasses(
  * (the original site of the pattern). Override with a different
  * `h-N w-N` after the constant if a tighter context wants smaller
  * (e.g. compact product cards inside a search dropdown).
+ *
+ * The `hover:` darken is pointer-only by design — no `active:`
+ * mirror. These icon-only bubbles (heart, video indicator, slider
+ * control) shouldn't flash on a tap: the tap's *result* (heart
+ * fills, slide changes) is the feedback, and a press-darken on a
+ * tiny glass circle just reads as a flicker. Press confirmation
+ * lives on the larger "selectable surface" frames instead (see
+ * `SURFACE_OUTLINE_CLASSES`).
  */
 export const MEDIA_OVERLAY_BUBBLE_CLASSES =
   "flex h-9 w-9 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/55";
@@ -318,6 +340,11 @@ const PILL_ACTIVE_CLASSES = cn(
 const PILL_IDLE_CLASSES = cn(
   "bg-[color:var(--color-surface)] text-[color:var(--color-ink)]",
   "border-2 border-[color:var(--color-border-strong)]",
+  /* Hover-only border (desktop pointer). Pills get no press
+   * feedback on touch — the *selection* is the feedback: a tapped
+   * pill snaps to its active variant (ink fill or ink outline)
+   * instantly, which reads clearer than a transient press flash
+   * and never flickers against the selection commit. */
   "hover:border-[color:var(--color-ink)]",
 );
 

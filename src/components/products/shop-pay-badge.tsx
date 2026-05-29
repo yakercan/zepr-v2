@@ -21,13 +21,21 @@ export function ShopPayBadge({ className }: { className?: string }) {
   return (
     <p
       className={cn(
-        "flex flex-wrap items-center gap-x-1 pl-1 text-sm font-medium leading-snug",
+        "pl-1 text-sm font-medium leading-snug",
         "text-[color:var(--color-ink-secondary)]",
         className,
       )}
     >
-      Pay in 4 interest-free installments for orders over $35.00 with
-      <ShopPayLogo className="h-[14px] w-[59px]" />
+      Pay in 4 interest-free installments for orders over $35.00{" "}
+      {/* Keep "with [Shop Pay]" together so the logo never orphans
+          onto a line by itself — if the sentence wraps, the word and
+          the wordmark drop to the next line as one unit. `align-middle`
+          centres the logo on the text; `-top-px` nudges it the last
+          hair up so its baseline sits level with the copy. */}
+      <span className="whitespace-nowrap">
+        with{" "}
+        <ShopPayLogo className="relative -top-px inline-block h-[14px] w-[59px] align-middle" />
+      </span>
     </p>
   );
 }
