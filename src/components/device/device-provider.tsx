@@ -1,191 +1,91 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import {
-  DEVICE_COOKIE,
-  DEVICE_COOKIE_MAX_AGE_DAYS,
-  MOBILE_MAX_WIDTH_PX,
-  TOUCH_PRIMARY_MEDIA_QUERY,
-  type DeviceContext as DeviceContextValue,
-  type DeviceMode,
-} from "@/lib/device-mode";
+import { useSyncExternalStore } from "react";
 
 /**
- * React context exposing the resolved `DeviceMode` to the tree.
- * Mounted once near the root, seeded with the SSR-resolved value from
- * the root layout so first paint is guaranteed accurate.
+ * Device hooks — two orthogonal signals, deliberately kept separate.
  *
- * Two side-effects live inside:
+ * There is no provider, no cookie, and no server-side user-agent read.
+ * Structural layout is handled by viewport media queries in the markup
+ * (standard Tailwind breakpoints); these hooks exist only for the
+ * places that must branch a React *component* rather than just CSS.
  *
- *  - `DeviceHtmlSync` keeps `<html data-device>` in sync after any
- *    client-side refinement. Tailwind variants and the desktop
- *    min-width clamp live on that attribute (see `globals.css`), so
- *    we have to write it back to the DOM whenever React state changes.
+ *   • `useIsCompact()` — **viewport** gate. `true` below Tailwind's
+ *     `xl` (1280px), i.e. exactly when the mobile header is showing.
+ *     Use it to pick the *structure* of an overlay: a Vaul bottom/side
+ *     **sheet** vs a centered **modal** / hover **dropdown**. This is
+ *     what makes drawers work on a small desktop window — the choice
+ *     follows the layout, not the input device.
  *
- *  - `DeviceModeRefiner` checks `matchMedia` on mount (and on resize)
- *    and corrects the cookie when the live viewport disagrees with
- *    what we shipped. The SSR UA guess is necessarily fuzzy — a
- *    desktop UA on a narrow window, an iPad pretending to be a
- *    desktop, etc. — and the refiner is what guarantees the *second*
- *    visit ships the right mode from the start.
+ *   • `useIsTouch()` — **input** gate. `true` when the primary input
+ *     is a finger (`(hover: none) and (pointer: coarse)`). Use it for
+ *     genuinely input-dependent *behavior*: swipe vs hover gallery
+ *     navigation, hover-intent dropdowns, tap-vs-hover tooltips. It
+ *     shares its signal with the `touch:` / `desktop:` Tailwind
+ *     variants, and correctly classifies iPads (which report a desktop
+ *     UA but answer `pointer: coarse` honestly).
  *
- * Strict hydration discipline: the initial context value is exactly
- * what came out of the loader. Refinement only ever changes state from
- * `useEffect`, never during render, so React sees identical
- * server/client trees on the first pass.
+ * Both render the "false" branch on the server and swap to the live
+ * value on the client via `useSyncExternalStore` — no hydration
+ * warning. Nothing that branches on them is visible on first paint
+ * (overlays are closed, gesture handlers attach post-hydration), so
+ * there is no flash.
  */
 
-interface DeviceContextShape extends DeviceContextValue {
-  /** Imperatively set the mode at runtime. Persists to the cookie so
-   *  the choice survives a reload. The refiner uses this internally;
-   *  an in-app device-toggle UI can call it directly. */
-  setMode: (mode: DeviceMode) => void;
-}
-
-export const DeviceContext = createContext<DeviceContextShape | null>(null);
-
-interface DeviceProviderProps {
-  initial: DeviceContextValue;
-  children: ReactNode;
-}
-
-export function DeviceProvider({ initial, children }: DeviceProviderProps) {
-  const [state, setState] = useState<DeviceContextValue>(initial);
-
-  const value = useMemo<DeviceContextShape>(
-    () => ({
-      mode: state.mode,
-      source: state.source,
-      setMode: (mode) => {
-        writeDeviceCookie(mode);
-        setState({ mode, source: "cookie" });
-      },
-    }),
-    [state],
-  );
-
-  return (
-    <DeviceContext.Provider value={value}>
-      <DeviceHtmlSync mode={state.mode} />
-      <DeviceModeRefiner state={state} setState={setState} />
-      {children}
-    </DeviceContext.Provider>
-  );
-}
-
-/** Keep `<html data-device>` aligned with React state after the SSR
- *  value has been refined on the client. Pure side-effect — renders
- *  nothing. */
-function DeviceHtmlSync({ mode }: { mode: DeviceMode }) {
-  useEffect(() => {
-    document.documentElement.dataset.device = mode;
-  }, [mode]);
-  return null;
-}
-
-interface RefinerProps {
-  state: DeviceContextValue;
-  setState: (next: DeviceContextValue) => void;
-}
-
-/** Side-effect only. On mount, asks the browser what the live
- *  viewport actually is and corrects the cookie if the SSR UA guess
- *  was wrong. Also keeps listening for viewport changes (DevTools
- *  resize, orientation flip) so the mode stays aligned.
- *
- *  `forced-desktop` is skipped — detection is off by definition, so
- *  refining would be wrong. */
-function DeviceModeRefiner({ state, setState }: RefinerProps) {
-  const modeRef = useRef(state.mode);
-
-  // Keep the ref tracking the latest mode without reading it during
-  // render — React 19's `react-hooks/refs` rule forbids that.
-  useEffect(() => {
-    modeRef.current = state.mode;
-  }, [state.mode]);
-
-  useEffect(() => {
-    if (state.source === "forced-desktop") return;
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
+/** A media-query store with a single, lazily-created `MediaQueryList`
+ *  and stable subscribe / snapshot callbacks, so `useSyncExternalStore`
+ *  never needlessly re-subscribes and every consumer shares one
+ *  browser listener. */
+function mediaQueryStore(query: string) {
+  let mql: MediaQueryList | null = null;
+  const resolve = (): MediaQueryList | null => {
+    if (
+      mql === null &&
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function"
+    ) {
+      mql = window.matchMedia(query);
     }
-
-    /* Two signals, evaluated in priority order:
-     *
-     *   1. `touchMq` — true when the device's *primary* input is a
-     *      finger (no hover, coarse pointer). Phones and tablets
-     *      all match, including iPads that ship a Mac UA, while
-     *      touch-screen laptops with a mouse stay on the desktop
-     *      branch (they report `hover: hover`).
-     *   2. `widthMq` — fallback narrow-window check for tiny
-     *      desktop windows / dev-tools resize / shrunk Chrome.
-     *
-     * Touch wins: a wide-viewport iPad in landscape (1366px) is
-     * still a touch device and should pick up the bottom-sheet UX,
-     * not the desktop dropdowns. */
-    const touchMq = window.matchMedia(TOUCH_PRIMARY_MEDIA_QUERY);
-    const widthMq = window.matchMedia(
-      `(max-width: ${MOBILE_MAX_WIDTH_PX}px)`,
-    );
-
-    const applyMode = (source: DeviceContextValue["source"]) => {
-      const liveMode: DeviceMode =
-        touchMq.matches || widthMq.matches ? "mobile" : "desktop";
-      if (liveMode === modeRef.current) return;
-      writeDeviceCookie(liveMode);
-      setState({ mode: liveMode, source });
-    };
-
-    /* Always run on mount when the source was a UA guess — we want
-     * to correct iPad-as-Mac on the very first paint without
-     * waiting for a viewport change event. */
-    if (state.source === "ua") {
-      applyMode("cookie");
-    }
-
-    const onChange = () => applyMode("cookie");
-    touchMq.addEventListener("change", onChange);
-    widthMq.addEventListener("change", onChange);
-    return () => {
-      touchMq.removeEventListener("change", onChange);
-      widthMq.removeEventListener("change", onChange);
-    };
-  }, [state.source, setState]);
-
-  return null;
+    return mql;
+  };
+  return {
+    subscribe(onChange: () => void): () => void {
+      const m = resolve();
+      if (!m) return () => {};
+      m.addEventListener("change", onChange);
+      return () => m.removeEventListener("change", onChange);
+    },
+    getSnapshot(): boolean {
+      return resolve()?.matches ?? false;
+    },
+    getServerSnapshot(): boolean {
+      return false;
+    },
+  };
 }
 
-/** Write the device cookie from the client. Non-HttpOnly by definition
- *  (the browser is the one writing it), `SameSite=Lax`, and `Secure`
- *  whenever the page is on HTTPS so the cookie never leaks over
- *  plaintext. */
-function writeDeviceCookie(mode: DeviceMode): void {
-  if (typeof document === "undefined") return;
-  const maxAgeSec = DEVICE_COOKIE_MAX_AGE_DAYS * 24 * 60 * 60;
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${DEVICE_COOKIE}=${mode}; Path=/; Max-Age=${maxAgeSec}; SameSite=Lax${secure}`;
+/* `1279.98px` mirrors Tailwind's `max-xl` boundary so this hook flips
+ * on the exact pixel the header / layout breakpoints do. */
+const compactStore = mediaQueryStore("(max-width: 1279.98px)");
+const touchStore = mediaQueryStore("(hover: none) and (pointer: coarse)");
+
+/** `true` below the `xl` breakpoint — the "mobile UI" / compact-layout
+ *  mode where the mobile header is shown and overlays render as Vaul
+ *  sheets. Structural gate. */
+export function useIsCompact(): boolean {
+  return useSyncExternalStore(
+    compactStore.subscribe,
+    compactStore.getSnapshot,
+    compactStore.getServerSnapshot,
+  );
 }
 
-export function useDeviceMode() {
-  const ctx = useContext(DeviceContext);
-  if (!ctx) {
-    throw new Error("useDeviceMode() must be used within <DeviceProvider>");
-  }
-  return ctx;
-}
-
-export function useIsMobile(): boolean {
-  return useDeviceMode().mode === "mobile";
-}
-
-export function useIsDesktop(): boolean {
-  return useDeviceMode().mode === "desktop";
+/** `true` when the primary input is a finger (no hover, coarse
+ *  pointer) — phones and tablets, including iPads. Behavior gate. */
+export function useIsTouch(): boolean {
+  return useSyncExternalStore(
+    touchStore.subscribe,
+    touchStore.getSnapshot,
+    touchStore.getServerSnapshot,
+  );
 }

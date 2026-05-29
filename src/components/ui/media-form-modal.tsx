@@ -11,7 +11,7 @@ import {
   useTransition,
 } from "react";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import {
   LoadingOverlay,
   type LoadingOverlayState,
@@ -250,7 +250,7 @@ export function MediaFormModal({
       ? children({ pending, success, disabled })
       : children;
 
-  const isMobile = useIsMobile();
+  const isCompact = useIsCompact();
   /* Stable id so the submit button in the sheet's footer slot
    * (rendered outside the form element) can still be linked to
    * the form via `form="…"`. `useId()` keeps it unique even
@@ -322,8 +322,8 @@ export function MediaFormModal({
     </>
   );
 
-  if (isMobile) {
-    /* Mobile bottom sheet. The action row rides the sheet's
+  if (isCompact) {
+    /* Compact-viewport bottom sheet. The action row rides the sheet's
      * footer slot (safe-area-inset padded), the form body
      * scrolls inside the body slot, and the LoadingOverlay
      * sits inside the body's relative wrapper to cover the

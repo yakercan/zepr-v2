@@ -19,11 +19,11 @@ import { cn } from "@/lib/utils";
  *
  * # Behaviour
  *
- *   - **Desktop** (`data-device="desktop"`): regular
+ *   - **Wide viewport** (`md` / 768px and up): regular
  *     `flex flex-wrap items-center gap-2` row. The optional
  *     `trailing` slot lands on the right via `ml-auto` and drops
  *     to a new line cleanly when the pills wrap.
- *   - **Mobile** (`data-device="mobile"`): single-row scroller
+ *   - **Narrow viewport** (below `md`): single-row scroller
  *     that *bleeds out of the page-container's gutter* so the
  *     scroll track touches the screen edges. First / last items
  *     still align with the content above and below via inner
@@ -148,18 +148,21 @@ export function ScrollRow({
         /* Desktop default — same wrap behaviour the row had
          * before this primitive existed. */
         "flex flex-wrap items-center gap-2",
-        /* Mobile override — full-bleed single-row scroller. */
-        "touch:-mx-[var(--page-gutter-px)] touch:flex-nowrap",
-        "touch:overflow-x-auto touch:overscroll-x-contain touch:scrollbar-hide",
-        "touch:px-[var(--page-gutter-px)]",
+        /* Narrow-viewport override — full-bleed single-row scroller.
+         * Fires below `md` (768px), the same breakpoint where the
+         * trailing slot reveals, so the row either scrolls *or* wraps
+         * with a "View all" link, never both. */
+        "max-md:-mx-[var(--page-gutter-px)] max-md:flex-nowrap",
+        "max-md:overflow-x-auto max-md:overscroll-x-contain max-md:scrollbar-hide",
+        "max-md:px-[var(--page-gutter-px)]",
         /* Belt-and-braces: force every direct child to refuse
-         * shrinking on the mobile scroller. Pills already opt in
-         * via `pillClasses`, but consumers like skeleton rows
+         * shrinking on the narrow-viewport scroller. Pills already opt
+         * in via `pillClasses`, but consumers like skeleton rows
          * (which compose `<Skeleton>` placeholders directly) and
          * any future caller that forgets `shrink-0` would
          * otherwise collapse under flex's default `shrink: 1` and
          * pancake their content. */
-        "touch:[&>*]:shrink-0",
+        "max-md:[&>*]:shrink-0",
         className,
       )}
     >

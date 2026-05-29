@@ -1,96 +1,41 @@
 @import "tailwindcss";
 
 /*
- * Device-mode paired variants — `touch:` and `desktop:`.
+ * Interaction variants — `touch:` and `desktop:`.
  *
- * Both are anchored to the SSR-resolved `html[data-device]`
- * attribute (see `device-detection.ts` + `device-provider.tsx`)
- * rather than the browser's `(hover: none)` media query. Two
- * reasons:
+ * Structural layout is driven entirely by the standard, unmodified
+ * Tailwind viewport breakpoints (`sm:`/`md:`/`lg:`/`xl:` and their
+ * `max-*` counterparts). That's the canonical responsive pattern:
+ * one document, one URL, layout follows the viewport — no UA guess,
+ * no first-paint flash, no per-request server work.
  *
- *   1. `(hover: none)` is unreliable on hybrid hardware — touch
- *      laptops, iPads in keyboard-and-trackpad mode, Samsung
- *      DeX, anything with a pen. Some of those report `hover:
- *      none` even when the user is actively using a precise
- *      pointer; others report `hover: hover` for fingers.
- *   2. `data-device` is the gate's source of truth. It flips
- *      cleanly via cookie / dev override / refiner — so
- *      everything we author against this attribute stays in
- *      lockstep with the rest of the mobile branch (cart sheet,
- *      mobile nav, hover suppression, etc.).
+ * These two variants are reserved for the genuinely *input*-dependent
+ * bits — press feedback, hover reveals, swipe affordances, larger tap
+ * targets — keyed on the CSS interaction media features rather than
+ * viewport width:
  *
- * Use:
+ *   `touch:`    → primary input is a finger (no hover, coarse pointer)
+ *   `desktop:`  → primary input hovers and is precise (mouse/trackpad)
  *
- *   `desktop:hover:bg-foo`  — hover style applied on desktop only
- *   `touch:opacity-100`     — value applied on mobile/touch only
+ * They share their signal with the JS hooks (see
+ * `components/device/device-provider.tsx`), so CSS and JS always agree
+ * on what "touch" means. `(hover: none) and (pointer: coarse)`
+ * correctly classifies iPads (which report a desktop UA but answer the
+ * pointer query honestly) and degrades gracefully on hybrids — pure
+ * progressive enhancement, never a broken layout.
  *
- * Pair them when you want different treatments at the call site
- * without forking the component (`desktop:opacity-0 desktop:group-
- * hover:opacity-100 touch:opacity-100` → reveal-on-hover desktop,
- * always-visible touch).
+ * Pair them at a call site without forking the component
+ * (`desktop:opacity-0 desktop:group-hover:opacity-100 touch:opacity-100`
+ * → reveal-on-hover for pointers, always-visible for touch).
  */
 @custom-variant touch {
-  &:where(html[data-device="mobile"] *) {
+  @media (hover: none) and (pointer: coarse) {
     @slot;
   }
 }
 
 @custom-variant desktop {
-  &:where(html[data-device="desktop"] *) {
-    @slot;
-  }
-}
-
-/*
- * Desktop-locked breakpoint variants.
- *
- * The desktop layout is min-width-clamped to 1280px on `<html>` (see
- * the `html[data-device="desktop"]` rule below), which guarantees the
- * body has at least that much room to lay out into. But Tailwind's
- * built-in `sm:` / `md:` / `lg:` / `xl:` variants still fire on
- * *viewport* width — so narrowing a desktop window below 1280px would
- * collapse `lg:grid-cols-3` to a single column even though the body
- * is comfortably 1280px wide and just being scrolled.
- *
- * We override each viewport-based variant so that in desktop mode the
- * utility applies unconditionally. Net effect: in desktop mode the
- * layout is frozen at its 1280px appearance no matter how small the
- * window gets — the OS just shows a horizontal scrollbar, exactly
- * mirroring the `min-width` clamp. Mobile mode keeps its true
- * responsive behavior.
- */
-@custom-variant sm {
-  @media (min-width: 640px) {
-    @slot;
-  }
-  &:where(html[data-device="desktop"] *) {
-    @slot;
-  }
-}
-
-@custom-variant md {
-  @media (min-width: 768px) {
-    @slot;
-  }
-  &:where(html[data-device="desktop"] *) {
-    @slot;
-  }
-}
-
-@custom-variant lg {
-  @media (min-width: 1024px) {
-    @slot;
-  }
-  &:where(html[data-device="desktop"] *) {
-    @slot;
-  }
-}
-
-@custom-variant xl {
-  @media (min-width: 1280px) {
-    @slot;
-  }
-  &:where(html[data-device="desktop"] *) {
+  @media (hover: hover) and (pointer: fine) {
     @slot;
   }
 }
@@ -425,20 +370,17 @@
   }
 
   /*
-   * Desktop-mode min-width clamp.
+   * Sanity floor for the whole page.
    *
-   * The desktop layout is designed against a known minimum (header,
-   * dashboard, modals all assume room to breathe), so when the device
-   * resolver picks `desktop` we lock the page to at least 1280px.
-   * Below that the OS just shows a horizontal scrollbar instead of
-   * components collapsing in unintended ways.
-   *
-   * Mobile mode (`data-device="mobile"`) intentionally has no clamp
-   * and stays fluid down to 320px — the mobile-specific layouts own
-   * that range with their own responsive rules.
+   * The layout is fully fluid/responsive down to phone widths, but we
+   * never want it to collapse into an unusable sliver at degenerate
+   * window sizes — a 5px-wide drag-resize, a tiny split-screen pane,
+   * an embedded frame. 320×480 is the smallest real phone; below that
+   * the browser shows scrollbars instead of letting the layout buckle.
    */
-  html[data-device="desktop"] {
-    min-width: 1280px;
+  html {
+    min-width: 320px;
+    min-height: 480px;
   }
 
   button,
@@ -466,8 +408,8 @@
  * iOS Safari auto-zooms when a form control's computed `font-size`
  * is below 16px at focus time — there's no JS hook, the browser
  * decides based on the rendered size at focus and pans the
- * viewport in. We bump every text-shaped input on mobile to 16px
- * so the heuristic is satisfied. For our typical compact UI
+ * viewport in. We bump every text-shaped input on touch devices to
+ * 16px so the heuristic is satisfied. For our typical compact UI
  * (`text-sm` = 14px) that's a ~14% visual increase, which also
  * improves readability on a phone.
  *
@@ -481,10 +423,12 @@
  * over `text-sm`, `text-xs`, and anything else a consumer paints
  * onto an input — no `!important` needed, no per-input bumps.
  */
-html[data-device="mobile"] input,
-html[data-device="mobile"] textarea,
-html[data-device="mobile"] select {
-  font-size: 16px;
+@media (hover: none) and (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 @utility scrollbar-hide {

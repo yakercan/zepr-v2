@@ -32,11 +32,12 @@ const nextConfig: NextConfig = {
    * Cache Components (`'use cache'` directive + cacheLife / cacheTag) is
    * intentionally NOT enabled here yet. Turning `cacheComponents: true`
    * on forces every dynamic read (cookies, headers) into a Suspense
-   * boundary so the static shell can stream first — and the root
-   * layout's SSR device gate reads `headers()`/`cookies()` to set
-   * `<html data-device>` *before* any Suspense fence can be drawn,
-   * which means the layout itself would have to be reshaped before
-   * we can flip the flag.
+   * boundary so the static shell can stream first. The root layout no
+   * longer does any per-request reads (device is resolved from the
+   * viewport in CSS + a client matchMedia hook), so that former blocker
+   * is gone — but the dynamic reads still living in `SiteHeader` (auth /
+   * cart / taxonomy) would each need a Suspense fence before flipping
+   * the flag, so this stays a deliberate, separate migration.
    *
    * Until then, our caching story is the simpler `fetch()`-level
    * one: every Shopify Storefront, Salespace, and Supabase read

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { Backdrop } from "@/components/ui/backdrop";
 import { CloseIcon } from "@/components/ui/icons";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -73,13 +73,17 @@ export function CartDrawer() {
   const lines = useCartLines();
   const subtotalCents = useCartSubtotalCents();
   const pending = useCartPending();
-  const isMobile = useIsMobile();
+  /* Compact viewport (below `xl`, where the mobile header shows) gets
+   * the Vaul sheet; the wide layout keeps the custom slide-in panel.
+   * Keyed on the viewport — not the pointer — so the cart opens in a
+   * small desktop window too. */
+  const isCompact = useIsCompact();
 
   /* Currency token comes from the first line — when the cart is empty
    * we don't render the footer, so the fallback is just defensive. */
   const currency = lines[0]?.currency ?? "USD";
 
-  if (isMobile) {
+  if (isCompact) {
     return (
       <CartDrawerMobile
         open={open}

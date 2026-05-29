@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { Sheet } from "@/components/ui/sheet";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { pillClasses } from "@/lib/styles";
@@ -70,8 +70,8 @@ export interface FilterPillProps {
 }
 
 export function FilterPill(props: FilterPillProps) {
-  const isMobile = useIsMobile();
-  return isMobile ? (
+  const isCompact = useIsCompact();
+  return isCompact ? (
     <FilterPillSheet {...props} />
   ) : (
     <FilterPillPopover {...props} />

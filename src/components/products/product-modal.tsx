@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { getProductDetailAction } from "@/app/products/actions";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { BuyActions } from "@/components/products/buy-actions";
 import { DeliveryBadge } from "@/components/products/delivery-badge";
 import { ProductGallery } from "@/components/products/product-gallery";
@@ -273,7 +273,7 @@ export function ProductModal({
       : 0;
   const isDiscounted = discountPct > 0;
 
-  const isMobile = useIsMobile();
+  const isCompact = useIsCompact();
 
   /* Body content — same JSX in both surfaces. Captured as a
    * variable so the Modal branch can wire its overflow-aware
@@ -371,8 +371,8 @@ export function ProductModal({
       <FooterSkeleton />
     );
 
-  if (isMobile) {
-    /* Mobile bottom-sheet branch. `<Sheet>` owns its own
+  if (isCompact) {
+    /* Compact-viewport bottom-sheet branch. `<Sheet>` owns its own
      * scroll container + sticky footer slot — no overflow-
      * border logic needed because the chrome already keeps
      * the CTAs anchored to the safe-area floor regardless

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { Modal } from "@/components/ui/modal";
 import { Sheet } from "@/components/ui/sheet";
 
@@ -60,7 +60,7 @@ export function SignInPromptModal({
   title = "Sign in to continue",
   message = "Sign in to your account or create one in a few seconds.",
 }: SignInPromptModalProps) {
-  const isMobile = useIsMobile();
+  const isCompact = useIsCompact();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -106,9 +106,9 @@ export function SignInPromptModal({
 
   /* Touch → bottom drawer; desktop → centered dialog. Only the
    * matching branch mounts (the `<Sheet>` self-short-circuits to
-   * `null` on desktop, and we gate the `<Modal>` the other way),
+   * `null` above `xl`, and we gate the `<Modal>` the other way),
    * so there's no double render or focus competition. */
-  if (isMobile) {
+  if (isCompact) {
     return (
       <Sheet
         open={open}

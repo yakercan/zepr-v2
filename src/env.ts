@@ -115,12 +115,7 @@ export const env = createEnv({
     /* ----- Order tracking ----- */
     SEVENTEEN_TRACK_API_KEY: z.string().optional(),
   },
-  client: {
-    NEXT_PUBLIC_DEVICE_DETECTION_ENABLED: z
-      .enum(["true", "false"])
-      .default("false")
-      .transform((value) => value === "true"),
-  },
+  client: {},
   runtimeEnv: {
     APP_URL: process.env.APP_URL,
     SESSION_SECRET: process.env.SESSION_SECRET,
@@ -158,9 +153,6 @@ export const env = createEnv({
     TWILIO_SERVICE_SID: process.env.TWILIO_SERVICE_SID,
 
     SEVENTEEN_TRACK_API_KEY: process.env.SEVENTEEN_TRACK_API_KEY,
-
-    NEXT_PUBLIC_DEVICE_DETECTION_ENABLED:
-      process.env.NEXT_PUBLIC_DEVICE_DETECTION_ENABLED,
   },
   // Tiny correctness knobs.
   emptyStringAsUndefined: true,

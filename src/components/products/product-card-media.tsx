@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type MouseEvent, type ReactNode } from "react";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsTouch } from "@/components/device/device-provider";
 import { PlayIcon } from "@/components/ui/icons";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import {
@@ -64,8 +64,8 @@ export function ProductCardMedia({
    * video before the navigation fires, which feels glitchy. Drop
    * the handlers entirely; the primary image is what the shopper
    * sees, and the product detail page carries the canonical media. */
-  const isMobile = useIsMobile();
-  const hoverInteractive = hasVideo && !isMobile;
+  const isTouch = useIsTouch();
+  const hoverInteractive = hasVideo && !isTouch;
 
   function handleEnter(_e: MouseEvent<HTMLDivElement>) {
     // play() returns a promise; swallow rejection silently. If

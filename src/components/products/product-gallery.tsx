@@ -10,7 +10,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsTouch } from "@/components/device/device-provider";
 import {
   MediaLightbox,
   type LightboxMediaItem,
@@ -301,22 +301,22 @@ export function ProductGallery({
     <div
       className={cn(
         "gap-3",
-        /* Layout switches per device when thumbs exist:
+        /* Layout switches on viewport width when thumbs exist:
          *
-         *   - **Desktop** — 2-column grid (`64px` rail + `1fr`
+         *   - **`lg` and up** — 2-column grid (`64px` rail + `1fr`
          *     main). JSX order = layout order, thumbs land in
          *     col 1, main in col 2.
-         *   - **Mobile** — column flex with `flex-col-reverse`.
-         *     Thumbs render first in JSX (so the desktop grid
-         *     places them on the left); on mobile the reverse
-         *     flex flips that order so the main viewer sits on
-         *     top and the thumb rail drops to the bottom — no
+         *   - **Below `lg`** — column flex with `flex-col-reverse`.
+         *     Thumbs render first in JSX (so the wide grid places
+         *     them on the left); narrow viewports flip that order
+         *     via the reverse flex so the main viewer sits on top
+         *     and the thumb rail drops to the bottom — no
          *     duplicated JSX branches, just a one-class flip.
          *
          * Single-media products skip the rail entirely and stay
-         * on a 1-col grid in both modes. */
+         * on a 1-col grid at every width. */
         hasThumbs
-          ? "touch:flex touch:flex-col-reverse desktop:grid desktop:grid-cols-[64px_1fr]"
+          ? "max-lg:flex max-lg:flex-col-reverse lg:grid lg:grid-cols-[64px_1fr]"
           : "grid grid-cols-1",
         className,
       )}
@@ -455,11 +455,11 @@ function GalleryMain({
    * undefined at the gallery's edges, so swiping past the first /
    * last item is automatically a no-op without an extra branch
    * here. */
-  const isMobile = useIsMobile();
+  const isTouch = useIsTouch();
   const swipeProps = usePointerSwipe({
     onLeft: onNext,
     onRight: onPrev,
-    enabled: isMobile,
+    enabled: isTouch,
   });
 
   return (
@@ -481,8 +481,8 @@ function GalleryMain({
          * compositor-driven fix every modern carousel (Embla,
          * Swiper) uses — no non-passive `touchmove` listener, no
          * per-frame `preventDefault`, so it stays jank-free. Scoped
-         * to `touch:` (mobile data-device) because it only governs
-         * touch input and desktop never swipes here. */
+         * to `touch:` (coarse-pointer devices) because it only governs
+         * touch input and a pointer never swipes here. */
         "touch:[touch-action:pan-y]",
       )}
       {...swipeProps}
@@ -605,7 +605,7 @@ function GalleryThumbs({
    * `onSelect(i)`, which is harmless functionally but kicks off two
    * crossfade animations in a row. Cleaner to bind `onMouseEnter`
    * only when we're sure there's a real pointer in play. */
-  const isMobile = useIsMobile();
+  const isTouch = useIsTouch();
 
   /* When the active thumb falls outside the viewport (e.g. the
    * shopper steps through via the main viewer's prev / next
@@ -625,15 +625,15 @@ function GalleryThumbs({
     });
   }, [activeIndex]);
 
-  /* Layout per device:
+  /* Layout per viewport:
    *
-   *   - **Desktop** — outer `relative` is a zero-intrinsic-height
+   *   - **`lg`+** — outer `relative` is a zero-intrinsic-height
    *     cell that the grid row stretches to the main viewer's
    *     `aspect-square` height. The inner scroller is
    *     `absolute inset-0` so it fills that height without ever
    *     contributing back to the row's intrinsic size — the rail
    *     can never push the row taller than the media square.
-   *   - **Mobile** — outer flips to `display: contents`, removing
+   *   - **Below `lg`** — outer flips to `display: contents`, removing
    *     itself from layout entirely. The inner scroller then
    *     participates as a *direct flex child* of the parent
    *     gallery's `flex-col-reverse` layout: a normal horizontal
@@ -641,7 +641,7 @@ function GalleryThumbs({
    *     parent column claiming its full width. No absolute
    *     positioning, no synthetic height plumbing. */
   return (
-    <div className="relative touch:contents">
+    <div className="relative max-lg:contents">
     <div
       ref={scrollRef}
       role="tablist"
@@ -652,12 +652,12 @@ function GalleryThumbs({
         // touch / trackpad scrolling still works without the
         // chrome bar.
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        // Desktop: absolute-positioned vertical scroller inside
-        // the outer `relative` cell.
-        "desktop:absolute desktop:inset-0 desktop:flex-col desktop:overflow-y-auto",
-        // Mobile: static, full-width horizontal scroller in the
+        // `lg`+: absolute-positioned vertical scroller inside the
+        // outer `relative` cell (the 64px left rail).
+        "lg:absolute lg:inset-0 lg:flex-col lg:overflow-y-auto",
+        // Below `lg`: static, full-width horizontal scroller in the
         // parent column's bottom row.
-        "touch:overflow-x-auto",
+        "max-lg:overflow-x-auto",
       )}
     >
       {media.map((item, i) => {
@@ -674,7 +674,7 @@ function GalleryThumbs({
              *  Skipped entirely on mobile so a tap can't fire both
              *  the synthetic mouseenter and the click in succession
              *  (which would queue back-to-back crossfades). */
-            onMouseEnter={isMobile ? undefined : () => onSelect(i)}
+            onMouseEnter={isTouch ? undefined : () => onSelect(i)}
             className={cn(
               "relative h-16 w-16 shrink-0 overflow-hidden rounded-lg",
               "border-2 transition-colors duration-150",

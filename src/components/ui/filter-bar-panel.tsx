@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -62,8 +62,8 @@ export interface FilterBarPanelProps {
 }
 
 export function FilterBarPanel(props: FilterBarPanelProps) {
-  const isMobile = useIsMobile();
-  return isMobile ? <FilterBarSheetMobile {...props} /> : <FilterBarInlineDesktop {...props} />;
+  const isCompact = useIsCompact();
+  return isCompact ? <FilterBarSheetMobile {...props} /> : <FilterBarInlineDesktop {...props} />;
 }
 
 /**

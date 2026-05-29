@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from "react";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsTouch } from "@/components/device/device-provider";
 import { cn } from "@/lib/utils";
 import { Backdrop } from "@/components/ui/backdrop";
 import { ChevronDownIcon, ChevronRightIcon } from "@/components/ui/icons";
@@ -158,7 +158,7 @@ export function Dropdown({
    * navigation); only the hover heuristics are stripped so a
    * touch-emitted synthetic mouseenter doesn't fire phantom opens
    * or sticky side panels on iOS / Android Chrome. */
-  const isMobile = useIsMobile();
+  const isTouch = useIsTouch();
 
   // Two separate timers — `open` and `close` — so a re-entry into
   // the trigger after a brief mouseleave cancels the scheduled close
@@ -236,10 +236,10 @@ export function Dropdown({
   // Hover-intent on the outer <details> covers both the summary and
   // the panel (and, in sideMode, the side column too). Touch devices
   // skip these — clicking the summary uses the native toggle path.
-  // Both handlers no-op in mobile mode so synthetic mouseenter
-  // events from iOS / Android Chrome can't open the panel on tap.
+  // Both handlers no-op on touch so synthetic mouseenter events
+  // from iOS / Android Chrome can't open the panel on tap.
   const onMouseEnter = () => {
-    if (isMobile) return;
+    if (isTouch) return;
     clearCloseTimer();
     if (open) return;
     openTimerRef.current = setTimeout(
@@ -248,7 +248,7 @@ export function Dropdown({
     );
   };
   const onMouseLeave = () => {
-    if (isMobile) return;
+    if (isTouch) return;
     clearOpenTimer();
     if (!open) return;
     closeTimerRef.current = setTimeout(
@@ -441,7 +441,7 @@ export function DropdownItem({
    * via a synthetic mouseenter from iOS / Android. The default
    * `setActiveIfNone` registration still runs so the side panel
    * isn't blank — the first item just stays as the resting view. */
-  const isMobile = useIsMobile();
+  const isTouch = useIsTouch();
 
   const key =
     itemKey ?? href ?? (typeof children === "string" ? children : null);
@@ -458,7 +458,7 @@ export function DropdownItem({
     sideEnabled && key !== null && side?.activeKey === key;
 
   const handleEnter = () => {
-    if (isMobile) return;
+    if (isTouch) return;
     if (!sideEnabled || !key || !side) return;
     side.setActive(key, sidePanel);
   };

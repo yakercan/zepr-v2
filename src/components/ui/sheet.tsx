@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
-import { useIsDesktop } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -52,15 +52,15 @@ function useKeyboardInset(active: boolean): number {
 }
 
 /**
- * Mobile bottom-sheet primitive.
+ * Compact-viewport sheet primitive.
  *
  * Thin wrapper over [Vaul](https://vaul.emilkowal.ski/) that gives
  * the storefront a single, design-locked drawer surface to migrate
- * mobile overlays into. Anything that lives in a `<Modal>` on
- * desktop and benefits from a drag-to-dismiss / multi-snap drawer
- * feel on touch should render `<Sheet>` instead when
- * `useIsMobile()` is true — see the cart drawer, filter panel,
- * size-chart modal etc. for the migration template.
+ * overlays into. Anything that lives in a `<Modal>` on the wide
+ * (desktop) layout and benefits from a drag-to-dismiss / multi-snap
+ * drawer feel on compact viewports should render `<Sheet>` instead
+ * behind a `useIsCompact()` check — see the cart drawer, filter
+ * panel, size-chart modal etc. for the migration template.
  *
  * # Design dialect
  *
@@ -96,18 +96,18 @@ function useKeyboardInset(active: boolean): number {
  * snap point becomes the resting state on open; drag past
  * `closeThreshold` (default 0.25) to dismiss.
  *
- * # Desktop short-circuit
+ * # Viewport short-circuit
  *
- * On `data-device="desktop"` we return `null` *before* mounting
- * Vaul's portal. That means a caller can render `<Sheet>` and
- * `<Modal>` side by side (one for each branch) without worrying
- * about double-rendering, focus competition, or scroll-lock
+ * Above the `xl` breakpoint (`!useIsCompact()`) we return `null`
+ * *before* mounting Vaul's portal. That means a caller can render
+ * `<Sheet>` and `<Modal>` side by side (one for each branch) without
+ * worrying about double-rendering, focus competition, or scroll-lock
  * fights — only the matching branch ever attaches to the DOM.
  *
- * Note: the short-circuit reads from the same `DeviceProvider`
- * context the rest of the gate uses, so it tracks live changes
- * (dev `?device=` override, refiner mode flips) without a page
- * reload.
+ * Gating on the viewport (not the pointer type) is what lets every
+ * drawer work in a small desktop window: whenever the mobile header
+ * is showing, its sheets mount too — mouse or finger. It also tracks
+ * live resizes without a page reload.
  */
 /** Which viewport edge the sheet slides in from. Bottom is the
  *  storefront's default — it's the conventional mobile drawer
@@ -198,13 +198,13 @@ export function Sheet({
   footer,
   elevated = false,
 }: SheetProps) {
-  const isDesktop = useIsDesktop();
+  const isCompact = useIsCompact();
   /* "Keyboard is open" signal (its height, > 0 when up). Measured
-   * here (before the desktop early return) so the hook order stays
-   * stable; gated on `open && !isDesktop` so it's inert unless a
-   * mobile sheet is actually showing. Drives the re-reveal scroll
-   * below — it does NOT lift the sheet. See `useKeyboardInset`. */
-  const keyboardInset = useKeyboardInset(open && !isDesktop);
+   * here (before the wide-viewport early return) so the hook order
+   * stays stable; gated on `open && isCompact` so it's inert unless a
+   * sheet is actually showing. Drives the re-reveal scroll below — it
+   * does NOT lift the sheet. See `useKeyboardInset`. */
+  const keyboardInset = useKeyboardInset(open && isCompact);
 
   /* Ref on the scrollable body so we can pull a focused field into
    * the visible region above the keyboard. */
@@ -228,7 +228,7 @@ export function Sheet({
    * layout). Both call `scrollIntoView({ block: "center" })`, which
    * is idempotent, so the overlap is a harmless no-op. */
   useEffect(() => {
-    if (isDesktop || !open) return;
+    if (!isCompact || !open) return;
     const body = bodyRef.current;
     if (!body) return;
 
@@ -257,13 +257,12 @@ export function Sheet({
     }
 
     return () => body.removeEventListener("focusin", onFocusIn);
-  }, [isDesktop, open, keyboardInset]);
+  }, [isCompact, open, keyboardInset]);
 
-  /* Desktop branch: render nothing. Callers pair this with a
-   * `<Modal>` rendered behind a `useIsMobile()` check, so the
-   * desktop path picks up the modal and the mobile path picks
-   * up the sheet. */
-  if (isDesktop) return null;
+  /* Wide-viewport branch: render nothing. Callers pair this with a
+   * `<Modal>` rendered behind a `!useIsCompact()` check, so above the
+   * `xl` breakpoint the modal shows and below it this sheet does. */
+  if (!isCompact) return null;
 
   /* Per-direction chrome bundle. Each direction needs a different
    * combination of:

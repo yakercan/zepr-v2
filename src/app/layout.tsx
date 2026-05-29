@@ -1,11 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { cookies, headers } from "next/headers";
-import { DeviceDevTools } from "@/components/device/device-dev-tools";
-import { DeviceProvider } from "@/components/device/device-provider";
 import { ShopLayout } from "@/components/layout/shop-layout";
 import { site } from "@/config/site";
-import { resolveDeviceMode } from "@/lib/device-detection";
-import { DEVICE_COOKIE } from "@/lib/device-mode";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -39,36 +34,22 @@ export const viewport: Viewport = {
   interactiveWidget: "resizes-content",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [headerStore, cookieStore] = await Promise.all([headers(), cookies()]);
-  const device = resolveDeviceMode(
-    headerStore.get("user-agent"),
-    cookieStore.get(DEVICE_COOKIE)?.value,
-  );
-
+  /* No per-request device read here: layout follows the viewport via
+     CSS, and the touch/hover interaction model is resolved on the
+     client (see `components/device/device-provider.tsx`). That keeps
+     the root layout free of dynamic request data. */
   return (
-    <html
-      lang="en"
-      data-device={device.mode}
-      className="h-full"
-      suppressHydrationWarning
-    >
+    <html lang="en" className="h-full">
       {/* suppressHydrationWarning: browser extensions (Grammarly,
           Dashlane, etc.) inject attributes onto <body> before React
           hydrates — not an app bug, but it trips React's check. */}
       <body className="min-h-full" suppressHydrationWarning>
-        <DeviceProvider initial={device}>
-          <ShopLayout>{children}</ShopLayout>
-          {/* Dev-only device-mode indicator + ?device=… query
-              override consumer. Tree-shaken out of production via
-              the literal `process.env.NODE_ENV === "development"`
-              check below — zero runtime cost in shipped code. */}
-          {process.env.NODE_ENV === "development" && <DeviceDevTools />}
-        </DeviceProvider>
+        <ShopLayout>{children}</ShopLayout>
       </body>
     </html>
   );

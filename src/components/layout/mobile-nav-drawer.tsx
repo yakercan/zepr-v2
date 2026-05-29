@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 
-import { useIsDesktop } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { CategoryLineIcon } from "@/components/layout/category-line-icon";
 import {
   BestSellersIcon,
@@ -82,14 +82,13 @@ export function MobileNavDrawer({
   categories,
   isLoggedIn,
 }: MobileNavDrawerProps) {
-  /* Same desktop short-circuit as `<Sheet>` — keeps the drawer
-   * from holding stale `open` state if the shopper resizes from
-   * mobile into desktop mid-session (or flips via the dev tools
-   * `?device=` override). On desktop the whole subtree is
-   * unmounted; no listeners, no portals, no risk of a hidden
-   * drawer being stuck open behind the desktop chrome. */
-  const isDesktop = useIsDesktop();
-  if (isDesktop) return null;
+  /* Same viewport short-circuit as `<Sheet>` — this drawer only
+   * exists for the mobile header (shown below `xl`), so above that
+   * breakpoint the whole subtree unmounts: no listeners, no portals,
+   * no risk of a hidden drawer stuck open behind the desktop chrome
+   * if the shopper widens the window mid-session. */
+  const isCompact = useIsCompact();
+  if (!isCompact) return null;
 
   return (
     <Drawer.Root

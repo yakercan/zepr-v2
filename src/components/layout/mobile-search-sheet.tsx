@@ -8,7 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { Drawer } from "vaul";
-import { useIsDesktop } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { SearchModal } from "@/components/layout/search-modal";
 import {
   ArrowRightIcon,
@@ -81,12 +81,12 @@ export function MobileSearchSheet({
   const [value, setValue] = useState(urlQuery);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* Desktop short-circuit (same pattern as `<Sheet>` and the nav
-   * drawer) — keeps the sheet from being stuck open if the
-   * device gate flips to desktop mid-session. The hooks above
-   * still run unconditionally so React's hook-order invariant
-   * holds across the render path. */
-  const isDesktop = useIsDesktop();
+  /* Viewport short-circuit (same pattern as `<Sheet>` and the nav
+   * drawer) — keeps the sheet from being stuck open if the window
+   * widens past `xl` mid-session. The hooks above still run
+   * unconditionally so React's hook-order invariant holds across
+   * the render path. */
+  const isCompact = useIsCompact();
 
   /* Prop-derived state sync — every time `open` flips from false
    * to true we snap the input back to the URL's `q` value. The
@@ -143,7 +143,7 @@ export function MobileSearchSheet({
    * without an empty sheet lingering behind. */
   const closeFromSuggestion = () => onOpenChange(false);
 
-  if (isDesktop) return null;
+  if (!isCompact) return null;
 
   return (
     <Drawer.Root

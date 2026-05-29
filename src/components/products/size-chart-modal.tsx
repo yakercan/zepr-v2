@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsCompact } from "@/components/device/device-provider";
 import { Modal } from "@/components/ui/modal";
 import { Sheet } from "@/components/ui/sheet";
 import { parseSizeTable, type SizeChart } from "@/lib/size-chart";
@@ -86,7 +86,7 @@ export function SizeChartModal({ open, onClose, chart }: SizeChartModalProps) {
   const headerRow = rows[0];
   const bodyRows = rows.slice(1);
 
-  const isMobile = useIsMobile();
+  const isCompact = useIsCompact();
 
   /* Shared body — table-heavy content the desktop modal pads
    * inside its own padding box. The mobile sheet body inherits
@@ -178,7 +178,7 @@ export function SizeChartModal({ open, onClose, chart }: SizeChartModalProps) {
     </>
   );
 
-  if (isMobile) {
+  if (isCompact) {
     return (
       <Sheet
         open={open}

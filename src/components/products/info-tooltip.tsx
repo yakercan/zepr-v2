@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useIsMobile } from "@/components/device/device-provider";
+import { useIsTouch } from "@/components/device/device-provider";
 import { InfoIcon } from "@/components/ui/icons";
 
 /**
@@ -29,16 +29,16 @@ export function InfoTooltip({
   title: string;
   description: string;
 }) {
-  const isMobile = useIsMobile();
+  const isTouch = useIsTouch();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement>(null);
 
   /* Click-outside-to-close — only attached when open, only on
-   * mobile. Desktop doesn't need it (mouseleave closes via the
-   * `group-hover` CSS path), and attaching it on desktop would
+   * touch. A hover pointer doesn't need it (mouseleave closes via
+   * the `group-hover` CSS path), and attaching it there would
    * close the panel on every random click in the page. */
   useEffect(() => {
-    if (!open || !isMobile) return;
+    if (!open || !isTouch) return;
     function onPointerDown(e: PointerEvent) {
       if (!wrapperRef.current) return;
       if (!wrapperRef.current.contains(e.target as Node)) {
@@ -47,7 +47,7 @@ export function InfoTooltip({
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open, isMobile]);
+  }, [open, isTouch]);
 
   return (
     <span

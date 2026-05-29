@@ -83,13 +83,11 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
   );
 
   return (
-    /* Responsive shell — mobile-first so it cooperates with the
-     * desktop-mode breakpoint override (see globals.css: `lg:` fires
-     * on viewport ≥ 64rem *or* `html[data-device="desktop"]`). Making
-     * the single-panel state the *base* and the two columns the `lg:`
-     * override keeps the two states mutually exclusive — a narrow
-     * desktop window stays frozen at the two-column layout instead of
-     * also picking up the mobile panel.
+    /* Responsive shell — mobile-first, driven purely by the viewport
+     * (`lg:` = width ≥ 64rem). Making the single-panel state the *base*
+     * and the two columns the `lg:` override keeps the two states
+     * mutually exclusive: below `lg` everything stacks in one panel,
+     * at `lg`+ it splits into two columns.
      *
      *   base (< lg) : ONE bordered panel (this element) holds
      *                 everything top-to-bottom — gallery → buy form →
