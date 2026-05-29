@@ -107,6 +107,12 @@ export function ProductCard({
     <Link
       href={`/products/${product.handle}`}
       prefetch={false}
+      /* Open the PDP in a new tab so the grid stays put behind it.
+       * `rel="noopener"` severs the new tab's `window.opener` back-
+       * reference (security + perf best practice for `_blank`);
+       * `noreferrer` also drops the Referer header. */
+      target="_blank"
+      rel="noopener noreferrer"
       className={cn(
         // Card outline pulls the shared `SURFACE_OUTLINE_CLASSES`
         // preset (see `lib/styles.ts`) so the whole page — feed
