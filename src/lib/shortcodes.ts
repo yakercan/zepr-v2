@@ -115,11 +115,16 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
  * search engines coalesce the old URL into the new one and
  * browsers can cache the hop.
  *
- * **Matching is exact.** `source: "/products"` matches only
- * `/products`, not `/products/<handle>` — so the PDP route at
- * `app/products/[handle]/page.tsx` keeps working untouched. Don't
- * add `:slug` or `:slug*` patterns here without thinking carefully
- * about which app routes you'd intercept.
+ * **Matching is exact unless the key carries a pattern.** Bare
+ * `source: "/products"` matches only `/products`, not
+ * `/products/<handle>` — so the PDP route at
+ * `app/products/[handle]/page.tsx` keeps working untouched. A
+ * `:path*` segment (see `/collections/:path*` below) opts a key
+ * into prefix matching and forwards the tail to the destination's
+ * matching `:path*`. Only add a pattern when the source prefix
+ * maps to *no* v2 app route — otherwise you'll intercept a live
+ * page. `/collections/*` is safe because v2 browses under
+ * `/categories`, never `/collections`.
  *
  * Adding a redirect: only do this when there's a known existing
  * link or expected typing pattern pointing at a URL the v2
@@ -147,4 +152,12 @@ export const LEGACY_REDIRECTS: Readonly<Record<string, string>> = {
    * because Next's redirect matcher only fires on exact source
    * equality without a `:slug` pattern. */
   "/products": "/search",
+  /* Legacy Shopify collection paths. The old storefront browsed
+   * under `/collections/<handle>`; v2 serves the same surface at
+   * `/categories/<handle>`. The `:path*` wildcard forwards the whole
+   * tail (handle + any nested segments) verbatim, and bare
+   * `/collections` maps to `/categories` too. Query strings carry
+   * through automatically, so old filter/sort params survive the
+   * hop. Safe to pattern-match: v2 has no `/collections` route. */
+  "/collections/:path*": "/categories/:path*",
 };
