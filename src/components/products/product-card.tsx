@@ -19,9 +19,11 @@ import type { SearchProduct } from "@/types/product";
  *
  * Server component (no state, no client hooks) so it ships zero JS
  * per card except what `<ShimmerImage>` needs for the loading
- * shimmer. The card itself is a plain `<Link>` so client-side
- * navigation, prefetch, and "open in new tab" all work without
- * custom handlers.
+ * shimmer. The card is a plain `<Link target="_blank">`, so a click
+ * opens the PDP in a new tab and leaves the grid (and the shopper's
+ * scroll position) untouched behind it — no custom click handler.
+ * Prefetch stays off since a fresh document loads in the new tab
+ * regardless.
  *
  * Visual layering:
  *
