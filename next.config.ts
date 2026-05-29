@@ -130,6 +130,21 @@ const nextConfig: NextConfig = {
         destination,
         permanent: true,
       })),
+      /**
+       * Legacy Shopify collection paths. The old storefront browsed
+       * under `/collections/<handle>`; v2 serves the same surface at
+       * `/categories/<handle>`. The `:path*` wildcard forwards the
+       * whole tail (handle + any nested segments) verbatim and bare
+       * `/collections` maps to `/categories` too. Query strings carry
+       * through automatically, so filter/sort params survive the hop.
+       * Lives here rather than in the exact-match `LEGACY_REDIRECTS`
+       * map because that table is deliberately pattern-free.
+       */
+      {
+        source: "/collections/:path*",
+        destination: "/categories/:path*",
+        permanent: true,
+      },
     ];
   },
 
