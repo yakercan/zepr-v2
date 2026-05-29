@@ -53,28 +53,27 @@ import { hydrateShopifyAnalyticsConfig } from "@/lib/analytics/providers/shopify
  */
 export function ShopifyAnalytics({
   shopId,
-  storefrontId,
   cookieDomain,
   checkoutDomain,
   currency = "USD",
   acceptedLanguage = "en",
 }: {
   shopId: string;
-  /** Headless storefront ID (Sales channels → Headless). Threaded
-   *  into every event as `storefrontId` so Shopify resolves the
-   *  `hydrogenSubchannelId` and attributes the session to this
-   *  storefront in Live View. Omitting it ships subchannel `"0"`,
-   *  which Live View ignores. */
-  storefrontId: string;
   /** Apex domain (e.g. `"zepr.com"`) the visitor/session cookies
    *  are scoped to. Required for Admin Analytics to attribute
    *  events to a session — without it the cookies default to
    *  host-only scope and don't bridge to `checkout.<apex>`,
    *  breaking conversion attribution. */
   cookieDomain?: string;
-  /** Checkout host (e.g. `"checkout.zepr.com"`). Passed through
-   *  to `useShopifyCookies` so it can validate the cookie domain
-   *  can actually be read by the checkout origin. */
+  /** Checkout host (e.g. `"checkout.zepr.com"`) — a Shopify-served
+   *  origin under the storefront's own apex. Two jobs:
+   *    1. handed to `useShopifyCookies` to validate the cookie
+   *       domain is readable by the checkout origin;
+   *    2. handed to the analytics provider as the first-party
+   *       Monorail host, so events POST to
+   *       `https://<checkoutDomain>/.well-known/shopify/monorail/…`
+   *       (same-site with the `_shopify_*` cookies) rather than the
+   *       generic third-party endpoint — the bit Live View needs. */
   checkoutDomain?: string;
   currency?: string;
   acceptedLanguage?: string;
@@ -87,7 +86,7 @@ export function ShopifyAnalytics({
     initRef.current = true;
     hydrateShopifyAnalyticsConfig({
       shopId,
-      storefrontId,
+      checkoutDomain,
       currency,
       acceptedLanguage,
     });

@@ -67,19 +67,27 @@ import type {
 
 interface ShopifyAnalyticsConfig {
   shopId: string | null;
-  /** Headless storefront ID → `hydrogenSubchannelId` in the event
-   *  payload. This is the field that makes Shopify Live View
-   *  attribute the session to this storefront; absent it, the
-   *  hydrogen-react schema falls back to `"0"` and the visit never
-   *  appears in the real-time map. */
-  storefrontId: string | null;
+  /** Shopify-served host under the storefront's own apex (e.g.
+   *  `"checkout.zepr.com"`). Passed as the 2nd arg to
+   *  `sendShopifyAnalytics`, which then POSTs events to
+   *  `https://<checkoutDomain>/.well-known/shopify/monorail/…`
+   *  instead of the generic `monorail-edge.shopifysvc.com`.
+   *
+   *  This is the difference between Live View staying blank and
+   *  working: the first-party endpoint is same-site with the
+   *  `_shopify_y` / `_shopify_s` cookies (both scoped to the
+   *  `.zepr.com` apex), so Shopify attributes the hit to a real
+   *  session. The third-party fallback is cross-site, the cookies
+   *  don't ride along, and the session never registers in the
+   *  real-time map. */
+  checkoutDomain: string | null;
   currency: string;
   acceptedLanguage: string;
 }
 
 const config: ShopifyAnalyticsConfig = {
   shopId: null,
-  storefrontId: null,
+  checkoutDomain: null,
   currency: "USD",
   acceptedLanguage: "en",
 };
@@ -94,11 +102,27 @@ export function hydrateShopifyAnalyticsConfig(
   next: Partial<ShopifyAnalyticsConfig>,
 ): void {
   if (next.shopId !== undefined) config.shopId = next.shopId;
-  if (next.storefrontId !== undefined) config.storefrontId = next.storefrontId;
+  if (next.checkoutDomain !== undefined) {
+    config.checkoutDomain = next.checkoutDomain;
+  }
   if (next.currency !== undefined) config.currency = next.currency;
   if (next.acceptedLanguage !== undefined) {
     config.acceptedLanguage = next.acceptedLanguage;
   }
+}
+
+/**
+ * Single send path for every event. Forwards the storefront's
+ * Shopify-served `checkoutDomain` as `sendShopifyAnalytics`'s second
+ * argument so events POST first-party to
+ * `https://<checkoutDomain>/.well-known/shopify/monorail/…` (the
+ * thing that makes Live View attribute the session). Falls back to
+ * the library's third-party default if the domain isn't configured,
+ * which keeps the Admin Analytics *reports* working even if the
+ * first-party route is ever unavailable.
+ */
+function send(event: Parameters<typeof sendShopifyAnalytics>[0]): void {
+  void sendShopifyAnalytics(event, config.checkoutDomain ?? undefined);
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -123,13 +147,6 @@ function buildEnvelope() {
     hasUserConsent: getAnalyticsConsent(),
     shopifySalesChannel: ShopifySalesChannel.headless,
     shopId: `gid://shopify/Shop/${config.shopId}`,
-    /* Resolves to `hydrogenSubchannelId` in the page-view /
-     * product-view / etc. schemas. The whole reason Live View was
-     * blank: without this it defaulted to `"0"` and Shopify couldn't
-     * tie the session to the Headless storefront. `?? ""` is a
-     * belt-and-braces guard — `shopId` already gates this builder,
-     * and config is hydrated with both ids in the same call. */
-    storefrontId: config.storefrontId ?? "",
     currency: config.currency as CurrencyCode,
     acceptedLanguage: config.acceptedLanguage as LanguageCode,
   };
@@ -183,7 +200,7 @@ function pageView(input?: PageViewInput): void {
   if (!envelope) return;
 
   const eventName = pickPageEventName(input?.resource);
-  void sendShopifyAnalytics({
+  send({
     eventName,
     payload: envelope,
   });
@@ -193,7 +210,7 @@ function productView({ product }: ProductViewInput): void {
   const envelope = buildEnvelope();
   if (!envelope) return;
 
-  void sendShopifyAnalytics({
+  send({
     eventName: AnalyticsEventName.PRODUCT_VIEW,
     payload: {
       ...envelope,
@@ -207,7 +224,7 @@ function collectionView({ collectionId, handle }: CollectionViewInput): void {
   const envelope = buildEnvelope();
   if (!envelope) return;
 
-  void sendShopifyAnalytics({
+  send({
     eventName: AnalyticsEventName.COLLECTION_VIEW,
     payload: {
       ...envelope,
@@ -227,7 +244,7 @@ function searchView({ query }: SearchViewInput): void {
    * subsequent page-view of the results page lands). Keeping
    * the input field in the provider-agnostic type so future
    * providers (GA4, custom) can use it. */
-  void sendShopifyAnalytics({
+  send({
     eventName: AnalyticsEventName.SEARCH_VIEW,
     payload: {
       ...envelope,
@@ -244,7 +261,7 @@ function addToCart({
   const envelope = buildEnvelope();
   if (!envelope) return;
 
-  void sendShopifyAnalytics({
+  send({
     eventName: AnalyticsEventName.ADD_TO_CART,
     payload: {
       ...envelope,
