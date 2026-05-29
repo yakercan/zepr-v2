@@ -39,26 +39,34 @@ import type {
  *     client state on the loader. Each click sends the cursor in,
  *     gets fresh items back, and updates state. Nobody deep-links
  *     "page 4" of a PDP rail, so the URL stays clean.
- *   - Each call fetches one Salespace page per still-needed pool
- *     (`limit = RELATED_PRODUCTS_PAGE_SIZE`). When a pool's page
- *     comes back partially deduplicated by the upstream overlap
- *     between sub/cat results, we retry up to one more page so
- *     a click never visibly returns zero fresh cards — bounded
- *     so a pathological upstream can't fan out indefinitely.
+ *   - Each call fetches AT MOST one Salespace page per still-needed
+ *     pool (`limit = RELATED_PRODUCTS_PAGE_SIZE`). So a batch is a
+ *     single ~10-item request when the subcategory pool fills the
+ *     band, and at most two (sub + a category top-up) only when the
+ *     subcategory is too shallow to reach a full band on its own —
+ *     that second request is genuine sourcing, not waste.
+ *
+ * Why a single page per pool (no retry): the band size is the unit
+ * of work *and* the unit of fetch — "show 10" means "fetch ~10".
+ * The previous version retried a second full page per pool when a
+ * page came back partially deduplicated, which meant a single batch
+ * could fan out to 2 pools × 2 pages × 10 = 40 products pulled from
+ * Salespace just to surface 10 (the rest discarded). That defeats
+ * the whole point of the small PDP band, so we accept the rare
+ * partially-deduplicated short band instead — `hasMore` stays true,
+ * so "See more" simply fetches the next page.
  *
  * Cache: defers to `searchProducts`' fetch-cache (60 s default),
  * so identical cursors across users hit a warm Salespace cache.
  */
 
 const SORT = "best_sellers:desc";
-/* Per-pool retry cap inside a single call — handles the case
- * where one Salespace page comes back mostly deduplicated by
- * the sub-vs-cat overlap. Two is enough for the typical PDP:
- * the first page either has fresh items or doesn't, and the
- * second covers the long tail. Bumping this would buy more
- * cards-per-click at the cost of more upstream calls per
- * click — keep it low. */
-const MAX_PAGES_PER_POOL_PER_CALL = 2;
+/* One Salespace page per pool per call — keeps each "See more"
+ * batch to a single ~10-item fetch per still-needed pool instead
+ * of fanning out into retry pages we'd mostly discard. A band that
+ * comes back short after dedup is fine: `hasMore` stays true and
+ * the next click picks up where this one left off. */
+const MAX_PAGES_PER_POOL_PER_CALL = 1;
 
 export async function loadRelatedProducts(
   params: LoadRelatedProductsParams,
