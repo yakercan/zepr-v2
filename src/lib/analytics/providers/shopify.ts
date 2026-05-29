@@ -17,7 +17,6 @@ import type { AnalyticsProvider } from "@/lib/analytics/events";
 import type {
   AddToCartInput,
   CollectionViewInput,
-  PageViewInput,
   ProductInput,
   ProductViewInput,
   SearchViewInput,
@@ -27,11 +26,13 @@ import type {
  * Shopify analytics provider.
  *
  * Wraps `sendShopifyAnalytics` from `@shopify/hydrogen-react` —
- * Shopify's framework-agnostic helper that POSTs events to
- * `monorail-edge.shopifysvc.com`. These events surface in
+ * Shopify's framework-agnostic helper that POSTs events into the
+ * Monorail pipeline. We route them first-party through the
+ * storefront's own checkout domain (see `send()` below) rather
+ * than the library's third-party default. These events surface in
  * Shopify Admin → Analytics (sessions, top products, conversion
- * funnel, add-to-cart counts) and are the only path to make
- * those dashboards work on a headless storefront.
+ * funnel, add-to-cart counts) and Live View, and are the only
+ * path to make those dashboards work on a headless storefront.
  *
  * Shape of the payloads is dictated by Shopify's Monorail
  * pipeline (Trekkie + Customer events). We feed it the same
@@ -217,13 +218,17 @@ function toShopifyGid(
  *  Provider methods
  * ──────────────────────────────────────────────────────────── */
 
-function pageView(input?: PageViewInput): void {
+/* Generic page-view / session counter. Resource-typed pages
+ * (PDP, category, search) fire their dedicated `productView` /
+ * `collectionView` / `searchView` events instead, which power the
+ * per-resource breakdowns in Admin Analytics. Everything else
+ * lands here as a plain `PAGE_VIEW`. */
+function pageView(): void {
   const envelope = buildEnvelope();
   if (!envelope) return;
 
-  const eventName = pickPageEventName(input?.resource);
   send({
-    eventName,
+    eventName: AnalyticsEventName.PAGE_VIEW,
     payload: envelope,
   });
 }
@@ -299,33 +304,6 @@ function addToCart({
       products: products.map(toShopifyProduct),
     },
   });
-}
-
-/**
- * Pick the Monorail event name based on the resource kind.
- *
- * Shopify's pipeline records `PAGE_VIEW` for everything-else
- * traffic and dedicated `PRODUCT_VIEW` / `COLLECTION_VIEW` /
- * `SEARCH_VIEW` events for those resource types. The dedicated
- * events power the per-resource breakdowns in Admin Analytics
- * (top products, top collections, top searches). PDP / category /
- * search trackers call the dedicated `productView` / etc.
- * methods directly — this resolver covers the plain-page case.
- */
-function pickPageEventName(
-  resource: PageViewInput["resource"],
-): keyof typeof AnalyticsEventName {
-  switch (resource) {
-    case "product":
-    case "collection":
-    case "search":
-      /* The resource-specific trackers handle these; if a caller
-       * routes a resource-typed page view through here we still
-       * emit a generic PAGE_VIEW so session counting works. */
-      return AnalyticsEventName.PAGE_VIEW;
-    default:
-      return AnalyticsEventName.PAGE_VIEW;
-  }
 }
 
 /**
