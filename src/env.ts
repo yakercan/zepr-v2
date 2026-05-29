@@ -47,6 +47,12 @@ export const env = createEnv({
      *  the Customer Account API settings page. Used as the OIDC
      *  discovery base for the Customer Account API. */
     SHOPIFY_SHOP_ID: z.string().min(1),
+    /** Headless storefront ID from Sales channels → Headless → your
+     *  storefront (mirrors Hydrogen's `PUBLIC_STOREFRONT_ID`). Sent
+     *  on every analytics event as `storefrontId` →
+     *  `hydrogenSubchannelId`; this is what lets Shopify Live View
+     *  attribute storefront sessions to this headless channel. */
+    SHOPIFY_STOREFRONT_ID: z.string().min(1),
 
     /* ----- Shopify Customer Account API (OAuth/OIDC, server-only) ----- */
     /** Public client ID from the Headless channel. We use PKCE so
@@ -125,6 +131,7 @@ export const env = createEnv({
     SHOPIFY_STOREFRONT_PRIVATE_TOKEN: process.env.SHOPIFY_STOREFRONT_PRIVATE_TOKEN,
     SHOPIFY_STOREFRONT_API_VERSION: process.env.SHOPIFY_STOREFRONT_API_VERSION,
     SHOPIFY_SHOP_ID: process.env.SHOPIFY_SHOP_ID,
+    SHOPIFY_STOREFRONT_ID: process.env.SHOPIFY_STOREFRONT_ID,
 
     SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID:
       process.env.SHOPIFY_CUSTOMER_ACCOUNT_CLIENT_ID,

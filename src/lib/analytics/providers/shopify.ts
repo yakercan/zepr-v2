@@ -67,6 +67,11 @@ import type {
 
 interface ShopifyAnalyticsConfig {
   shopId: string | null;
+  /** Headless storefront ID → `hydrogenSubchannelId` in every event.
+   *  The trekkie page-view schema that powers Live View *visitors*
+   *  attributes the session through this; without it the field is
+   *  `"0"` and the visit never lands in the real-time map. */
+  storefrontId: string | null;
   /** Shopify-served host under the storefront's own apex (e.g.
    *  `"checkout.zepr.com"`). Passed as the 2nd arg to
    *  `sendShopifyAnalytics`, which then POSTs events to
@@ -87,6 +92,7 @@ interface ShopifyAnalyticsConfig {
 
 const config: ShopifyAnalyticsConfig = {
   shopId: null,
+  storefrontId: null,
   checkoutDomain: null,
   currency: "USD",
   acceptedLanguage: "en",
@@ -102,6 +108,7 @@ export function hydrateShopifyAnalyticsConfig(
   next: Partial<ShopifyAnalyticsConfig>,
 ): void {
   if (next.shopId !== undefined) config.shopId = next.shopId;
+  if (next.storefrontId !== undefined) config.storefrontId = next.storefrontId;
   if (next.checkoutDomain !== undefined) {
     config.checkoutDomain = next.checkoutDomain;
   }
@@ -142,11 +149,26 @@ function send(event: Parameters<typeof sendShopifyAnalytics>[0]): void {
  *  follow-up when locale support lands. */
 function buildEnvelope() {
   if (!config.shopId) return null;
+  const consent = getAnalyticsConsent();
   return {
     ...getClientBrowserParameters(),
-    hasUserConsent: getAnalyticsConsent(),
+    hasUserConsent: consent,
     shopifySalesChannel: ShopifySalesChannel.headless,
     shopId: `gid://shopify/Shop/${config.shopId}`,
+    /* → `hydrogenSubchannelId`. The piece that ties the session to
+     * this Headless storefront in Live View; absent it the schema
+     * falls back to `"0"` and the hit is unattributed. */
+    storefrontId: config.storefrontId ?? undefined,
+    /* Consent flags → `analytics_allowed` / `marketing_allowed` /
+     * `sale_of_data_allowed` in the customer-tracking schema. They
+     * default to `false` when omitted, which makes Shopify drop the
+     * event from Analytics + Live View. This store runs no consent
+     * banner and the app's analytics consent defaults to granted, so
+     * we mirror that single source of truth here — when a banner
+     * lands and flips `getAnalyticsConsent()`, these follow. */
+    analyticsAllowed: consent,
+    marketingAllowed: consent,
+    saleOfDataAllowed: consent,
     currency: config.currency as CurrencyCode,
     acceptedLanguage: config.acceptedLanguage as LanguageCode,
   };

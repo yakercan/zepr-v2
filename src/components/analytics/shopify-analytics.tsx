@@ -53,12 +53,20 @@ import { hydrateShopifyAnalyticsConfig } from "@/lib/analytics/providers/shopify
  */
 export function ShopifyAnalytics({
   shopId,
+  storefrontId,
   cookieDomain,
   checkoutDomain,
   currency = "USD",
   acceptedLanguage = "en",
 }: {
   shopId: string;
+  /** Headless storefront ID (Sales channels → Headless). Sent on
+   *  every event as `storefrontId`, which Shopify maps to
+   *  `hydrogenSubchannelId` — the field the trekkie page-view uses
+   *  to attribute the session to this storefront in Live View.
+   *  Without it the field defaults to `"0"` and the real-time map
+   *  ignores the hit. */
+  storefrontId: string;
   /** Apex domain (e.g. `"zepr.com"`) the visitor/session cookies
    *  are scoped to. Required for Admin Analytics to attribute
    *  events to a session — without it the cookies default to
@@ -86,6 +94,7 @@ export function ShopifyAnalytics({
     initRef.current = true;
     hydrateShopifyAnalyticsConfig({
       shopId,
+      storefrontId,
       checkoutDomain,
       currency,
       acceptedLanguage,
