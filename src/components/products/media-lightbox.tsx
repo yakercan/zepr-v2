@@ -364,7 +364,14 @@ function NavButton({
       onClick={onClick}
       aria-label={side === "left" ? "Previous media" : "Next media"}
       className={cn(
-        "absolute top-1/2 z-20 -translate-y-1/2",
+        "absolute z-20",
+        /* Below `md`, drop the arrows to the bottom corners of the
+         * frame rather than the vertical mid-edges: easier
+         * one-thumb reach on a phone and it leaves the centre of
+         * the picture unobstructed. They flank the bottom-centre
+         * counter pill, so the three read as one bottom control
+         * row. `md+` restores the classic mid-height side arrows. */
+        "bottom-4 md:top-1/2 md:bottom-auto md:-translate-y-1/2",
         side === "left" ? "left-4" : "right-4",
         "inline-flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white",
         "transition-colors hover:bg-black/80",
