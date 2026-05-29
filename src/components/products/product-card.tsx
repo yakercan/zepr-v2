@@ -210,8 +210,20 @@ export function ProductCard({
             overflows the narrow card, gets clipped on line 1 instead
             of wrapping. A normal space would add width on top of
             `mr-1.5`; the zero-width space lets the line break right
-            after the badges while leaving the gap exactly `mr-1.5`. */}
-        <h3 className="line-clamp-2 text-sm font-medium leading-[1.8] text-[color:var(--color-ink)]">
+            after the badges while leaving the gap exactly `mr-1.5`.
+          
+            # `pb-0.5` keeps a one-line title's pill from clipping
+          
+            `line-clamp` is `overflow:hidden`, so a single-line title
+            collapses the box to exactly one line-height. The pill is
+            `inline`/`align-middle` with `leading-none`, so its visual
+            box (padding + border, plus the tall "★" glyph) hangs a
+            hair past the line's descent and the bottom edge gets
+            shaved. A 2px bottom padding moves the clip below the pill
+            (overflow clips at the padding edge); with two lines the
+            wrapped line already provides this slack, so it's a no-op
+            there. */}
+        <h3 className="line-clamp-2 pb-0.5 text-sm font-medium leading-[1.8] text-[color:var(--color-ink)]">
           {product.rating && (
             <RatingBadge value={product.rating.value} className="mr-1.5" />
           )}
