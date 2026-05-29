@@ -23,6 +23,10 @@ export const metadata: Metadata = {
   title: "Policies",
   description:
     "Read Zepr's privacy policy, cookie policy, terms & conditions, and submit a privacy request.",
+  /* Legal/boilerplate — kept out of the index (no search value,
+   *  and we don't want it competing with product pages) but still
+   *  `follow`ed so any links pass through. */
+  robots: { index: false, follow: true },
 };
 
 export default function PoliciesIndexPage() {

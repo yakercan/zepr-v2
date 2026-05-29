@@ -22,6 +22,10 @@ const ADDRESSES_HREF = "/account/addresses";
 
 export const metadata: Metadata = {
   title: "My Account",
+  // Auth-gated dashboard — noindex, follow. Crawlers also can't
+  // reach the sub-pages (they redirect guests to sign-in), and
+  // `/account` is `Disallow`ed in robots.ts as a second layer.
+  robots: { index: false, follow: true },
 };
 
 /**

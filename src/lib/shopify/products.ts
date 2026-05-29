@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { resolveLegalDisclaimerHtml } from "@/lib/legal/disclaimers";
 import { parseOffersMetafield, productIdToGid } from "@/lib/offers";
 import { shopifyFetch } from "@/lib/shopify/client";
@@ -256,22 +257,29 @@ interface ProductByHandleResponse {
  * `notFound()` cleanly. Network failures bubble up — the route
  * boundary can either render an error UI or rely on Next's default
  * `error.tsx`.
+ *
+ * Wrapped in React `cache()` so a single render that reads the
+ * product twice — the PDP's `generateMetadata` (title/description/
+ * canonical/OG) and its component body (Product JSON-LD + layout) —
+ * shares ONE upstream round-trip. The GraphQL call is a POST, which
+ * Next's `fetch` memoisation doesn't dedupe on its own, so the
+ * request-scoped cache here is what prevents the double fetch.
  */
-export async function getProductByHandle(
-  handle: string,
-): Promise<ProductDetail | null> {
-  const data = await shopifyFetch<ProductByHandleResponse>(
-    PRODUCT_BY_HANDLE_QUERY,
-    { handle },
-    {
-      revalidate: 3600,
-      tags: [`product:${handle}`],
-    },
-  );
+export const getProductByHandle = cache(
+  async (handle: string): Promise<ProductDetail | null> => {
+    const data = await shopifyFetch<ProductByHandleResponse>(
+      PRODUCT_BY_HANDLE_QUERY,
+      { handle },
+      {
+        revalidate: 3600,
+        tags: [`product:${handle}`],
+      },
+    );
 
-  if (!data.product) return null;
-  return normaliseProduct(data.product);
-}
+    if (!data.product) return null;
+    return normaliseProduct(data.product);
+  },
+);
 
 /* ---------- Companion products (tiered-offers bundle slots) ---------- */
 

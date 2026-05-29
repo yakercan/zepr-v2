@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { ShopLayout } from "@/components/layout/shop-layout";
 import { site } from "@/config/site";
+import { JsonLd } from "@/lib/seo/json-ld";
+import { organizationSchema } from "@/lib/seo/structured-data";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +18,24 @@ export const metadata: Metadata = {
    * truth — no `app/icon.svg` duplicate to keep in sync. */
   icons: {
     icon: "/zepr-logo.svg",
+  },
+  /* Social-card defaults. Per-page `generateMetadata` overrides
+   * `title`/`description`/`url`/`images` (PDPs ship the product
+   * photo); everything here is the fallback for pages that don't.
+   * No canonical is set at the root — that's per-page so we never
+   * accidentally point every URL at one. */
+  openGraph: {
+    type: "website",
+    siteName: site.name,
+    title: `${site.name} | ${site.tagline}`,
+    description: site.description,
+    url: `https://${site.domain}`,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${site.name} | ${site.tagline}`,
+    description: site.description,
   },
 };
 
@@ -49,6 +69,10 @@ export default function RootLayout({
           Dashlane, etc.) inject attributes onto <body> before React
           hydrates — not an app bug, but it trips React's check. */}
       <body className="min-h-full" suppressHydrationWarning>
+        {/* Brand identity for the Knowledge Graph — emitted once
+            here so every route carries it. Page-specific schema
+            (Product, BreadcrumbList, …) is rendered per route. */}
+        <JsonLd data={organizationSchema()} />
         <ShopLayout>{children}</ShopLayout>
       </body>
     </html>

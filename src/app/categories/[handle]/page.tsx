@@ -8,6 +8,13 @@ import {
 } from "@/components/category/category-results";
 import { SubcategorySlider } from "@/components/category/subcategory-slider";
 import { DEFAULT_CATEGORIES } from "@/config/categories";
+import { site } from "@/config/site";
+import { JsonLd } from "@/lib/seo/json-ld";
+import {
+  breadcrumbSchema,
+  collectionPageSchema,
+  SITE_URL,
+} from "@/lib/seo/structured-data";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
 import type { TaxonomyCategory } from "@/types/taxonomy";
 
@@ -41,17 +48,37 @@ interface CategoryPageProps {
   }>;
 }
 
+/** Compelling, indexable description for a category landing page.
+ *  Mirrors the legacy storefront's tailored collection copy without
+ *  the per-handle switch — the name-driven template reads well for
+ *  every category and stays in one place. */
+function categoryDescription(name: string): string {
+  return `Shop ${name} at ${site.name} — discover trending ${name.toLowerCase()} with exclusive bundle deals and free shipping on all orders.`;
+}
+
 export async function generateMetadata({
   params,
 }: CategoryPageProps): Promise<Metadata> {
   const { handle } = await params;
   const category = await resolveCategory(handle);
   if (!category) {
-    return { title: "Category" };
+    return { title: "Category", robots: { index: false } };
   }
+  const description = categoryDescription(category.name);
+  const path = `/categories/${category.handle}`;
   return {
     title: category.name,
-    description: `Shop ${category.name} on zepr.`,
+    description,
+    /* Canonical strips filter/sort/page query params so every
+     *  faceted view of a category consolidates onto the clean
+     *  landing URL — the one we actually want ranking. */
+    alternates: { canonical: path },
+    openGraph: {
+      title: category.name,
+      description,
+      url: `${SITE_URL}${path}`,
+      ...(category.imageUrl ? { images: [{ url: category.imageUrl }] } : {}),
+    },
   };
 }
 
@@ -70,6 +97,23 @@ export default async function CategoryPage({
 
   return (
     <div className="page-container flex flex-col gap-6 py-6">
+      {/* Breadcrumb trail + CollectionPage node. The grid's product
+          links each carry their own Product schema on their PDPs, so
+          we don't duplicate an ItemList of the results here. */}
+      <JsonLd
+        data={[
+          breadcrumbSchema([
+            { name: "Home", url: "/" },
+            { name: category.name },
+          ]),
+          collectionPageSchema({
+            name: category.name,
+            description: categoryDescription(category.name),
+            path: `/categories/${category.handle}`,
+            image: category.imageUrl,
+          }),
+        ]}
+      />
       {category.shopifyCollectionId && (
         <CollectionViewTracker
           collectionId={category.shopifyCollectionId}

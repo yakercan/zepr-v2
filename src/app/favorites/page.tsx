@@ -9,6 +9,8 @@ import { getSession } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "Favorites",
+  // Auth-gated, per-shopper list — noindex, follow.
+  robots: { index: false, follow: true },
 };
 
 /**

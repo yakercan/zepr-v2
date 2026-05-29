@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ProductViewTracker } from "@/components/analytics/view-trackers";
@@ -9,8 +10,16 @@ import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { RatingChip } from "@/components/ui/rating-chip";
 import { RichText } from "@/components/ui/rich-text";
+import { site } from "@/config/site";
 import { getAuthState } from "@/lib/auth/session";
 import { getProductReviews } from "@/lib/reviews";
+import { JsonLd } from "@/lib/seo/json-ld";
+import {
+  breadcrumbSchema,
+  plainText,
+  productSchema,
+  SITE_URL,
+} from "@/lib/seo/structured-data";
 import { hasPurchasedProduct } from "@/lib/shopify/customer-account-queries";
 import {
   getCompanionProducts,
@@ -72,6 +81,45 @@ interface ProductPageProps {
   params: Promise<{ handle: string }>;
 }
 
+/**
+ * Per-product `<head>`: a real title + description (stripped from
+ * the admin's rich-text body, length-capped), a canonical pinned to
+ * the bare `/products/{handle}` (variant/UTM query params never
+ * fork the canonical), and a social card carrying the hero image.
+ *
+ * Reads the same `cache()`-wrapped product the page body does, so
+ * this costs zero extra upstream fetches. Unknown handle → a
+ * `noindex` "not found" stub; the body still calls `notFound()`.
+ */
+export async function generateMetadata({
+  params,
+}: ProductPageProps): Promise<Metadata> {
+  const { handle } = await params;
+  const product = await getProductByHandle(handle);
+  if (!product) {
+    return { title: "Product not found", robots: { index: false } };
+  }
+
+  const description =
+    plainText(product.descriptionHtml) ||
+    `Shop ${product.title} at ${site.name}. Trending products with exclusive bundle deals and free shipping.`;
+  const path = `/products/${product.handle}`;
+  const image = product.featuredImage?.url;
+
+  return {
+    title: product.title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "website",
+      title: product.title,
+      description,
+      url: `${SITE_URL}${path}`,
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+  };
+}
+
 export default async function ProductPage({ params }: ProductPageProps) {
   const { handle } = await params;
   const baseProduct = await getProductByHandle(handle);
@@ -117,6 +165,25 @@ export default async function ProductPage({ params }: ProductPageProps) {
   return (
     <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
       <ProductViewTracker product={analyticsProduct} />
+      {/* Product rich result (price, availability, brand, hero
+          image — plus a star rating when reviews exist) and the
+          breadcrumb trail, built from the same data the visible
+          UI renders so the structured + on-page views agree. */}
+      <JsonLd
+        data={[
+          productSchema({
+            product,
+            ratingValue: reviewsSummary?.averageRating,
+            ratingCount: reviewsCount,
+          }),
+          breadcrumbSchema(
+            breadcrumbItems.map((item) => ({
+              name: item.label,
+              url: item.href,
+            })),
+          ),
+        ]}
+      />
       <Breadcrumb items={breadcrumbItems} className="mb-4" />
 
       {/* Additional PDP accordion sections drop in here as more

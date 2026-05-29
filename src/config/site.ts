@@ -26,6 +26,19 @@ export const site = {
    *  Analytics can't stitch pre-checkout sessions to conversions. */
   cookieDomain: "zepr.com",
   themeColor: "#f65f14",
+  /** Public path to the brand mark. Doubles as the favicon
+   *  (`metadata.icons`) and the `Organization` JSON-LD logo, so the
+   *  tab icon, social card, and structured data can't drift. */
+  logoPath: "/zepr-logo.svg",
+  /** Official brand profiles — fed verbatim into the `Organization`
+   *  schema's `sameAs`, the signal Google uses to tie the storefront
+   *  to its social presence in the Knowledge Graph. Keep in sync with
+   *  the footer's social links. */
+  social: [
+    "https://www.instagram.com/shopzepr/",
+    "https://www.facebook.com/shopzepr",
+    "https://www.tiktok.com/@zepr.com",
+  ],
 } as const;
 
 export type SiteConfig = typeof site;

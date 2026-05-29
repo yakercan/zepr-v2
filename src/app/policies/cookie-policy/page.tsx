@@ -13,6 +13,8 @@ const entry = findPolicy("cookie-policy");
 export const metadata: Metadata = {
   title: entry?.title ?? "Cookie policy",
   description: entry?.summary,
+  // Legal page — noindex, follow (see /policies index).
+  robots: { index: false, follow: true },
 };
 
 export default function CookiePolicyPage() {

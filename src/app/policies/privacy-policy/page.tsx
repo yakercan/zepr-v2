@@ -17,6 +17,8 @@ const entry = findPolicy("privacy-policy");
 export const metadata: Metadata = {
   title: entry?.title ?? "Privacy policy",
   description: entry?.summary,
+  // Legal page — noindex, follow (see /policies index).
+  robots: { index: false, follow: true },
 };
 
 export default function PrivacyPolicyPage() {

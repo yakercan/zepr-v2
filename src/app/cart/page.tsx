@@ -5,6 +5,9 @@ import { getCurrentCart } from "@/lib/cart/queries";
 
 export const metadata: Metadata = {
   title: "Your cart",
+  // Per-shopper utility surface — nothing to index, but follow so
+  // the in-page links still pass through.
+  robots: { index: false, follow: true },
 };
 
 /**

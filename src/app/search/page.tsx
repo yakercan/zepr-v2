@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { SearchViewTracker } from "@/components/analytics/view-trackers";
+import { SeoText } from "@/components/seo/seo-text";
 import {
   SearchResults,
   SearchResultsSkeleton,
 } from "@/components/search/search-results";
 import { DEFAULT_CATEGORIES } from "@/config/categories";
+import { site } from "@/config/site";
 import { getTaxonomy } from "@/lib/salespace/taxonomy";
 
 /**
@@ -41,16 +43,46 @@ interface SearchPageProps {
   }>;
 }
 
+/* ------------------------------------------------------------------ */
+/* SEO copy — derived once from the query so `generateMetadata` and   */
+/* the page body can't drift on what they tell crawlers.              */
+/* ------------------------------------------------------------------ */
+
+function searchTitle(query: string): string {
+  return query ? `Search: ${query}` : "Search";
+}
+
+function searchHeading(query: string): string {
+  return query ? `Search results for “${query}”` : `Search ${site.name}`;
+}
+
+function searchDescription(query: string): string {
+  return query
+    ? `Browse search results for “${query}” at ${site.name} — trending products with exclusive bundle deals and free shipping on all orders.`
+    : `Search thousands of trending products at ${site.name}. Find home essentials, beauty products, electronics, pet supplies & more. Free shipping on all orders.`;
+}
+
+/** Canonical drops filter/sort/page params so every faceted or
+ *  paginated view of a query folds onto one indexable URL. */
+function searchCanonical(query: string): string {
+  return query ? `/search?q=${encodeURIComponent(query)}` : "/search";
+}
+
 export async function generateMetadata({
   searchParams,
 }: SearchPageProps): Promise<Metadata> {
   const { q } = await searchParams;
   const query = (q ?? "").trim();
   return {
-    title: query ? `Search: ${query}` : "Search",
-    // Result pages are per-user, low-quality SEO surfaces. Don't
-    // index but do follow links so product cards still pass juice.
-    robots: { index: false, follow: true },
+    title: searchTitle(query),
+    description: searchDescription(query),
+    /* Indexable on purpose. High-intent query landing pages
+     *  ("electric kettle", "dog bed") are exactly what we want
+     *  ranking — the same play that lands marketplace search pages
+     *  high in results. The canonical above keeps the faceted
+     *  variants from splintering that signal. */
+    robots: { index: true, follow: true },
+    alternates: { canonical: searchCanonical(query) },
   };
 }
 
@@ -73,6 +105,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
        *  browse landing state, not a search the merchant would
        *  want surfaced in the "Top searches" report. */}
       {query && <SearchViewTracker query={query} />}
+      {/* The results grid has no visible <h1>; this hidden,
+          query-driven heading + intro gives the indexed page a
+          crawlable summary that matches what's on screen. */}
+      <SeoText
+        heading={searchHeading(query)}
+        description={searchDescription(query)}
+      />
       <Suspense key={query} fallback={<SearchResultsSkeleton />}>
         <SearchResults
           query={query}
