@@ -244,16 +244,21 @@ export function Sheet({
            * affordance. Vaul handles the fade timing. */
           className="fixed inset-0 bg-black/40"
           style={{ zIndex: overlayZ }}
-          /* Elevated sheets stack over another open sheet (e.g. the
-           * size-chart over the product modal). With two independent
-           * modal Vaul roots open at once, Vaul's built-in
-           * outside-press dismissal on the top drawer stops firing —
-           * only its drag gesture still closes it. The overlay is a
-           * plain `pointer-events:auto` div on top, so we wire the
-           * backdrop tap to close explicitly. Scoped to `elevated`
-           * so single (non-stacked) sheets keep relying on Vaul's
-           * native handling unchanged. */
-          onClick={elevated ? () => onOpenChange(false) : undefined}
+          /* Close on backdrop tap explicitly — the same contract the
+           * shared `<Backdrop>` gives every `<Modal>`. Vaul has a
+           * native outside-press dismissal, but it proves unreliable
+           * in two situations we hit: (a) stacked sheets (e.g. the
+           * size-chart over the product modal — two Vaul roots open
+           * at once silences the top drawer's native dismissal), and
+           * (b) a sheet mounted inside a click-handling ancestor (a
+           * card `<Link>`, where a `stopPropagation` guard wraps the
+           * subtree to block navigation and the native path no longer
+           * fires). Wiring the tap here makes outside-to-close work
+           * the same everywhere, independent of Vaul's internals;
+           * `onOpenChange(false)` is idempotent, so on the happy path
+           * where native handling *does* fire too it's a harmless
+           * second close. */
+          onClick={() => onOpenChange(false)}
         />
         <Drawer.Content
           /* `aria-describedby={undefined}` opts out of the Radix

@@ -193,15 +193,27 @@ export function FavoriteButton({
         />
       </button>
 
-      {/* Sign-in modal — mounted alongside so its open/close
-       *  lifecycle survives parent re-renders. Same pattern as
-       *  the WriteReviewButton + ReturnRequestButton. */}
-      <SignInPromptModal
-        open={signInOpen}
-        onClose={() => setSignInOpen(false)}
-        title="Sign in to save favorites"
-        message="Save items to your favorites and keep them across devices when you sign in or create an account."
-      />
+      {/* Sign-in prompt — mounted alongside so its open/close
+       *  lifecycle survives parent re-renders.
+       *
+       *  The `display:contents` span that stops click propagation is
+       *  load-bearing: the prompt opens via a portal (Vaul sheet /
+       *  `<Modal>` createPortal), so in the *DOM* its clicks stop at
+       *  `document.body` — but in *React's* tree the prompt is still a
+       *  child of this button, which lives inside the product card's
+       *  `<Link>`. Without this guard a backdrop tap to dismiss would
+       *  bubble through the React tree to the anchor and navigate to
+       *  the PDP. Same discipline the card-level `<AddToCartButton>`
+       *  applies to its `<ProductModal>`; `contents` keeps the span
+       *  out of layout while staying in the tree for event delegation. */}
+      <span className="contents" onClick={(e) => e.stopPropagation()}>
+        <SignInPromptModal
+          open={signInOpen}
+          onClose={() => setSignInOpen(false)}
+          title="Sign in to save favorites"
+          message="Save items to your favorites and keep them across devices when you sign in or create an account."
+        />
+      </span>
     </>
   );
 }

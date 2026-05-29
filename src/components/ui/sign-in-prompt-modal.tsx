@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
+import { useIsMobile } from "@/components/device/device-provider";
 import { Modal } from "@/components/ui/modal";
+import { Sheet } from "@/components/ui/sheet";
 
 /**
  * Reusable "you need to sign in to do this" modal.
@@ -17,10 +19,12 @@ import { Modal } from "@/components/ui/modal";
  * use cases that fit the same shape are easy to add (cart-add
  * gating, write-review prompt outside the PDP flow, etc.).
  *
- * Reuses the shared `<Modal>` shell so stacking, escape-to-
- * close, body scroll lock, focus management, and animation
- * come for free; this component just owns the copy + the two
- * action buttons.
+ * Reuses the shared overlay shells so stacking, escape-to-close,
+ * body scroll lock, focus management, and animation come for free;
+ * this component just owns the copy + the two action buttons. On
+ * touch devices it renders as a bottom `<Sheet>` (drag-to-dismiss
+ * drawer) and on desktop as a centered `<Modal>` — the same
+ * device-branch pattern the cart / size-chart / product modals use.
  *
  * `returnTo` round-trip:
  *
@@ -56,6 +60,7 @@ export function SignInPromptModal({
   title = "Sign in to continue",
   message = "Sign in to your account or create one in a few seconds.",
 }: SignInPromptModalProps) {
+  const isMobile = useIsMobile();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -75,6 +80,49 @@ export function SignInPromptModal({
     return `/account/login?return_to=${encodeURIComponent(returnTo)}`;
   }, [pathname, searchParams]);
 
+  const body = (
+    <div className="flex flex-col gap-5">
+      <p className="text-sm leading-relaxed text-[color:var(--color-ink-secondary)]">
+        {message}
+      </p>
+
+      {/* Stacked CTA pair — primary fills full width, secondary
+       *  sits below at the same footprint. Vertical stack reads
+       *  better than a side-by-side pair on a narrow surface and
+       *  matches how the account dropdown presents its sign-in /
+       *  register choices. Both destinations are the same OAuth
+       *  route — Shopify's login UI lets the shopper switch between
+       *  sign-in and account-creation on the next screen. */}
+      <div className="flex flex-col gap-2">
+        <Link href={loginHref} className="btn-primary w-full">
+          Sign in
+        </Link>
+        <Link href={loginHref} className="btn-secondary w-full">
+          Create account
+        </Link>
+      </div>
+    </div>
+  );
+
+  /* Touch → bottom drawer; desktop → centered dialog. Only the
+   * matching branch mounts (the `<Sheet>` self-short-circuits to
+   * `null` on desktop, and we gate the `<Modal>` the other way),
+   * so there's no double render or focus competition. */
+  if (isMobile) {
+    return (
+      <Sheet
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) onClose();
+        }}
+        title={title}
+        className="px-5 pb-5 pt-2"
+      >
+        {body}
+      </Sheet>
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -83,28 +131,7 @@ export function SignInPromptModal({
       className="max-w-sm"
       ariaLabel={title}
     >
-      <div className="flex flex-col gap-5 p-5 md:p-6">
-        <p className="text-sm leading-relaxed text-[color:var(--color-ink-secondary)]">
-          {message}
-        </p>
-
-        {/* Stacked CTA pair — primary fills full width, secondary
-         *  sits below at the same footprint. Vertical stack reads
-         *  better than a side-by-side pair on a narrow modal
-         *  (`max-w-sm`) and matches how the account dropdown
-         *  presents its sign-in / register choices. Both
-         *  destinations are the same OAuth route — Shopify's
-         *  login UI lets the shopper switch between sign-in and
-         *  account-creation on the next screen. */}
-        <div className="flex flex-col gap-2">
-          <Link href={loginHref} className="btn-primary w-full">
-            Sign in
-          </Link>
-          <Link href={loginHref} className="btn-secondary w-full">
-            Create account
-          </Link>
-        </div>
-      </div>
+      <div className="p-5 md:p-6">{body}</div>
     </Modal>
   );
 }
