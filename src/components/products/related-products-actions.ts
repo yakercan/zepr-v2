@@ -40,21 +40,22 @@ import type {
  *     gets fresh items back, and updates state. Nobody deep-links
  *     "page 4" of a PDP rail, so the URL stays clean.
  *   - Each call fetches AT MOST one Salespace page per still-needed
- *     pool (`limit = RELATED_PRODUCTS_PAGE_SIZE`). So a batch is a
- *     single ~10-item request when the subcategory pool fills the
- *     band, and at most two (sub + a category top-up) only when the
- *     subcategory is too shallow to reach a full band on its own —
- *     that second request is genuine sourcing, not waste.
+ *     pool (`limit = POOL_FETCH_LIMIT`, a small headroom over the
+ *     display band). So a batch is a single request when the
+ *     subcategory pool fills the band, and at most two (sub + a
+ *     category top-up) only when the subcategory is too shallow to
+ *     reach a full band on its own — that second request is genuine
+ *     sourcing, not waste.
  *
- * Why a single page per pool (no retry): the band size is the unit
- * of work *and* the unit of fetch — "show 10" means "fetch ~10".
- * The previous version retried a second full page per pool when a
- * page came back partially deduplicated, which meant a single batch
- * could fan out to 2 pools × 2 pages × 10 = 40 products pulled from
- * Salespace just to surface 10 (the rest discarded). That defeats
- * the whole point of the small PDP band, so we accept the rare
- * partially-deduplicated short band instead — `hasMore` stays true,
- * so "See more" simply fetches the next page.
+ * Why a single page per pool (no retry pages): the previous version
+ * retried a second full page per pool when a page came back
+ * partially deduplicated, which meant a single batch could fan out
+ * to 2 pools × 2 pages × 10 = 40 products pulled from Salespace just
+ * to surface 10 (the rest discarded). Instead we ask for a few extra
+ * items up front (`POOL_FETCH_LIMIT`) so one page survives the
+ * sub/cat dedup overlap and still fills the band — same single
+ * round-trip per pool, just a slightly larger payload, and the band
+ * lands at a full ten instead of an occasional eight or nine.
  *
  * Cache: defers to `searchProducts`' fetch-cache (60 s default),
  * so identical cursors across users hit a warm Salespace cache.
@@ -62,11 +63,21 @@ import type {
 
 const SORT = "best_sellers:desc";
 /* One Salespace page per pool per call — keeps each "See more"
- * batch to a single ~10-item fetch per still-needed pool instead
- * of fanning out into retry pages we'd mostly discard. A band that
- * comes back short after dedup is fine: `hasMore` stays true and
- * the next click picks up where this one left off. */
+ * batch to a single fetch per still-needed pool instead of fanning
+ * out into retry pages we'd mostly discard. */
 const MAX_PAGES_PER_POOL_PER_CALL = 1;
+
+/* Upstream page size — deliberately a few items larger than the
+ * display band (`RELATED_PRODUCTS_PAGE_SIZE`). The subcategory pool
+ * is a subset of the category pool, so when the category pool tops
+ * up a band it dedupes a couple of already-shown items off the
+ * page, which used to leave the band one or two cards short (a
+ * "+8" instead of "+10"). Over-fetching a small headroom absorbs
+ * that overlap so a single request still yields a full band; the
+ * surplus past the band is dropped (the rail samples, it doesn't
+ * exhaustively list), so this stays exactly one round-trip per
+ * pool — same speed, just a slightly larger payload. */
+const POOL_FETCH_LIMIT = RELATED_PRODUCTS_PAGE_SIZE + 5;
 
 export async function loadRelatedProducts(
   params: LoadRelatedProductsParams,
@@ -173,18 +184,18 @@ async function drainPool(
     attempts < MAX_PAGES_PER_POOL_PER_CALL
   ) {
     const result = await searchProducts(
-      { ...baseParams, limit: want, page },
+      { ...baseParams, limit: POOL_FETCH_LIMIT, page },
       { tags: cacheTags },
     );
     if (attempts === 0) firstTotal = result.total;
     attempts++;
     page++;
 
-    /* A short page (or an empty one) is the signal that this pool
-     * has nothing more to give. Mark exhausted *before* the dedup
-     * loop so the caller stops consulting the pool on the next
-     * call too. */
-    if (result.hits.length < want) exhausted = true;
+    /* A short page (fewer than the full page size we asked for) is
+     * the signal that this pool has nothing more to give. Mark
+     * exhausted *before* the dedup loop so the caller stops
+     * consulting the pool on the next call too. */
+    if (result.hits.length < POOL_FETCH_LIMIT) exhausted = true;
 
     for (const p of result.hits) {
       if (seen.has(p.handle)) continue;
