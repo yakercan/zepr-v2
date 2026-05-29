@@ -82,7 +82,7 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-8 md:grid-cols-[1.2fr_1fr] md:gap-12 md:items-start">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.2fr_1fr] lg:gap-12 lg:items-start">
       {/* Left column — gallery + long-form copy. `min-w-0` because
           grid tracks otherwise refuse to shrink past their content's
           intrinsic min-width, which would collapse the right column
@@ -110,17 +110,17 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
 
       {/* Right column — buy form, sticky.
        *
-       *   - `md:self-start`  → take only the form's natural height
+       *   - `lg:self-start`  → take only the form's natural height
        *                        (grid items default to `stretch`,
        *                        which would lock the form to the
        *                        full row height and break sticky).
-       *   - `md:sticky md:top-20` → cling to `5rem` (header is
+       *   - `lg:sticky lg:top-20` → cling to `5rem` (header is
        *                        4rem + 1px border; 5rem leaves a
        *                        small breathing gap).
        *   - When the left column scrolls past its end, the grid
        *     row ends, the sticky context releases, and the page
        *     continues into whatever comes after the layout. */}
-      <div className="md:sticky md:top-20 md:self-start">
+      <div className="lg:sticky lg:top-20 lg:self-start">
         <div className={cn(PANEL_SURFACE_CLASSES, PDP_PANEL_PADDING)}>
           <BuyForm
             product={product}

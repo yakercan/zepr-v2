@@ -22,7 +22,7 @@ import type { ProductDetail } from "@/types/product";
 /**
  * Product Detail Page — Shopify-backed.
  *
- * Layout (md and up):
+ * Layout (lg and up):
  *
  *   ┌───────────────────────────┬──────────────────────┐
  *   │ Gallery                   │  BuyForm  (sticky)   │
@@ -41,7 +41,8 @@ import type { ProductDetail } from "@/types/product";
  * "unsticks" when the left column ends — at which point the whole
  * page slides up into the related-products rail.
  *
- * Stack on phones (single column, no sticking — too tall).
+ * Stack below lg — phones and tablets get a single column, no
+ * sticking (the buy form is too tall to pin on a narrow viewport).
  *
  * Rendering model — dynamic shell, streaming Suspense holes:
  *
