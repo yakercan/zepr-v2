@@ -1,9 +1,55 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer } from "vaul";
 import { useIsDesktop } from "@/components/device/device-provider";
 import { cn } from "@/lib/utils";
+
+/**
+ * Live on-screen-keyboard height, in CSS px, derived from the
+ * `visualViewport`. Used purely as a "keyboard has settled" signal
+ * to re-run the scroll-into-view below — we do NOT lift the drawer
+ * with it.
+ *
+ * Why no lift: the drawer is `position: fixed`. iOS Safari already
+ * pins fixed elements to the shrunken visual viewport when the
+ * keyboard opens (so the sheet is above the keyboard for free), and
+ * Android gets the same effect from the `interactiveWidget=
+ * resizes-content` viewport hint (the layout viewport shrinks).
+ * Adding our own padding on top of that double-counts and floats
+ * the content up with a dead band above the keyboard — the exact
+ * overshoot Vaul's `repositionInputs` causes, which is why that's
+ * also off. The only thing left to do is scroll the focused field
+ * into the now-visible region, which the effect below handles.
+ *
+ * `window.innerHeight - visualViewport.height` is the band the
+ * keyboard covers; > 0 means a keyboard is up. Clamped to >= 0 so a
+ * transient negative (rotation, toolbar collapse) reads as closed.
+ * `active` gates the listener to a mounted, open mobile sheet.
+ */
+function useKeyboardInset(active: boolean): number {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      setInset(Math.max(0, Math.round(window.innerHeight - vv.height)));
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      setInset(0);
+    };
+  }, [active]);
+
+  return inset;
+}
 
 /**
  * Mobile bottom-sheet primitive.
@@ -153,6 +199,66 @@ export function Sheet({
   elevated = false,
 }: SheetProps) {
   const isDesktop = useIsDesktop();
+  /* "Keyboard is open" signal (its height, > 0 when up). Measured
+   * here (before the desktop early return) so the hook order stays
+   * stable; gated on `open && !isDesktop` so it's inert unless a
+   * mobile sheet is actually showing. Drives the re-reveal scroll
+   * below — it does NOT lift the sheet. See `useKeyboardInset`. */
+  const keyboardInset = useKeyboardInset(open && !isDesktop);
+
+  /* Ref on the scrollable body so we can pull a focused field into
+   * the visible region above the keyboard. */
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  /* Scroll the focused field above the keyboard.
+   *
+   * The platform already keeps the fixed sheet itself above the
+   * keyboard (iOS pins fixed elements to the visual viewport;
+   * Android shrinks the layout via `interactiveWidget=
+   * resizes-content`). What neither does reliably is scroll a field
+   * that's below the scroll fold *inside* a fixed element into view
+   * — iOS only ever scrolls the document, which our scroll-lock
+   * pins. So we centre the focused field within the scroll body,
+   * whose visible box sits above the keyboard.
+   *
+   * Two triggers: `focusin` (tapping / tabbing between fields while
+   * the keyboard is already up) and the `keyboardInset` change (the
+   * first open, where the keyboard is still animating when focus
+   * fires — re-running once it settles re-centres against the final
+   * layout). Both call `scrollIntoView({ block: "center" })`, which
+   * is idempotent, so the overlap is a harmless no-op. */
+  useEffect(() => {
+    if (isDesktop || !open) return;
+    const body = bodyRef.current;
+    if (!body) return;
+
+    const isField = (el: Element | null): el is HTMLElement =>
+      !!el && el.matches("input, textarea, select, [contenteditable='true']");
+
+    const reveal = (el: HTMLElement) => {
+      /* Defer so the keyboard's open animation + the platform's
+       * viewport resize settle before we measure where "centre of
+       * the visible body" is. */
+      window.setTimeout(() => {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 150);
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      if (isField(e.target as Element)) reveal(e.target as HTMLElement);
+    };
+    body.addEventListener("focusin", onFocusIn);
+
+    /* Initial open: focus often fires before the keyboard finishes
+     * animating, so also re-reveal whatever's focused once the inset
+     * has settled. */
+    if (keyboardInset > 0 && isField(document.activeElement)) {
+      reveal(document.activeElement as HTMLElement);
+    }
+
+    return () => body.removeEventListener("focusin", onFocusIn);
+  }, [isDesktop, open, keyboardInset]);
+
   /* Desktop branch: render nothing. Callers pair this with a
    * `<Modal>` rendered behind a `useIsMobile()` check, so the
    * desktop path picks up the modal and the mobile path picks
@@ -236,6 +342,14 @@ export function Sheet({
       direction={direction}
       snapPoints={snapPoints}
       handleOnly={handleOnly}
+      /* Off — Vaul's input repositioning shifts the whole drawer up
+       * by the keyboard height, which double-counts against the
+       * platform's own handling (iOS pins fixed elements to the
+       * visual viewport; Android resizes the layout) and overshoots,
+       * floating the sheet up with a dead band above the keyboard.
+       * We let the platform keep the sheet in place and only scroll
+       * the focused field into view. See `useKeyboardInset`. */
+      repositionInputs={false}
     >
       <Drawer.Portal>
         <Drawer.Overlay
@@ -330,7 +444,10 @@ export function Sheet({
               dragging past the first snap reveals more
               content rather than letting overflow leak below
               the safe-area. */}
-          <div className={cn("flex-1 overflow-y-auto", className)}>
+          <div
+            ref={bodyRef}
+            className={cn("flex-1 overflow-y-auto", className)}
+          >
             {children}
           </div>
 

@@ -29,6 +29,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  /* When the on-screen keyboard opens, resize the layout viewport
+   * (not just the visual one) so bottom-anchored fixed UI — chiefly
+   * our Vaul sheets — rises to sit above the keyboard instead of
+   * being buried behind it. Android Chrome honours this; iOS Safari
+   * ignores it but already pins fixed elements to the visual
+   * viewport, so both platforms end up keyboard-aware without any
+   * per-drawer JS repositioning. */
+  interactiveWidget: "resizes-content",
 };
 
 export default async function RootLayout({
