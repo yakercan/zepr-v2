@@ -63,11 +63,13 @@ const SWIPE_THRESHOLD_PX = 50;
  *      pointer drags reach this same code path when the dev-
  *      tools "device" emulator is engaged; the guard keeps
  *      ambient mouse input from page-throughing the gallery.
- *   2. **Horizontal dominance** (`|dx| > |dy|`). Vertical
- *      scrolls inside the product modal's scrollable body
- *      would otherwise be reinterpreted as ambiguous swipes
- *      whenever the user's finger drifted a few pixels
- *      sideways while scrolling.
+ *   2. **Horizontal dominance** (`|dx| > |dy|`). A secondary
+ *      guard behind the stage's `touch-action: pan-y` (which
+ *      already stops the page from scrolling during a
+ *      horizontal swipe): a vertical scroll cancels the pointer
+ *      before pointerup, but if the browser ever hands us a
+ *      diagonal gesture, the dominance check still keeps a
+ *      mostly-vertical drag from registering as a page-through.
  *   3. **Video opt-out.** `<video controls>` has its own
  *      horizontal-drag gestures (seekbar scrub); intercepting
  *      pointer events there would steal the seek interaction.
@@ -461,7 +463,30 @@ function GalleryMain({
   });
 
   return (
-    <div className={cn(MEDIA_STAGE_CLASSES, "rounded-2xl")} {...swipeProps}>
+    <div
+      className={cn(
+        MEDIA_STAGE_CLASSES,
+        "rounded-2xl",
+        /* Scroll-axis arbitration for the swipe.
+         *
+         * `touch-action: pan-y` hands the browser exactly one job on
+         * this surface — vertical panning — and reserves the
+         * horizontal axis for us. The compositor then locks each
+         * gesture to a single axis up front: a horizontal-dominant
+         * swipe scrolls *nothing* (so the page can't drift
+         * vertically mid-swipe) and its pointer stream flows to
+         * `usePointerSwipe`; a vertical-dominant drag scrolls the
+         * page natively and fires `pointercancel`, which the hook
+         * treats as "not a swipe". This is the declarative,
+         * compositor-driven fix every modern carousel (Embla,
+         * Swiper) uses — no non-passive `touchmove` listener, no
+         * per-frame `preventDefault`, so it stays jank-free. Scoped
+         * to `touch:` (mobile data-device) because it only governs
+         * touch input and desktop never swipes here. */
+        "touch:[touch-action:pan-y]",
+      )}
+      {...swipeProps}
+    >
       {media.map((item, i) => {
         const isActive = i === activeIndex;
         const isOutgoing = !isActive && i === outgoingIndex;
