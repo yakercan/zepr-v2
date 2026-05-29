@@ -90,8 +90,8 @@ export function ShopifyAnalytics({
     hasUserConsent,
     /* Apex-scoped cookies so the same `_shopify_y` /
      * `_shopify_s` pair is sent on requests to both the
-     * storefront (`zepr.com` / `dev.zepr.com`) and the
-     * Shopify-hosted checkout (`checkout.zepr.com`). Without
+     * storefront (`www.zepr.com`) and the Shopify-hosted
+     * checkout (`checkout.zepr.com`). Without
      * apex scoping, the cookies are host-only on the
      * storefront origin and Admin Analytics can't link
      * pre-checkout sessions to conversions. */

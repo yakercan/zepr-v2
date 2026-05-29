@@ -8,6 +8,7 @@ import { CartMetaHydrator } from "@/components/cart/cart-meta-hydrator";
 import { BfcacheRefresh } from "@/components/layout/bfcache-refresh";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
+import { site } from "@/config/site";
 import { env } from "@/env";
 import { getAttribution } from "@/lib/attribution/cookie";
 import { getAuthState } from "@/lib/auth/session";
@@ -85,19 +86,15 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
     env.SHOPIFY_CHECKOUT_DOMAIN ?? env.SHOPIFY_STOREFRONT_DOMAIN;
   const mode: "guest" | "server" = authState.isLoggedIn ? "server" : "guest";
 
-  /* Apex domain for the Shopify analytics cookies. Derived from
-   * `checkoutDomain` so the same value works across all our
-   * environments (`zepr.com`, `dev.zepr.com`) — they all check
-   * out via `checkout.zepr.com`, whose apex is `zepr.com`.
-   *
-   * Apex scoping is what lets the `_shopify_y` (visitor) and
-   * `_shopify_s` (session) cookies the analytics layer drops on
-   * the storefront travel with the request when the shopper
-   * navigates to checkout. Without it, Admin Analytics can't
-   * stitch pre-checkout pageviews / add-to-carts to the
-   * resulting orders, and sessions show up as "unknown" or get
-   * dropped from the dashboards entirely. */
-  const analyticsCookieDomain = deriveCookieApex(checkoutDomain);
+  /* Apex domain for the Shopify analytics cookies — a single fixed
+   * value from the site config (`zepr.com`). Apex scoping is what
+   * lets the `_shopify_y` (visitor) and `_shopify_s` (session)
+   * cookies the analytics layer drops on the storefront travel with
+   * the request when the shopper navigates to `checkout.zepr.com`.
+   * Without it, Admin Analytics can't stitch pre-checkout pageviews /
+   * add-to-carts to the resulting orders, and sessions show up as
+   * "unknown" or get dropped from the dashboards entirely. */
+  const analyticsCookieDomain = site.cookieDomain;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -118,27 +115,4 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
       <BfcacheRefresh />
     </div>
   );
-}
-
-/**
- * Strip one leading subdomain to derive the apex.
- *
- *   - `"checkout.zepr.com"` → `"zepr.com"`
- *   - `"dev.zepr.com"`      → `"zepr.com"`
- *   - `"zepr.com"`          → `"zepr.com"` (already apex)
- *   - `"localhost"`         → `undefined` (no apex, host-only
- *                             cookies will be used)
- *
- * Doesn't try to handle Public Suffix List edge cases (`.co.uk`,
- * etc.) — zepr's domain is a vanilla `.com`, and the only
- * deployment surface that fans out to subdomains is checkout +
- * the storefront, both of which share the same single-level
- * apex. If we ever ship to a multi-tier ccTLD we'd swap this
- * for a proper PSL parser.
- */
-function deriveCookieApex(domain: string): string | undefined {
-  const parts = domain.split(".");
-  if (parts.length < 2) return undefined;
-  if (parts.length === 2) return domain;
-  return parts.slice(1).join(".");
 }
