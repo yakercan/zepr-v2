@@ -244,6 +244,16 @@ export function Sheet({
            * affordance. Vaul handles the fade timing. */
           className="fixed inset-0 bg-black/40"
           style={{ zIndex: overlayZ }}
+          /* Elevated sheets stack over another open sheet (e.g. the
+           * size-chart over the product modal). With two independent
+           * modal Vaul roots open at once, Vaul's built-in
+           * outside-press dismissal on the top drawer stops firing —
+           * only its drag gesture still closes it. The overlay is a
+           * plain `pointer-events:auto` div on top, so we wire the
+           * backdrop tap to close explicitly. Scoped to `elevated`
+           * so single (non-stacked) sheets keep relying on Vaul's
+           * native handling unchanged. */
+          onClick={elevated ? () => onOpenChange(false) : undefined}
         />
         <Drawer.Content
           /* `aria-describedby={undefined}` opts out of the Radix

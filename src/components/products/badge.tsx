@@ -26,11 +26,24 @@ type BadgeVariant = "outline" | "solid";
 function BadgeChrome({
   accent,
   variant = "outline",
+  inline = false,
   className,
   children,
 }: {
   accent: string;
   variant?: BadgeVariant;
+  /** Render as `display:inline` instead of `inline-flex`.
+   *
+   *  Pass this when the pill flows *inside* a `line-clamp` title.
+   *  `line-clamp` makes its container a `display:-webkit-box`, which
+   *  stacks any *atomic* inline child (`inline-flex`/`inline-block`,
+   *  or a replaced element like an `<svg>`) onto its own line — the
+   *  cause of the pill "cutoff" / star-splitting bugs. A plain
+   *  `inline` box of pure text flows as ordinary inline content the
+   *  clamp handles correctly (and its trailing ellipsis still works).
+   *  Callers using `inline` must keep the pill text-only — see
+   *  `RatingBadge`, which renders a "★" glyph rather than an svg. */
+  inline?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -42,8 +55,8 @@ function BadgeChrome({
     <span
       style={style}
       className={cn(
-        "inline-flex shrink-0 items-center rounded-sm border",
-        "px-2 py-0.5 leading-none whitespace-nowrap",
+        "rounded-sm border px-2 py-0.5 leading-none whitespace-nowrap",
+        inline ? "inline align-middle" : "inline-flex shrink-0 items-center",
         className,
       )}
     >
@@ -62,16 +75,21 @@ function BadgeChrome({
 export function ProductBadge({
   badge,
   variant,
+  inline,
   className,
 }: {
   badge: BadgeView;
   variant?: BadgeVariant;
+  /** See `BadgeChrome.inline` — pass when the pill sits inside a
+   *  `line-clamp` title. The label is already text-only. */
+  inline?: boolean;
   className?: string;
 }) {
   return (
     <BadgeChrome
       accent={badge.theme.accent}
       variant={variant}
+      inline={inline}
       className={className}
     >
       <span className="text-xs font-medium uppercase">{badge.label}</span>
@@ -97,16 +115,18 @@ export function RatingBadge({
   className?: string;
 }) {
   if (value <= 0) return null;
+  // Always renders `inline` because its only home is the `line-clamp`
+  // product-card title. The star is a text "★" glyph rather than an
+  // svg: a `line-clamp` title's `-webkit-box` stacks a replaced <svg>
+  // onto its own line, splitting it from the number. A glyph is plain
+  // inline text, and the chrome's `whitespace-nowrap` keeps "★ 4.7"
+  // together.
   return (
-    <BadgeChrome accent="var(--color-ink)" className={className}>
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden
-        className="mr-1 h-3 w-3 fill-current"
-      >
-        <path d="M8 1.5l2.06 4.17 4.6.67-3.33 3.25.79 4.58L8 11.99l-4.12 2.17.79-4.58L1.34 6.33l4.6-.67L8 1.5z" />
-      </svg>
+    <BadgeChrome accent="var(--color-ink)" inline className={className}>
       <span className="text-xs font-medium tabular-nums">
+        <span aria-hidden className="mr-0.5">
+          ★
+        </span>
         {value.toFixed(1)}
       </span>
     </BadgeChrome>

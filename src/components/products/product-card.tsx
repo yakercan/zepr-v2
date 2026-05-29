@@ -34,7 +34,7 @@ import type { SearchProduct } from "@/types/product";
  *   │   ── sold-out scrim when not available               │
  *   ├──────────────────────────────────────────────────────┤
  *   │  [★ 4.7] [BADGE] Product title that wraps onto the   │
- *   │  second line if it's long (2-line clamp)             │
+ *   │  second line if it's long, then ellipsises (clamp)   │
  *   │  price    (tinted with badge accent · strikethrough) │
  *   └──────────────────────────────────────────────────────┘
  *
@@ -171,50 +171,55 @@ export function ProductCard({
           baseline regardless of how long the title is or whether
           a promo badge takes up space. */}
       <div className="flex flex-1 flex-col gap-1 p-3">
-        {/* Badges flow *inline* at the head of the title so the text
+        {/* Badges flow inline at the head of the title so the text
             continues right after them and wraps naturally beneath.
             Order: rating leads (every product has one, so it anchors
             the row) → promo badge (only standouts get one) → title.
             Free Shipping is intentionally not here — it lives on the
             media as a callout sticker.
           
-            # Two-line clamp without `-webkit-box` (the bug-free path)
+            # Two-line clamp WITH a trailing ellipsis
           
-            We deliberately do NOT use `line-clamp-2` here. `line-clamp`
-            forces `display:-webkit-box`, and WebKit mishandles pills
-            inside it: as `inline-flex` they get the line *clipped* on
-            mobile (the "cutoff"), and as plain `inline` they lose
-            `white-space:nowrap` and *break apart* (star on one line,
-            rating on the next). Both are the same root cause — pills
-            don't belong in a `-webkit-box`.
+            `line-clamp-2` clips the whole composition (badges + text)
+            to two lines and appends a "…" when the title overflows —
+            the trailing truncation we want. It forces
+            `display:-webkit-box`, which stacks any *atomic* inline
+            child (an `inline-flex` pill, or an `<svg>` — a replaced
+            element) onto its own line. We dodge that by passing
+            `inline` to the pills (renders them `display:inline`) and
+            letting `RatingBadge` draw a text "★" glyph instead of an
+            svg, so every pill is pure inline text the clamp treats
+            like an ordinary word.
           
-            Instead we clamp with a plain block + `overflow-hidden`
-            capped at `max-h-[2lh]` (two line-heights — the `lh` unit
-            tracks `leading-relaxed` automatically, so the cap stays
-            exactly two lines if the leading ever changes). Ordinary
-            block flow handles `inline-flex` children correctly, so the
-            pills stay atomic (no break) and uncliped (no `-webkit-box`)
-            while the title still hard-stops at two lines. `align-middle`
-            keeps each pill centred on the text line. The only thing we
-            give up vs `line-clamp` is the trailing ellipsis — overflow
-            clips cleanly at the line boundary instead. */}
-        {/* `leading-relaxed` instead of `snug` so the line carrying
-            the badge pills (taller than plain text) doesn't crowd the
-            wrapped title below. Applied unconditionally so cards with
-            and without badges share the same title rhythm. */}
-        <h3 className="max-h-[2lh] overflow-hidden text-sm font-medium leading-relaxed text-[color:var(--color-ink)]">
+            # Line-height sets the gap between the two lines
+          
+            `leading-[1.8]` (a touch above `leading-relaxed`'s 1.625).
+            Inside `line-clamp`'s `-webkit-box` the inline pills don't
+            inflate the first line the way the old `inline-flex` pills
+            did in normal block flow, so the inter-line gap renders
+            tighter; the slightly larger line-height restores the
+            comfortable spacing between the badge line and the wrapped
+            line below.
+          
+            # The zero-width spaces are load-bearing
+          
+            The `{"\u200B"}` after each pill is a real line-break
+            opportunity. The pills carry `mr-1.5` for their visual gap,
+            but a margin alone gives no break point — the first title
+            word stays glued to the badge and, when `[badge]word`
+            overflows the narrow card, gets clipped on line 1 instead
+            of wrapping. A normal space would add width on top of
+            `mr-1.5`; the zero-width space lets the line break right
+            after the badges while leaving the gap exactly `mr-1.5`. */}
+        <h3 className="line-clamp-2 text-sm font-medium leading-[1.8] text-[color:var(--color-ink)]">
           {product.rating && (
-            <RatingBadge
-              value={product.rating.value}
-              className="mr-1.5 align-middle"
-            />
+            <RatingBadge value={product.rating.value} className="mr-1.5" />
           )}
+          {"\u200B"}
           {productBadge && (
-            <ProductBadge
-              badge={productBadge}
-              className="mr-1.5 align-middle"
-            />
+            <ProductBadge badge={productBadge} inline className="mr-1.5" />
           )}
+          {"\u200B"}
           {product.title}
         </h3>
 
