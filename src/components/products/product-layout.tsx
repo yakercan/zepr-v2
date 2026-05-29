@@ -31,7 +31,7 @@ import type { ProductDetail, ProductVariant } from "@/types/product";
  * first render — no visible jump animation when the layout
  * hydrates.
  */
-const PDP_PANEL_PADDING = "p-5 md:p-6";
+const PDP_PANEL_PADDING = "p-4 md:p-6";
 
 export interface ProductLayoutProps {
   product: ProductDetail;

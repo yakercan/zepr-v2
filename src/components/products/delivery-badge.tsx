@@ -40,7 +40,6 @@ import { cn } from "@/lib/utils";
  */
 
 const DEFAULT_DELIVERY_TIME = "7-14";
-const CREDIT_AMOUNT_LABEL = "$5.00 credit for delay";
 
 function formatDeliveryRange(deliveryTime: string): string {
   const parts = deliveryTime.split("-").map((s) => Number.parseInt(s.trim(), 10));
@@ -92,7 +91,11 @@ export function DeliveryBadge({
         // and prevents the "Arrives …" date span from getting
         // pinched against the trailing divider. Desktop keeps the
         // original gap-3 / px-3 / py-2.5 for full breathing room.
-        "flex flex-wrap items-center gap-2 rounded-lg border px-2.5 py-2",
+        // `@container` so the credit label can react to the badge's
+        // *own* width (container query) rather than the viewport — the
+        // buy form / modal / PDP column it lives in are all different
+        // widths, and the gallery aspect ratio shifts them around.
+        "@container flex flex-wrap items-center gap-2 rounded-lg border px-2.5 py-2",
         "md:gap-3 md:px-3 md:py-2.5",
         "border-[color:var(--color-success-soft-border)] bg-[color:var(--color-success-soft)]",
         "text-[color:var(--color-success)]",
@@ -130,7 +133,19 @@ export function DeliveryBadge({
           className="h-8 w-px bg-[color:var(--color-success-soft-border)]"
         />
         <ZeprIcon src={ZEPR_ICONS.medal} size={20} />
-        <span className="text-sm font-medium">{CREDIT_AMOUNT_LABEL}</span>
+        {/* Drop the word "credit" when the badge container is narrow
+            (< 24rem) so a pinched surface reads "$5.00 for delay" on
+            one line; the full "$5.00 credit for delay" returns the
+            moment the container has room — no viewport breakpoint, so
+            it tracks the actual width at any aspect ratio.
+            `whitespace-nowrap` keeps whichever phrase is shown on a
+            single line (the credit block wraps as a whole via the
+            parent's `flex-wrap`) so a word never orphans onto its own
+            row. */}
+        <span className="whitespace-nowrap text-sm font-medium">
+          $5.00<span className="hidden @min-[24rem]:inline"> credit</span> for
+          delay
+        </span>
       </span>
     </div>
   );
