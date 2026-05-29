@@ -2,7 +2,11 @@
 
 import { Price } from "@/components/ui/price";
 import { FREE_SHIPPING_THRESHOLD_CENTS } from "@/lib/badges";
-import { useCartCheckoutUrl } from "@/lib/cart/store";
+import {
+  useCartBundleSavingsCents,
+  useCartCheckoutUrl,
+  useCartCompareAtSavingsCents,
+} from "@/lib/cart/store";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +66,17 @@ export function CartFooter({
   className?: string;
 }) {
   const checkoutUrl = useCartCheckoutUrl();
+  const bundleSavingsCents = useCartBundleSavingsCents();
+  const compareSavingsCents = useCartCompareAtSavingsCents();
+
+  /* `subtotalCents` is the regular sale-price total (price × qty,
+   * pre-bundle). The amount the shopper actually pays is that minus
+   * the bundle discount; the struck "was" figure adds the compare-at
+   * markdown back on so the original list price reads through. */
+  const finalCents = subtotalCents - bundleSavingsCents;
+  const regularCents = subtotalCents + compareSavingsCents;
+  const totalSavingsCents = bundleSavingsCents + compareSavingsCents;
+  const hasSavings = totalSavingsCents > 0;
 
   return (
     <div className={cn("px-5 py-4", className)}>
@@ -70,12 +85,53 @@ export function CartFooter({
         currency={currency}
       />
 
-      <div className="mt-4 flex items-baseline justify-between">
+      {/* Bundle savings row — itemised breakdown intentionally hidden
+          for now. The bundle discount IS applied (it's folded into the
+          `finalCents` subtotal below and shown per line in the drawer);
+          we just don't surface a separate "Bundle savings" line. Drop
+          the comment markers to bring this row back.
+      {bundleSavingsCents > 0 && (
+        <div className="mt-4 flex items-baseline justify-between text-sm">
+          <span className="text-[color:var(--color-ink-secondary)]">
+            Bundle savings
+          </span>
+          <span className="font-semibold text-[color:var(--color-success)]">
+            &minus;{formatPrice(bundleSavingsCents, currency)}
+          </span>
+        </div>
+      )}
+      */}
+
+      <div
+        className={cn(
+          "flex items-baseline justify-between",
+          bundleSavingsCents > 0 ? "mt-1.5" : "mt-4",
+        )}
+      >
         <span className="text-sm font-semibold text-[color:var(--color-ink)]">
           Subtotal
         </span>
-        <Price cents={subtotalCents} currency={currency} className="text-base" />
+        <span className="inline-flex items-baseline gap-2">
+          {hasSavings && (
+            <Price cents={regularCents} currency={currency} variant="compare" />
+          )}
+          {/* Final amount stays default ink — the struck "was" beside
+           *  it and the green savings lines carry the discount signal,
+           *  matching the cart line rows' transaction-summary tone. */}
+          <Price cents={finalCents} currency={currency} className="text-base" />
+        </span>
       </div>
+
+      {/* "You're saving" total — intentionally hidden for now alongside
+          the bundle savings row. The struck "was" price beside the
+          subtotal still carries the savings signal. Drop the comment
+          markers to bring this caption back.
+      {hasSavings && (
+        <p className="mt-1 text-xs font-medium text-[color:var(--color-success)]">
+          You&rsquo;re saving {formatPrice(totalSavingsCents, currency)}.
+        </p>
+      )}
+      */}
       <p className="mt-1 text-xs text-[color:var(--color-ink-muted)]">
         Shipping and taxes calculated at checkout.
       </p>

@@ -15,6 +15,7 @@ import {
   getCurrentAttribution,
   useAttribution,
 } from "@/lib/attribution/store";
+import { bundleSavingsCents, cartBundlePercent } from "@/lib/cart/bundle";
 import { openCart } from "@/lib/cart/drawer-store";
 import { createStore } from "@/lib/external-store";
 import { buildCartPermalink, type CheckoutLine } from "@/lib/shopify/checkout";
@@ -749,11 +750,64 @@ export function useCartCount(): number {
   );
 }
 
-/** Subtotal in cents (sum of price × quantity). Doesn't account
- *  for shipping, taxes, or coupons — those layer on at checkout. */
+/** Subtotal in cents (sum of price × quantity) at the *line* sale
+ *  price — before any bundle discount. This is the regular sale
+ *  total; `useCartBundleSavingsCents` is subtracted from it for the
+ *  amount the shopper actually pays. Doesn't account for shipping or
+ *  taxes — those layer on at checkout. */
 export function useCartSubtotalCents(): number {
   return linesStore.useSelector(
     (lines) => lines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0),
+    0,
+  );
+}
+
+/** Cart-wide "Bundle & Save" percentage for the current cart, driven
+ *  by total unit count (2 → 15%, 3+ → 20%). Drives the per-line
+ *  discounted-total preview in `<CartLineRow>` and the footer's
+ *  "Bundle savings" math. `0` for a single-item cart. */
+export function useCartBundlePercent(): number {
+  return linesStore.useSelector(
+    (lines) =>
+      cartBundlePercent(lines.reduce((sum, l) => sum + l.quantity, 0)),
+    0,
+  );
+}
+
+/** Total bundle discount across the cart, in cents. Applies the
+ *  cart-wide percentage (from total unit count) to every line and
+ *  sums — so the footer figure equals the sum of the discounted line
+ *  totals shown above it. `0` below the 2-unit threshold. The
+ *  matching Shopify quantity-break discount applies the real
+ *  reduction at checkout; this is the in-cart preview of it. */
+export function useCartBundleSavingsCents(): number {
+  return linesStore.useSelector((lines) => {
+    const percent = cartBundlePercent(
+      lines.reduce((sum, l) => sum + l.quantity, 0),
+    );
+    if (percent <= 0) return 0;
+    return lines.reduce(
+      (sum, l) => sum + bundleSavingsCents(l.priceCents, l.quantity, percent),
+      0,
+    );
+  }, 0);
+}
+
+/** Total compare-at ("was" price) markdown savings across the cart,
+ *  in cents — the difference between each discounted line's
+ *  compare-at and its sale price. Independent of bundle savings;
+ *  the footer sums the two for the headline "You're saving" figure. */
+export function useCartCompareAtSavingsCents(): number {
+  return linesStore.useSelector(
+    (lines) =>
+      lines.reduce(
+        (sum, l) =>
+          sum +
+          (l.compareAtCents !== undefined && l.compareAtCents > l.priceCents
+            ? (l.compareAtCents - l.priceCents) * l.quantity
+            : 0),
+        0,
+      ),
     0,
   );
 }

@@ -36,6 +36,8 @@
  *     are the contract — keep them stable.
  */
 
+import { bundleUnitSavingsCents } from "./cart/bundle";
+
 /** Master kill switch. Flip to `false` to fall back to the qty
  *  stepper everywhere; the metafield is ignored. */
 export const TIERED_OFFERS_ENABLED = true;
@@ -220,24 +222,31 @@ export interface SlotPriceInfo {
  * makes the math correct for both same-product and mixed bundles
  * without a special case.
  *
- * Rounding is to the nearest cent on the discounted side; the
- * worst-case display drift vs the eventual Shopify-side discount
- * is sub-cent and won't mislead a shopper because the cart math
- * stays server-authoritative.
+ * Discount math is shared with the cart's "Bundle & Save" so the two
+ * never drift: the saving is FLOORED to the cent (never rounded up)
+ * via `bundleUnitSavingsCents`, the same per-unit primitive each cart
+ * line row applies. Crucially the floor happens PER SLOT (each slot
+ * is one unit) and the discounted prices are then summed — NOT a
+ * single floor on the grouped tile total. That's what makes a
+ * "Buy 2 of the same product" tile equal the qty-2 cart line it
+ * becomes, to the cent (2 × floor vs floor of the doubled subtotal
+ * can differ by a cent). A `0`% tier (Buy 1) is a pass-through.
  */
 export function tierPricingFromSlots(
   tier: OfferTier,
   slotPrices: ReadonlyArray<SlotPriceInfo>,
 ): { discountedTotalCents: number; compareTotalCents: number } {
   const slots = slotPrices.slice(0, tier.quantity);
-  const baseTotal = slots.reduce((sum, s) => sum + s.priceCents, 0);
+  const discountedTotalCents = slots.reduce(
+    (sum, s) =>
+      sum +
+      s.priceCents -
+      bundleUnitSavingsCents(s.priceCents, tier.savingsPercent),
+    0,
+  );
   const compareTotalCents = slots.reduce(
     (sum, s) => sum + (s.compareAtCents ?? s.priceCents),
     0,
   );
-  const discountedTotalCents =
-    tier.savingsPercent === 0
-      ? baseTotal
-      : Math.round(baseTotal * (1 - tier.savingsPercent / 100));
   return { discountedTotalCents, compareTotalCents };
 }

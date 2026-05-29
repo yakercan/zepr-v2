@@ -5,9 +5,11 @@ import { Price } from "@/components/ui/price";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { ShimmerImage } from "@/components/ui/shimmer-image";
 import { TrashIcon } from "@/components/ui/icons";
+import { bundleDiscountedCents } from "@/lib/cart/bundle";
 import {
   removeCartLine,
   setCartLineQuantity,
+  useCartBundlePercent,
 } from "@/lib/cart/store";
 import { closeCart } from "@/lib/cart/drawer-store";
 import type { CartLine } from "@/types/cart";
@@ -49,13 +51,36 @@ import type { CartLine } from "@/types/cart";
  *     the stepper on the left and the trash on the right.
  */
 export function CartLineRow({ line }: { line: CartLine }) {
-  const totalCents = line.priceCents * line.quantity;
+  /* Cart-wide bundle percent (2 units → 15%, 3+ → 20%). Read here so
+   * every row reflects the same "applies to all items" discount the
+   * footer totals; re-renders only when the tier itself changes. */
+  const bundlePercent = useCartBundlePercent();
+  const saleSubtotal = line.priceCents * line.quantity;
+  /* The line's payable total: sale price × qty, minus the cart-wide
+   * bundle discount. The discount is floored PER UNIT then multiplied
+   * by qty (not floored on the grouped subtotal), so a qty-2 line
+   * matches two single units to the cent. No active tier → the sale
+   * subtotal passes through unchanged. */
+  const totalCents = bundleDiscountedCents(
+    line.priceCents,
+    line.quantity,
+    bundlePercent,
+  );
   const compareTotal =
     line.compareAtCents !== undefined
       ? line.compareAtCents * line.quantity
       : undefined;
-  const hasDiscount =
-    compareTotal !== undefined && compareTotal > totalCents;
+  /* "Was" price to strike through: the compare-at original when it's
+   * higher, otherwise the pre-bundle sale subtotal when a bundle
+   * trimmed the line. Either way it's the price the `totalCents`
+   * discounted down from. */
+  const struckCents =
+    compareTotal !== undefined && compareTotal > totalCents
+      ? compareTotal
+      : bundlePercent > 0
+        ? saleSubtotal
+        : undefined;
+  const hasDiscount = struckCents !== undefined && struckCents > totalCents;
 
   return (
     <li className="flex gap-3 py-4">
@@ -101,7 +126,7 @@ export function CartLineRow({ line }: { line: CartLine }) {
             />
             {hasDiscount && (
               <Price
-                cents={compareTotal!}
+                cents={struckCents!}
                 currency={line.currency}
                 variant="compare"
               />
@@ -112,6 +137,15 @@ export function CartLineRow({ line }: { line: CartLine }) {
             <div className="mt-0.5 text-xs text-[color:var(--color-ink-muted)]">
               {line.variantTitle}
             </div>
+          )}
+
+          {/* Bundle tag — only on offer lines. A quiet success-tinted
+           *  pill so the shopper sees *why* the line is discounted
+           *  without competing with the price block for attention. */}
+          {bundlePercent > 0 && (
+            <span className="mt-1 inline-flex w-fit items-center rounded-full border border-[color:var(--color-success-soft-border)] bg-[color:var(--color-success-soft)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--color-success)]">
+              Bundle &middot; {bundlePercent}% off
+            </span>
           )}
         </div>
 
