@@ -108,6 +108,7 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
       <Suspense fallback={null}>
         <ShopifyAnalytics
           shopId={env.SHOPIFY_SHOP_ID}
+          storefrontId={env.SHOPIFY_STOREFRONT_ID}
           cookieDomain={analyticsCookieDomain}
           checkoutDomain={checkoutDomain}
         />

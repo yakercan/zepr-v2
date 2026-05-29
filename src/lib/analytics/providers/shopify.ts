@@ -67,12 +67,19 @@ import type {
 
 interface ShopifyAnalyticsConfig {
   shopId: string | null;
+  /** Headless storefront ID → `hydrogenSubchannelId` in the event
+   *  payload. This is the field that makes Shopify Live View
+   *  attribute the session to this storefront; absent it, the
+   *  hydrogen-react schema falls back to `"0"` and the visit never
+   *  appears in the real-time map. */
+  storefrontId: string | null;
   currency: string;
   acceptedLanguage: string;
 }
 
 const config: ShopifyAnalyticsConfig = {
   shopId: null,
+  storefrontId: null,
   currency: "USD",
   acceptedLanguage: "en",
 };
@@ -87,6 +94,7 @@ export function hydrateShopifyAnalyticsConfig(
   next: Partial<ShopifyAnalyticsConfig>,
 ): void {
   if (next.shopId !== undefined) config.shopId = next.shopId;
+  if (next.storefrontId !== undefined) config.storefrontId = next.storefrontId;
   if (next.currency !== undefined) config.currency = next.currency;
   if (next.acceptedLanguage !== undefined) {
     config.acceptedLanguage = next.acceptedLanguage;
@@ -115,6 +123,13 @@ function buildEnvelope() {
     hasUserConsent: getAnalyticsConsent(),
     shopifySalesChannel: ShopifySalesChannel.headless,
     shopId: `gid://shopify/Shop/${config.shopId}`,
+    /* Resolves to `hydrogenSubchannelId` in the page-view /
+     * product-view / etc. schemas. The whole reason Live View was
+     * blank: without this it defaulted to `"0"` and Shopify couldn't
+     * tie the session to the Headless storefront. `?? ""` is a
+     * belt-and-braces guard — `shopId` already gates this builder,
+     * and config is hydrated with both ids in the same call. */
+    storefrontId: config.storefrontId ?? "",
     currency: config.currency as CurrencyCode,
     acceptedLanguage: config.acceptedLanguage as LanguageCode,
   };
