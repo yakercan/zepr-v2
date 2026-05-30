@@ -63,7 +63,7 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
   "121": "/products/inflatable-standing-boxing-trainer",
   "122": "/products/yoga-block-set-2-pack",
   "123": "/products/pelvic-floor-thigh-trainer",
-  "124": "/products/adjustable-hand-grip-strengthener",
+  "124": "/products/adjustable-hand-grip-strength-trainer",
   "125": "/products/coffee-mug-warmer",
   "126": "/products/easy-squeeze-sponge-mop",
   "127": "/products/anti-gravity-levitating-water-drop-humidifier",
