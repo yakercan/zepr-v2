@@ -78,12 +78,14 @@ export function VariantDropdown({
   return (
     <div
       ref={wrapperRef}
-      /* `min-w-0 max-w-full` so the trigger shrinks to fit its
-       * flex row (the PDP picker row / offer-unit card) instead of
-       * pushing its label out over the neighbouring tiered-offer
-       * bubble — paired with the `min-w-0 truncate` label below,
-       * this lets a long "Option: Value" clip with an ellipsis. */
-      className={cn("relative inline-block min-w-0 max-w-full", className)}
+      /* Flex (not inline-block) + `min-w-0 max-w-full` so the trigger
+       * shrinks to fit its row (the PDP picker row / offer-unit card)
+       * instead of pushing its label out over the neighbouring
+       * tiered-offer bubble. Flex here is deliberate: it lets the
+       * button below opt back into shrinking (the shared pill chrome
+       * pins it `shrink-0`), which is what finally gives the
+       * `min-w-0 truncate` label a bounded box to ellipsis against. */
+      className={cn("relative flex min-w-0 max-w-full", className)}
     >
       <button
         type="button"
@@ -92,7 +94,11 @@ export function VariantDropdown({
         aria-haspopup="listbox"
         className={cn(
           pillClasses(open || !!currentValue, "outline"),
-          "flex items-center gap-1.5",
+          /* `min-w-0 shrink` overrides the pill chrome's `shrink-0`
+           * for this one trigger so a long "Option: Value" label can
+           * shrink and ellipsis inside its row instead of overflowing
+           * the card. tailwind-merge keeps the later `shrink`. */
+          "flex min-w-0 shrink items-center gap-1.5",
           isCompact ? "px-3 py-1 text-xs" : "px-4 py-2",
         )}
       >
