@@ -76,7 +76,15 @@ export function VariantDropdown({
   const isCompact = size === "sm";
 
   return (
-    <div ref={wrapperRef} className={cn("relative inline-block", className)}>
+    <div
+      ref={wrapperRef}
+      /* `min-w-0 max-w-full` so the trigger shrinks to fit its
+       * flex row (the PDP picker row / offer-unit card) instead of
+       * pushing its label out over the neighbouring tiered-offer
+       * bubble — paired with the `min-w-0 truncate` label below,
+       * this lets a long "Option: Value" clip with an ellipsis. */
+      className={cn("relative inline-block min-w-0 max-w-full", className)}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -88,7 +96,7 @@ export function VariantDropdown({
           isCompact ? "px-3 py-1 text-xs" : "px-4 py-2",
         )}
       >
-        <span className="truncate">{labelText}</span>
+        <span className="min-w-0 truncate">{labelText}</span>
         <ChevronDownIcon
           className={cn(
             "shrink-0 transition-transform duration-150",
