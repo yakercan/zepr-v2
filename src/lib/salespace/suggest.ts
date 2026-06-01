@@ -1,6 +1,8 @@
 import "server-only";
 
+import type { Market } from "@/config/markets";
 import { env } from "@/env";
+import { getServerMarket } from "@/lib/market/server";
 import { searchProducts } from "@/lib/salespace/search";
 import type { SearchProduct } from "@/types/product";
 
@@ -72,6 +74,24 @@ export async function getSearchSuggestions(
   return trimmed ? getQuerySuggestions(trimmed) : getPopularSuggestions();
 }
 
+/**
+ * Read a per-market price column off a raw autocomplete hit — same
+ * contract as the search client's projector: column name is the
+ * base field plus the market suffix (`""` = USA baseline), and a
+ * missing / non-positive value yields `undefined` so the caller
+ * falls back to the baseline rather than surfacing a $0.00.
+ */
+function marketCents(
+  raw: Record<string, unknown>,
+  baseField: string,
+  suffix: string,
+): number | undefined {
+  const value = raw[`${baseField}${suffix}`];
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
 /* ------------------------------------------------------------------ */
 /* Empty-query path — curated keywords + best-sellers                  */
 /* ------------------------------------------------------------------ */
@@ -113,6 +133,11 @@ async function getQuerySuggestions(query: string): Promise<SuggestResult> {
   const apiKey = env.SALESPACE_SEARCH_API_KEY;
   if (!apiKey) return EMPTY;
 
+  /* Autocomplete hits carry the same all-market price columns as
+   * /search, so the upstream response is country-agnostic (shared
+   * cache) and we project the active market's columns below. */
+  const market = await getServerMarket();
+
   const headers = {
     "X-API-Key": apiKey,
     "Content-Type": "application/json",
@@ -135,7 +160,7 @@ async function getQuerySuggestions(query: string): Promise<SuggestResult> {
 
   const [keywords, products] = await Promise.all([
     extractKeywords(keywordsRes),
-    extractProducts(productsRes),
+    extractProducts(productsRes, market),
   ]);
 
   return { keywords, products };
@@ -186,6 +211,7 @@ interface RawAutocompleteResponse {
 
 async function extractProducts(
   res: PromiseSettledResult<Response>,
+  market: Market,
 ): Promise<SuggestProduct[]> {
   if (res.status !== "fulfilled" || !res.value.ok) {
     if (res.status === "rejected") {
@@ -196,7 +222,7 @@ async function extractProducts(
   try {
     const data = (await res.value.json()) as RawAutocompleteResponse;
     return (data.suggestions ?? [])
-      .map(normalizeProduct)
+      .map((p) => normalizeProduct(p, market))
       .filter((p): p is SuggestProduct => p !== null)
       .slice(0, MAX_PRODUCTS);
   } catch (err) {
@@ -207,6 +233,7 @@ async function extractProducts(
 
 function normalizeProduct(
   raw: RawAutocompleteSuggestion,
+  market: Market,
 ): SuggestProduct | null {
   if (
     !raw.id ||
@@ -218,13 +245,18 @@ function normalizeProduct(
   ) {
     return null;
   }
+  const suffix = market.salespaceSuffix;
+  const rawRecord = raw as Record<string, unknown>;
   return {
     id: raw.id,
     handle: raw.handle,
     title: raw.title,
     image_url: raw.image_url,
-    price_min_cents: raw.price_min_cents,
-    compare_at_min_cents: raw.compare_at_min_cents,
-    currency: raw.currency,
+    price_min_cents:
+      marketCents(rawRecord, "price_min_cents", suffix) ?? raw.price_min_cents,
+    compare_at_min_cents:
+      marketCents(rawRecord, "compare_at_min_cents", suffix) ??
+      raw.compare_at_min_cents,
+    currency: market.currency,
   };
 }

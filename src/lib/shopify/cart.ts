@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getServerCountry } from "@/lib/market/server";
 import { shopifyFetch } from "@/lib/shopify/client";
 import type { CartLine } from "@/types/cart";
 
@@ -31,6 +32,18 @@ import type { CartLine } from "@/types/cart";
  * pre-fills the customer profile, address book, and saved payment
  * methods. Guest mode passes `undefined` and the cart stays
  * anonymous on Shopify.
+ *
+ * Multi-market pricing: the cart's currency is governed entirely by
+ * `buyerIdentity.countryCode`. We stamp it from the visitor's
+ * resolved market (`getServerCountry()`) at creation, so a cart is
+ * priced in the local currency from line one — and because *both*
+ * the displayed `cost` and what Shopify checkout charges derive from
+ * that single stored field, display and charge can never diverge
+ * (the "show £X, charge $Y" trap). If a returning shopper's market
+ * has drifted from the cart's stored country (relocation, VPN),
+ * `getOrCreateCart` repriceses the cart via `cartBuyerIdentityUpdate`
+ * on the next mutation, keeping the two aligned. Country is resolved
+ * inside this module, so the action layer needs no country plumbing.
  */
 
 /* ------------------------------------------------------------------ */
@@ -55,6 +68,7 @@ const CART_FRAGMENT = /* GraphQL */ `
     }
     buyerIdentity {
       email
+      countryCode
     }
     lines(first: 250) {
       nodes {
@@ -273,6 +287,9 @@ export interface RawCart {
   };
   buyerIdentity: {
     email: string | null;
+    /** ISO 3166-1 alpha-2 of the cart's pricing market. Drives both
+     *  the returned `cost` currency and what checkout charges. */
+    countryCode: string | null;
   };
   lines: {
     nodes: RawCartLine[];
@@ -291,6 +308,12 @@ export interface Cart {
   checkoutUrl: string;
   subtotalCents: number;
   currency: string;
+  /** The cart's pricing market (ISO alpha-2), read from
+   *  `buyerIdentity.countryCode`. `getOrCreateCart` compares this
+   *  against the visitor's current market to decide whether to
+   *  reprice. `null` only for legacy carts created before the
+   *  field was stamped. */
+  countryCode: string | null;
   lines: ReadonlyArray<CartLine>;
 }
 
@@ -368,6 +391,7 @@ export function rawCartToCart(raw: RawCart): Cart {
     checkoutUrl: raw.checkoutUrl,
     subtotalCents: toCents(raw.cost.subtotalAmount),
     currency: raw.cost.subtotalAmount.currencyCode,
+    countryCode: raw.buyerIdentity.countryCode,
     lines: cartToCartLines(raw),
   };
 }
@@ -419,6 +443,10 @@ interface CartCreateInput {
   buyerIdentity?: {
     customerAccessToken?: string;
     email?: string;
+    /** Pricing market. When omitted, `cartCreate` stamps the
+     *  visitor's resolved market so a cart is always priced in the
+     *  local currency from creation. */
+    countryCode?: string;
   };
   /** Cart-level attributes stamped at creation time — primarily
    *  the UTM attribution payload so the merge / fresh-cart path
@@ -435,6 +463,16 @@ interface CartCreateInput {
  */
 export async function cartCreate(input: CartCreateInput): Promise<Cart | null> {
   try {
+    /* Always stamp the visitor's market onto the new cart's buyer
+     * identity (unless the caller already specified one), so the
+     * cart prices in the local currency from line one and checkout
+     * charges the same. Merged with any caller-provided token /
+     * email rather than replacing it. */
+    const country = await getServerCountry();
+    const buyerIdentity = {
+      ...input.buyerIdentity,
+      countryCode: input.buyerIdentity?.countryCode ?? country,
+    };
     const data = await shopifyFetch<{
       cartCreate: { cart: RawCart | null; userErrors: RawUserError[] };
     }>(
@@ -442,7 +480,7 @@ export async function cartCreate(input: CartCreateInput): Promise<Cart | null> {
       {
         input: {
           lines: input.lines?.map(toLineInputForCreate),
-          buyerIdentity: input.buyerIdentity,
+          buyerIdentity,
           ...(input.attributes && input.attributes.length > 0
             ? { attributes: input.attributes }
             : {}),
@@ -537,7 +575,11 @@ export async function cartLinesRemove(
 
 export async function cartBuyerIdentityUpdate(
   cartId: string,
-  buyerIdentity: { customerAccessToken?: string; email?: string },
+  buyerIdentity: {
+    customerAccessToken?: string;
+    email?: string;
+    countryCode?: string;
+  },
 ): Promise<Cart | null> {
   try {
     const data = await shopifyFetch<{
@@ -626,14 +668,33 @@ export async function getOrCreateCart(
   customerAccessToken?: string,
   attributes?: ReadonlyArray<{ key: string; value: string }>,
 ): Promise<Cart | null> {
+  const country = await getServerCountry();
   if (cartId) {
     const existing = await fetchCart(cartId);
-    if (existing) return existing;
+    if (existing) {
+      /* Reprice on market drift: a returning shopper whose cart was
+       * minted under a different country (relocation, VPN) gets the
+       * cart's buyer identity updated to their current market, so
+       * its prices — and checkout — switch to the local currency.
+       * `cartBuyerIdentityUpdate` returns the repriced cart; fall
+       * back to the existing one if the update fails so we never
+       * drop the shopper's lines over a reprice hiccup. We re-pass
+       * the customer token so the country update doesn't detach the
+       * cart from the signed-in customer. */
+      if (existing.countryCode !== country) {
+        const repriced = await cartBuyerIdentityUpdate(cartId, {
+          countryCode: country,
+          customerAccessToken,
+        });
+        return repriced ?? existing;
+      }
+      return existing;
+    }
   }
   return cartCreate({
     buyerIdentity: customerAccessToken
-      ? { customerAccessToken }
-      : undefined,
+      ? { customerAccessToken, countryCode: country }
+      : { countryCode: country },
     attributes,
   });
 }

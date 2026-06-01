@@ -1,6 +1,8 @@
 import "server-only";
 
+import type { Market } from "@/config/markets";
 import { env } from "@/env";
+import { getServerMarket } from "@/lib/market/server";
 import { PRODUCTS_PAGE_SIZE } from "@/lib/pagination";
 import type {
   SearchFacets,
@@ -116,6 +118,16 @@ export async function searchProducts(
 
   const url = `${SALESPACE_API_BASE}/search?${search.toString()}`;
 
+  /* Resolve the visitor's market once per call. The Salespace
+   * payload carries *every* market's price columns on every hit
+   * (USA baseline + the `_au`/`_ca`/`_gb`/`_nz`/`_sg` suffixed
+   * sets), so the response bytes are country-agnostic and the
+   * fetch cache below stays shared across markets — we just
+   * *project* the active market's columns out of the cached
+   * payload in `normalizeProduct`. Nothing about the request or
+   * cache key changes per country. */
+  const market = await getServerMarket();
+
   try {
     const res = await fetch(url, {
       headers: {
@@ -134,7 +146,7 @@ export async function searchProducts(
       return EMPTY_RESULT;
     }
     const raw = (await res.json()) as RawSearchResponse;
-    return normalizeSearchResponse(raw, params);
+    return normalizeSearchResponse(raw, params, market);
   } catch (err) {
     console.error("[salespace] /search error", err);
     return EMPTY_RESULT;
@@ -165,6 +177,11 @@ interface RawSearchProduct {
   handle?: string;
   title?: string;
   image_url?: string;
+  /* USA baseline price columns (unsuffixed). The payload also
+   * carries one suffixed set per non-US market — `price_min_cents_gb`,
+   * `compare_at_min_cents_au`, … — which we read dynamically by
+   * `${field}${market.salespaceSuffix}` in `marketCents()` rather
+   * than enumerating all 20 here. */
   price_min_cents?: number;
   price_max_cents?: number;
   compare_at_min_cents?: number;
@@ -187,9 +204,10 @@ interface RawSearchProduct {
 function normalizeSearchResponse(
   raw: RawSearchResponse,
   params: SearchProductsParams,
+  market: Market,
 ): SearchResult {
   const hits = (raw.hits ?? [])
-    .map(normalizeProduct)
+    .map((p) => normalizeProduct(p, market))
     .filter((p): p is SearchProduct => p !== null);
 
   return {
@@ -272,7 +290,32 @@ function normalizeFacets(raw: unknown): SearchFacets | undefined {
  *   |      |      |   ✓   | upstream   | video         |
  *   |      |      |       | upstream   | —             |
  */
-function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
+/**
+ * Read a per-market price column off the raw hit.
+ *
+ * Builds the column name from the canonical base field plus the
+ * market's suffix (`""` for USA → the unsuffixed baseline column,
+ * `"_gb"` → `price_min_cents_gb`, …). Returns `undefined` for
+ * missing / non-positive values so the caller can fall back to the
+ * USA baseline — the columns are `NOT NULL DEFAULT 0`, so a `0`
+ * means "no per-market price for this row" and we'd rather show the
+ * baseline than a $0.00.
+ */
+function marketCents(
+  raw: RawSearchProduct,
+  baseField: string,
+  suffix: string,
+): number | undefined {
+  const value = (raw as Record<string, unknown>)[`${baseField}${suffix}`];
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
+function normalizeProduct(
+  raw: RawSearchProduct,
+  market: Market,
+): SearchProduct | null {
   if (
     !raw.id ||
     !raw.handle ||
@@ -283,6 +326,22 @@ function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
   ) {
     return null;
   }
+
+  /* Project the active market's columns. USA uses an empty suffix,
+   * so this same path reads the unsuffixed baseline for the home
+   * market with no special-casing. Currency is the market's ISO
+   * code (the payload's own `currency` stays the shop default);
+   * the displayed number is the market column, the label is the
+   * market currency, and `Price` localises the pair. */
+  const suffix = market.salespaceSuffix;
+  const priceMin = marketCents(raw, "price_min_cents", suffix) ?? raw.price_min_cents;
+  const priceMax =
+    marketCents(raw, "price_max_cents", suffix) ??
+    (typeof raw.price_max_cents === "number" ? raw.price_max_cents : priceMin);
+  const compareMin =
+    marketCents(raw, "compare_at_min_cents", suffix) ?? raw.compare_at_min_cents;
+  const compareMax =
+    marketCents(raw, "compare_at_max_cents", suffix) ?? raw.compare_at_max_cents;
 
   const img1 = parseMetafieldUrl(raw.metafields?.["custom.product_image_1"]);
   const img2 = parseMetafieldUrl(raw.metafields?.["custom.product_image_2"]);
@@ -301,14 +360,11 @@ function normalizeProduct(raw: RawSearchProduct): SearchProduct | null {
     image_url,
     hover_image_url,
     hover_video_url: video,
-    price_min_cents: raw.price_min_cents,
-    price_max_cents:
-      typeof raw.price_max_cents === "number"
-        ? raw.price_max_cents
-        : raw.price_min_cents,
-    compare_at_min_cents: raw.compare_at_min_cents,
-    compare_at_max_cents: raw.compare_at_max_cents,
-    currency: raw.currency,
+    price_min_cents: priceMin,
+    price_max_cents: priceMax,
+    compare_at_min_cents: compareMin,
+    compare_at_max_cents: compareMax,
+    currency: market.currency,
     available: raw.available !== false,
     badges: raw.badges,
     rating: parseRating(raw.rating),

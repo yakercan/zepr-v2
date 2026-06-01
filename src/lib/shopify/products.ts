@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { resolveLegalDisclaimerHtml } from "@/lib/legal/disclaimers";
+import { getServerCountry } from "@/lib/market/server";
 import { parseOffersMetafield, productIdToGid } from "@/lib/offers";
 import { shopifyFetch } from "@/lib/shopify/client";
 import type {
@@ -29,8 +30,17 @@ import type {
  * without sweeping every page.
  */
 
+/* `@inContext(country:)` localises every MoneyV2 in the response to
+ * the visitor's market — Shopify converts using the Markets FX +
+ * rounding rules the merchant configured, i.e. the *same* numbers
+ * checkout charges. The `country` variable is part of the POST body,
+ * so Next's data cache keys each market to its own entry
+ * automatically (no manual cache-key work). Until the merchant
+ * enables per-country prices in Shopify Markets, every market
+ * returns the shop default (USD) — the documented fallback. */
 const PRODUCT_BY_HANDLE_QUERY = /* GraphQL */ `
-  query Product($handle: String!) {
+  query Product($handle: String!, $country: CountryCode)
+  @inContext(country: $country) {
     product(handle: $handle) {
       id
       handle
@@ -267,11 +277,15 @@ interface ProductByHandleResponse {
  */
 export const getProductByHandle = cache(
   async (handle: string): Promise<ProductDetail | null> => {
+    const country = await getServerCountry();
     const data = await shopifyFetch<ProductByHandleResponse>(
       PRODUCT_BY_HANDLE_QUERY,
-      { handle },
+      { handle, country },
       {
         revalidate: 3600,
+        /* One tag per handle (not per handle+country) so an admin
+         * product edit purges every market's cached copy in one
+         * `revalidateTag("product:<handle>")`. */
         tags: [`product:${handle}`],
       },
     );
@@ -284,7 +298,8 @@ export const getProductByHandle = cache(
 /* ---------- Companion products (tiered-offers bundle slots) ---------- */
 
 const COMPANION_PRODUCTS_QUERY = /* GraphQL */ `
-  query CompanionProducts($ids: [ID!]!) {
+  query CompanionProducts($ids: [ID!]!, $country: CountryCode)
+  @inContext(country: $country) {
     nodes(ids: $ids) {
       ... on Product {
         id
@@ -367,9 +382,10 @@ export async function getCompanionProducts(
 ): Promise<Array<CompanionProduct | null>> {
   if (numericIds.length === 0) return [];
   const gids = numericIds.map(productIdToGid);
+  const country = await getServerCountry();
   const data = await shopifyFetch<CompanionProductsResponse>(
     COMPANION_PRODUCTS_QUERY,
-    { ids: gids },
+    { ids: gids, country },
     {
       revalidate: 3600,
       /* Same tag namespace as the anchor fetcher so a single

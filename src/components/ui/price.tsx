@@ -1,3 +1,4 @@
+import { localeForCurrency } from "@/config/markets";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,17 +19,25 @@ import { cn } from "@/lib/utils";
  *   - Cents are stored as integers everywhere (Salespace + our
  *     types), so the component takes `cents` and divides once.
  *     Callers never have to remember "is this dollars or cents?".
+ *   - Multi-market formatting is driven entirely by the `currency`
+ *     prop: the locale is derived from it via `localeForCurrency`,
+ *     so a GBP amount renders `£1,234.56` (en-GB) and a CAD amount
+ *     `CA$1,234.56` (en-CA) with no context, no prop-drilling, and
+ *     no client-side FX conversion — the amount is already the
+ *     market's presentment price (Salespace per-market column or
+ *     Shopify `@inContext`), we only localise its *display*. Each
+ *     geo-targeted visitor sees a single currency, so the locale's
+ *     native symbol is unambiguous to them.
  *   - We run `Intl.NumberFormat` (cached internally by the JS
  *     engine) for the symbol + grouping, then regex-split the
  *     result. Currencies whose format doesn't match
  *     `<sym><dollars>.<cents>` (e.g. JPY) fall back to the plain
- *     formatted string, so nothing breaks for non-USD storefronts.
+ *     formatted string, so nothing breaks for non-decimal currencies.
  *   - The `accent` prop lets the card pass the headline badge's
  *     colour through to the current price. We apply it inline so
  *     the JIT doesn't need to know every possible accent ahead of
  *     time (badges live in CSS vars + theme tokens).
  */
-const DEFAULT_LOCALE = "en-US";
 
 interface PriceParts {
   symbol: string;
@@ -37,7 +46,7 @@ interface PriceParts {
 }
 
 function splitPrice(cents: number, currency: string): PriceParts | null {
-  const formatted = new Intl.NumberFormat(DEFAULT_LOCALE, {
+  const formatted = new Intl.NumberFormat(localeForCurrency(currency), {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
@@ -93,7 +102,7 @@ export function Price({
   if (!parts) {
     return (
       <span className={className}>
-        {new Intl.NumberFormat(DEFAULT_LOCALE, {
+        {new Intl.NumberFormat(localeForCurrency(currency), {
           style: "currency",
           currency,
         }).format(cents / 100)}
