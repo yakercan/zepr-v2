@@ -12,12 +12,20 @@ export const metadata: Metadata = {
   },
   description: site.description,
   metadataBase: new URL(`https://${site.domain}`),
-  /* Favicon shares the same asset as the in-header Logo so the
-   * tab icon and the storefront mark can't drift apart. Pointing
-   * `metadata.icons` at the public file keeps a single source of
-   * truth — no `app/icon.svg` duplicate to keep in sync. */
+  /* Icons share the same source mark as the in-header Logo so the
+   * tab icon and the storefront brand can't drift apart. SVG is the
+   * primary favicon — scalable and crisp in every modern browser —
+   * with the square PNG as a raster fallback for the few surfaces
+   * that don't take SVG, and as the `apple-touch-icon` (iOS home
+   * screens require a raster, never SVG). Pointing at the public
+   * files keeps a single source of truth — no `app/icon.*`
+   * duplicates to keep in sync. */
   icons: {
-    icon: "/zepr-logo.svg",
+    icon: [
+      { url: "/zepr-logo.svg", type: "image/svg+xml" },
+      { url: "/zepr-logo.png", type: "image/png", sizes: "any" },
+    ],
+    apple: "/zepr-logo.png",
   },
   /* Social-card defaults. Per-page `generateMetadata` overrides
    * `title`/`description`/`url`/`images` (PDPs ship the product
