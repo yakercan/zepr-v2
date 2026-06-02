@@ -41,7 +41,7 @@
 export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
   "101": "/products/hip-raised-multifunctional-bedside-sleep-cushion",
   "102": "/products/mini-portable-bag-sealer",
-  "103": "/products/desktop-vacuum-cleaner",
+  "103": "/products/mini-desktop-vacuum-cleaner",
   "104": "/products/dogs-portable-water-bottle",
   "105": "/products/pet-hair-removal-gloves",
   "106": "/products/rechargeable-face-cleanser",
@@ -58,7 +58,7 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
   "117": "/products/retractable-dog-leash-with-light-bag-dispenser",
   "118": "/products/head-massager-for-migraine-relief",
   "119": "/products/drain-hair-insect-blockers",
-  "120": "/products/quick-easy-egg-shell-opener",
+  "120": "/products/quick-easy-egg-cracker",
   "121": "/products/inflatable-standing-boxing-trainer",
   "122": "/products/yoga-block-set-2-pack",
   "123": "/products/pelvic-floor-thigh-trainer",
