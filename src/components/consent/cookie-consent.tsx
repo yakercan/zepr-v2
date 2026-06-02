@@ -49,7 +49,7 @@ import { cn } from "@/lib/utils";
  * production: when false, the real geo gate (UK + Singapore) governs
  * visibility.
  */
-const FORCE_SHOW_FOR_PREVIEW = true;
+const FORCE_SHOW_FOR_PREVIEW = false;
 
 export function CookieConsent({
   requiresConsent,
