@@ -86,13 +86,13 @@ export const FAQ_SECTIONS: ReadonlyArray<FaqSection> = [
         id: "delivery-regions",
         question: "Where do you deliver to?",
         answer:
-          "Currently, we deliver across the United States only. For international availability, subscribe to our newsletter — we’ll let you know as soon as we expand.",
+          "We currently deliver to the United States, United Kingdom, Canada, Singapore, New Zealand, and Australia. For availability in other countries, subscribe to our newsletter — we’ll let you know as soon as we expand.",
       },
       {
         id: "delivery-time",
         question: "When can I expect my delivery?",
         answer:
-          "For domestic shipments (U.S.), delivery typically takes up to 7 days.\nFor international shipments, please allow up to 14 days.",
+          "For domestic shipments, delivery typically takes up to 7 days.\nFor international shipments, please allow up to 14 days.",
       },
       {
         id: "track-order",
