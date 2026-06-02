@@ -46,8 +46,7 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
   "105": "/products/pet-hair-removal-gloves",
   "106": "/products/rechargeable-face-cleanser",
   "107": "/products/domino-train",
-  "108":
-    "/products/air-humidifier-cute-cat-ultra-silent-usb-office-household-bedroom-car-aromatherapy-air-purifier-with-led-cool-mist-spray",
+  "108": "/products/waterproof-pet-hair-trimmer-with-led-light",
   "109": "/products/self-warming-cat-dog-bed-mat-washable-soft-pet-sleeping-mat",
   "110": "/products/handheld-portable-car-vacuum-cleaner",
   "111": "/products/shoe-washing-machine-bag",
