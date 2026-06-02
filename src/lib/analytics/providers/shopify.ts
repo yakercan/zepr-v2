@@ -150,10 +150,18 @@ function send(event: Parameters<typeof sendShopifyAnalytics>[0]): void {
  *  follow-up when locale support lands. */
 function buildEnvelope() {
   if (!config.shopId) return null;
-  const consent = getAnalyticsConsent();
+  /* Consent gate. `getAnalyticsConsent()` defaults to granted, so
+   * markets without a banner (US/CA/NZ/AU) always pass. In the
+   * opt-in markets (UK/Singapore) `<CookieConsent>` flips it off
+   * until the shopper accepts — so a `false` here means "no consent
+   * yet / declined" and we send nothing: no event, and
+   * `useShopifyCookies` independently withholds the `_shopify_*`
+   * cookies on the same signal. Re-checked at fire time (not mount)
+   * so withdrawing consent mid-session stops tracking immediately. */
+  if (!getAnalyticsConsent()) return null;
   return {
     ...getClientBrowserParameters(),
-    hasUserConsent: consent,
+    hasUserConsent: true,
     shopifySalesChannel: ShopifySalesChannel.headless,
     shopId: `gid://shopify/Shop/${config.shopId}`,
     /* → `hydrogenSubchannelId`. The piece that ties the session to
@@ -163,13 +171,11 @@ function buildEnvelope() {
     /* Consent flags → `analytics_allowed` / `marketing_allowed` /
      * `sale_of_data_allowed` in the customer-tracking schema. They
      * default to `false` when omitted, which makes Shopify drop the
-     * event from Analytics + Live View. This store runs no consent
-     * banner and the app's analytics consent defaults to granted, so
-     * we mirror that single source of truth here — when a banner
-     * lands and flips `getAnalyticsConsent()`, these follow. */
-    analyticsAllowed: consent,
-    marketingAllowed: consent,
-    saleOfDataAllowed: consent,
+     * event from Analytics + Live View. We only reach this point
+     * with consent granted (the gate above), so they're `true`. */
+    analyticsAllowed: true,
+    marketingAllowed: true,
+    saleOfDataAllowed: true,
     currency: config.currency as CurrencyCode,
     acceptedLanguage: config.acceptedLanguage as LanguageCode,
   };

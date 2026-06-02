@@ -226,6 +226,15 @@
    *
    *   --z-header              50      site header (sticky)
    *   --z-cart-drawer         70      cart drawer panel (desktop)
+   *   --z-cookie-banner       90      cookie-consent drawer. Non-modal
+   *                                   (no backdrop, page stays
+   *                                   interactive so it can't hurt
+   *                                   conversion); sits above the
+   *                                   header + cart drawer so the
+   *                                   consent choice is prioritised,
+   *                                   but below modals/sheets which
+   *                                   are deliberate full-attention
+   *                                   surfaces.
    *   --z-modal-base         110      default modal panel
    *   --z-modal-preview      130      preview-tier modal panel
    *                                   (variant pick)
@@ -253,6 +262,7 @@
    */
   --z-header: 50;
   --z-cart-drawer: 70;
+  --z-cookie-banner: 90;
   --z-modal-base: 110;
   --z-modal-preview: 130;
   --z-modal-confirm: 150;

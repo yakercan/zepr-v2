@@ -5,6 +5,7 @@ import { AttributionHydrator } from "@/components/attribution/attribution-hydrat
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { CartLoginHandoff } from "@/components/cart/cart-login-handoff";
 import { CartMetaHydrator } from "@/components/cart/cart-meta-hydrator";
+import { CookieConsent } from "@/components/consent/cookie-consent";
 import { BfcacheRefresh } from "@/components/layout/bfcache-refresh";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -13,6 +14,8 @@ import { env } from "@/env";
 import { getAttribution } from "@/lib/attribution/cookie";
 import { getAuthState } from "@/lib/auth/session";
 import { getCartHandoffPending } from "@/lib/cart/cookie";
+import { getConsentChoice } from "@/lib/consent/server";
+import { getServerMarket } from "@/lib/market/server";
 
 /**
  * Top-level layout shell. Wraps every page below the device gate.
@@ -71,11 +74,14 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
    * sub-millisecond. The slow Shopify cart fetch happens inside
    * `<SiteHeader>` and only blocks the header itself, not the
    * meta hydration mounted here. */
-  const [cartHandoffPending, attribution, authState] = await Promise.all([
-    getCartHandoffPending(),
-    getAttribution(),
-    getAuthState(),
-  ]);
+  const [cartHandoffPending, attribution, authState, market, consentChoice] =
+    await Promise.all([
+      getCartHandoffPending(),
+      getAttribution(),
+      getAuthState(),
+      getServerMarket(),
+      getConsentChoice(),
+    ]);
 
   /* Checkout subdomain — server-only env. Prefer the dedicated
    * `checkout.<domain>` when set, fall back to the storefront
@@ -105,6 +111,15 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
       <CartDrawer />
       <CartLoginHandoff pending={cartHandoffPending} />
       <AttributionHydrator attribution={attribution} />
+      {/* Mounted before `<ShopifyAnalytics>` so its consent-off
+          effect runs before the first page-view fires in an opt-in
+          market (UK / Singapore). Non-required markets render it too
+          but it stays invisible and analytics keeps its granted
+          default. */}
+      <CookieConsent
+        requiresConsent={market.requiresCookieConsent}
+        priorChoice={consentChoice}
+      />
       <Suspense fallback={null}>
         <ShopifyAnalytics
           shopId={env.SHOPIFY_SHOP_ID}

@@ -39,15 +39,22 @@ export interface Market {
   locale: string;
   /** Salespace column suffix; `""` for the USA baseline. */
   salespaceSuffix: string;
+  /** Whether this market legally requires opt-in cookie consent
+   *  before analytics fire. Drives the cookie banner (UK → UK GDPR,
+   *  Singapore → PDPA). Markets without it (US/CA/NZ/AU) never see
+   *  the banner and keep analytics on by default. Piggybacks on the
+   *  same geo resolution the currency logic already uses, so there's
+   *  no second geo path to maintain. */
+  requiresCookieConsent: boolean;
 }
 
 export const MARKETS: Readonly<Record<MarketCountry, Market>> = {
-  US: { country: "US", currency: "USD", locale: "en-US", salespaceSuffix: "" },
-  GB: { country: "GB", currency: "GBP", locale: "en-GB", salespaceSuffix: "_gb" },
-  CA: { country: "CA", currency: "CAD", locale: "en-CA", salespaceSuffix: "_ca" },
-  SG: { country: "SG", currency: "SGD", locale: "en-SG", salespaceSuffix: "_sg" },
-  NZ: { country: "NZ", currency: "NZD", locale: "en-NZ", salespaceSuffix: "_nz" },
-  AU: { country: "AU", currency: "AUD", locale: "en-AU", salespaceSuffix: "_au" },
+  US: { country: "US", currency: "USD", locale: "en-US", salespaceSuffix: "", requiresCookieConsent: false },
+  GB: { country: "GB", currency: "GBP", locale: "en-GB", salespaceSuffix: "_gb", requiresCookieConsent: true },
+  CA: { country: "CA", currency: "CAD", locale: "en-CA", salespaceSuffix: "_ca", requiresCookieConsent: false },
+  SG: { country: "SG", currency: "SGD", locale: "en-SG", salespaceSuffix: "_sg", requiresCookieConsent: true },
+  NZ: { country: "NZ", currency: "NZD", locale: "en-NZ", salespaceSuffix: "_nz", requiresCookieConsent: false },
+  AU: { country: "AU", currency: "AUD", locale: "en-AU", salespaceSuffix: "_au", requiresCookieConsent: false },
 } as const;
 
 /** USA is the baseline: unsuffixed Salespace columns, no shortcode,
