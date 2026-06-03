@@ -212,7 +212,14 @@ function OfferRow({
           </span>
         </span>
 
-        <span className="flex flex-shrink-0 flex-col items-end leading-tight">
+        {/* `min-h` reserves the height of a full two-line price
+            (discounted `text-base` + `mt-0.5` + compare `text-xs`,
+            all `leading-none` ≈ 1.875rem) and `justify-center`
+            centres the content within it. So a row without a
+            compare (Buy 1) keeps its single price vertically
+            centred *and* matches the closed height of the rows that
+            do show a compare. */}
+        <span className="flex min-h-[1.875rem] flex-shrink-0 flex-col items-end justify-center leading-tight">
           <Price
             cents={discountedTotalCents}
             currency={currency}
