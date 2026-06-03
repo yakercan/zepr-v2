@@ -219,19 +219,13 @@ function OfferRow({
             accent={isSelected ? "var(--color-brand)" : undefined}
             className="text-base"
           />
-          {showCompare ? (
+          {showCompare && (
             <Price
               cents={compareTotalCents}
               currency={currency}
               variant="compare"
               className="mt-0.5"
             />
-          ) : (
-            /* Reserve the compare-line slot so rows align
-             * vertically whether or not a compare is shown. */
-            <span aria-hidden className="mt-0.5 text-xs leading-none">
-              &nbsp;
-            </span>
           )}
         </span>
       </button>
