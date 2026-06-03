@@ -7,11 +7,8 @@ import { ExternalLinkIcon } from "@/components/ui/icons";
 import {
   availableValuesFor,
   findVariant,
-  shouldUseDropdownForOfferUnit,
   type OptionSelection,
 } from "@/lib/variants";
-import { pillClasses } from "@/lib/styles";
-import { cn } from "@/lib/utils";
 import type { ProductOption, ProductVariant } from "@/types/product";
 
 /**
@@ -80,14 +77,13 @@ export interface UnitSlotConfig {
  *     the row so a shopper can inspect the bundled product
  *     without losing their current cart configuration.
  *
- * Per-option presentation via `shouldUseDropdownForOfferUnit`:
- *
- *   - 1 option, ≤ 3 values → inline chips
- *   - > 1 option OR > 3 values → dropdown (compact size)
- *
- * Tighter than the PDP top picker's threshold on purpose — the
- * unit cards are dense single-row strips, so even modest chip
- * rows benefit from folding into a dropdown sooner.
+ * Per-option presentation: every option renders as a compact
+ * dropdown. The unit cards are dense single-row strips, so folding
+ * each option into a dropdown — regardless of option or value count
+ * — keeps the row from growing vertically (stacked chip rows) or
+ * past the column width (wide chip rows). The PDP top picker keeps
+ * its own chip/dropdown threshold; this collapse is specific to the
+ * offer units.
  *
  * Pure presentation. All state lives in `<BuyForm>` because the
  * Add-to-cart + Buy Now CTAs need it to compose the cart payload;
@@ -168,51 +164,23 @@ function UnitCard({ unitNumber, slot }: UnitCardProps) {
           const visibleValues = option.values.filter((v) => reachable.has(v));
           if (visibleValues.length === 0) return null;
 
-          if (shouldUseDropdownForOfferUnit(slot.options, option)) {
-            return (
-              <VariantDropdown
-                key={option.name}
-                optionName={option.name}
-                currentValue={currentValue}
-                values={visibleValues}
-                onSelect={(value) => slot.onSelect(option.name, value)}
-                size="sm"
-              />
-            );
-          }
-
+          /* Always a dropdown. The unit cards are dense single-row
+           * strips (`#N · thumb · pickers · ↗`), so folding every
+           * option into a compact dropdown keeps the row from
+           * blowing out vertically (stacked chip rows) or past the
+           * column width (wide chip rows) regardless of option or
+           * value count. The PDP picker keeps its own chip/dropdown
+           * threshold — this collapse is specific to the offer
+           * units. */
           return (
-            <div
+            <VariantDropdown
               key={option.name}
-              className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1"
-            >
-              <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-[color:var(--color-ink-muted)]">
-                {option.name}:
-              </span>
-              {visibleValues.map((value) => {
-                const selected = currentValue === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => slot.onSelect(option.name, value)}
-                    aria-pressed={selected}
-                    aria-label={`Item ${unitNumber}, ${option.name}: ${value}`}
-                    className={cn(
-                      pillClasses(selected, "outline"),
-                      /* Tighter than the top picker — these chips
-                       * sit inside an inline wrap-row, so the
-                       * smaller pad keeps a multi-option product
-                       * from blowing out the card's vertical
-                       * height. */
-                      "px-3 py-1 text-xs",
-                    )}
-                  >
-                    {value}
-                  </button>
-                );
-              })}
-            </div>
+              optionName={option.name}
+              currentValue={currentValue}
+              values={visibleValues}
+              onSelect={(value) => slot.onSelect(option.name, value)}
+              size="sm"
+            />
           );
         })}
       </div>

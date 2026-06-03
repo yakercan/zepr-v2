@@ -38,29 +38,6 @@ export function shouldUseDropdownForPdp(option: ProductOption): boolean {
 }
 
 /**
- * Tiered-offer unit cards — should this option render as a
- * dropdown instead of a chip row?
- *
- * The unit cards are dense (a single inline row per slot:
- * `#N · thumb · chips/dropdowns · arrow`) so the threshold is
- * much tighter than the PDP picker:
- *
- *   - Multiple option groups on the same card → all options as
- *     dropdowns. Stacking two chip rows inside a card balloons
- *     the card's vertical height; one dropdown per option fits
- *     on a single line.
- *   - A single option with more than three values → dropdown.
- *     Anything wider than three chips starts pushing the card
- *     past the picker column on narrow viewports.
- */
-export function shouldUseDropdownForOfferUnit(
-  options: readonly ProductOption[],
-  option: ProductOption,
-): boolean {
-  return options.length > 1 || option.values.length > 3;
-}
-
-/**
  * Find the variant whose `selectedOptions` exactly matches every
  * entry in `selection`. Returns `undefined` when the selection is
  * partial (some options unset) or refers to a combination the
