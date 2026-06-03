@@ -148,7 +148,7 @@ function UnitCard({ unitNumber, slot }: UnitCardProps) {
          *  filling the otherwise-empty single-configuration row
          *  with the only piece of context that identifies it. */}
         {(isCompanion || slot.options.length === 0) && (
-          <span className="line-clamp-1 text-xs font-semibold text-[color:var(--color-ink)]">
+          <span className="line-clamp-2 text-xs font-semibold text-[color:var(--color-ink)]">
             {slot.title}
           </span>
         )}
