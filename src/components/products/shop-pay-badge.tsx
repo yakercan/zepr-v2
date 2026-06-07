@@ -13,9 +13,10 @@ import { cn } from "@/lib/utils";
  * the parent CTA stack — not "is the price above $35".
  *
  * Threshold copy is intentionally hardcoded to mirror what the
- * old zepr storefront ships; the value lines up with our
- * `FREE_SHIPPING_THRESHOLD_CENTS` today, but the two are
- * independent concerns and shouldn't be coupled.
+ * old zepr storefront ships — this is Shop Pay's installment
+ * minimum (gated by Shopify at checkout), an independent concern
+ * from our `FREE_SHIPPING_THRESHOLD_CENTS` (currently $50); the
+ * two shouldn't be coupled.
  */
 export function ShopPayBadge({ className }: { className?: string }) {
   return (

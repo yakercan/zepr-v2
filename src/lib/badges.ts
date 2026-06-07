@@ -135,7 +135,7 @@ export function pickProductBadge(
 /** Single threshold for the whole storefront. Lives here so the
  *  card badge, the cart-progress bar, and any landing-page CTA all
  *  trace back to one number. */
-export const FREE_SHIPPING_THRESHOLD_CENTS = 3500;
+export const FREE_SHIPPING_THRESHOLD_CENTS = 5000;
 
 export const FREE_SHIPPING_BADGE: BadgeView = {
   label: "Free Shipping",

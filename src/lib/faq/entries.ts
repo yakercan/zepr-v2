@@ -80,7 +80,7 @@ export const FAQ_SECTIONS: ReadonlyArray<FaqSection> = [
         id: "shipping-cost",
         question: "How much will shipping be?",
         answer:
-          "Shipping is completely free for orders over $35. Shipping costs for orders below $35 are calculated at checkout.",
+          "Shipping is completely free for orders over $50. Shipping costs for orders below $50 are calculated at checkout.",
       },
       {
         id: "delivery-regions",
