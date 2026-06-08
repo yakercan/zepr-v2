@@ -138,30 +138,30 @@ export function pickProductBadge(
  * delivery badge, the cart-progress bar, and the FAQ copy.
  *
  * Per-market rule (mirrors the Shopify shipping config): the US and
- * UK sit at 50; every other market at 35.
+ * UK sit at 35; every other market at 50.
  *
  * Currency model: each value is a flat amount in **the visitor's
  * market currency**, NOT a USD amount converted per market. It works
  * because every price compared against it is already the market's
  * presentment price in minor units (Salespace per-market columns /
  * Shopify `@inContext`), and all supported markets are 2-decimal — so
- * `5000` reads as $50 / £50 and `3500` as $35 / CA$35 for the matching
+ * `3500` reads as $35 / £35 and `5000` as CA$50 / A$50 for the matching
  * visitor, with no conversion step.
  */
 const FREE_SHIPPING_THRESHOLD_BY_CURRENCY: Readonly<Record<string, number>> = {
-  USD: 5000,
-  GBP: 5000,
-  CAD: 3500,
-  SGD: 3500,
-  NZD: 3500,
-  AUD: 3500,
+  USD: 3500,
+  GBP: 3500,
+  CAD: 5000,
+  SGD: 5000,
+  NZD: 5000,
+  AUD: 5000,
 };
 
-/** Fallback for an unknown currency — the USA baseline (50). */
+/** Fallback for an unknown currency — the non-US/UK baseline (50). */
 const DEFAULT_FREE_SHIPPING_THRESHOLD_CENTS = 5000;
 
 /** Free-shipping threshold (minor units) for a presentment currency.
- *  US/UK → 5000, all other supported markets → 3500. */
+ *  US/UK → 3500, all other supported markets → 5000. */
 export function freeShippingThresholdCents(currency: string): number {
   return (
     FREE_SHIPPING_THRESHOLD_BY_CURRENCY[currency.toUpperCase()] ??
