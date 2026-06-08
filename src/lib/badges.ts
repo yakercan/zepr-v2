@@ -132,9 +132,19 @@ export function pickProductBadge(
 /* ------------------------------------------------------------------ */
 /* Free shipping (computed, additive)                                  */
 /* ------------------------------------------------------------------ */
-/** Single threshold for the whole storefront. Lives here so the
- *  card badge, the cart-progress bar, and any landing-page CTA all
- *  trace back to one number. */
+/** Single free-shipping threshold for the whole storefront. Lives
+ *  here so the card badge, the PDP delivery badge, the cart-progress
+ *  bar, and any landing-page CTA all trace back to one number.
+ *
+ *  Currency model: this is a flat **50 units of the visitor's market
+ *  currency**, NOT a fixed USD amount converted per market. It works
+ *  because every price compared against it is already the market's
+ *  presentment price in minor units (Salespace per-market columns /
+ *  Shopify `@inContext`), and all supported markets (USD/GBP/CAD/SGD/
+ *  NZD/AUD) are 2-decimal — so `5000` reads as $50 / £50 / CA$50 / …
+ *  for the matching visitor, and every display formats with that same
+ *  market currency. Keep both sides market-priced and this stays
+ *  correct with no conversion step. */
 export const FREE_SHIPPING_THRESHOLD_CENTS = 5000;
 
 export const FREE_SHIPPING_BADGE: BadgeView = {
@@ -146,6 +156,10 @@ export const FREE_SHIPPING_BADGE: BadgeView = {
   theme: { accent: "var(--color-success)" },
 };
 
+/** True when `priceCents` clears the free-shipping bar. `priceCents`
+ *  MUST be in the visitor's market currency (the same presentment
+ *  currency the rest of the UI shows), so the comparison means "≥ 50
+ *  in the local currency" — see `FREE_SHIPPING_THRESHOLD_CENTS`. */
 export function qualifiesForFreeShipping(priceCents: number): boolean {
   return priceCents >= FREE_SHIPPING_THRESHOLD_CENTS;
 }

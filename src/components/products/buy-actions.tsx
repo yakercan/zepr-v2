@@ -176,7 +176,9 @@ export function BuyActions({
       >
         Buy Now - Fast Checkout
       </button>
-      {sellable && showInstallmentBadge && <ShopPayBadge className="mt-1" />}
+      {sellable && showInstallmentBadge && (
+        <ShopPayBadge currency={product.currency} className="mt-1" />
+      )}
     </div>
   );
 }

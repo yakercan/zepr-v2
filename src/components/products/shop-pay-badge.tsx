@@ -1,24 +1,55 @@
+import { localeForCurrency } from "@/config/markets";
 import { ShopPayLogo } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 
 /**
- * "Pay in 4 interest-free installments for orders over $35.00
- * with [Shop Pay]" — the small installment promise that sits
- * directly under the Buy Now CTA on the PDP.
+ * "Pay in 4 interest-free installments for orders over <min> with
+ * [Shop Pay]" — the installment promise under the Buy Now CTA.
  *
- * Pure presentational. The legacy storefront renders this for
- * every in-stock product regardless of price (Shopify itself
- * gates the actual eligibility at checkout), so the gate here
- * is "do we have something the shopper can buy?" — managed by
- * the parent CTA stack — not "is the price above $35".
+ * # Eligibility (market-gated)
  *
- * Threshold copy is intentionally hardcoded to mirror what the
- * old zepr storefront ships — this is Shop Pay's installment
- * minimum (gated by Shopify at checkout), an independent concern
- * from our `FREE_SHIPPING_THRESHOLD_CENTS` (currently $50); the
- * two shouldn't be coupled.
+ * Shop Pay Installments (serviced by Affirm) is only offered in the
+ * US, Canada, and the UK, each with its own order minimum. We gate
+ * on the product's presentment `currency`, which maps 1:1 to the
+ * visitor's market (USD → US, CAD → CA, GBP → UK); the remaining
+ * markets (SGD / NZD / AUD) aren't eligible, so the badge renders
+ * nothing for them. Minimums follow Shopify's published thresholds:
+ *
+ *   US → $35 USD     CA → $35 CAD     UK → £50 GBP
+ *
+ * The minimum is shown in the same currency (and locale-aware
+ * formatting) as every other price on the page, so a Canadian sees
+ * "$35.00", a UK shopper "£50.00", etc. Shopify still gates the
+ * actual eligibility at checkout — this line is the marketing
+ * promise, not a hard price check on the current product.
  */
-export function ShopPayBadge({ className }: { className?: string }) {
+
+/** Per-currency installment minimum, in minor units. Presence in
+ *  this map == "Shop Pay Installments available for this market". */
+const INSTALLMENT_MIN_CENTS: Readonly<Record<string, number>> = {
+  USD: 3500,
+  CAD: 3500,
+  GBP: 5000,
+};
+
+export function ShopPayBadge({
+  currency,
+  className,
+}: {
+  /** Product's presentment currency. Gates eligibility (US/CA/UK
+   *  only) and sets the minimum amount + its formatting. */
+  currency: string;
+  className?: string;
+}) {
+  const minCents = INSTALLMENT_MIN_CENTS[currency];
+  /* Not an installment market → no badge. */
+  if (minCents === undefined) return null;
+
+  const minLabel = new Intl.NumberFormat(localeForCurrency(currency), {
+    style: "currency",
+    currency,
+  }).format(minCents / 100);
+
   return (
     <p
       className={cn(
@@ -27,7 +58,7 @@ export function ShopPayBadge({ className }: { className?: string }) {
         className,
       )}
     >
-      Pay in 4 interest-free installments for orders over $35.00{" "}
+      Pay in 4 interest-free installments for orders over {minLabel}{" "}
       {/* Keep "with [Shop Pay]" together so the logo never orphans
           onto a line by itself — if the sentence wraps, the word and
           the wordmark drop to the next line as one unit. `align-middle`

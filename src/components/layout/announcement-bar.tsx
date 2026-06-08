@@ -59,7 +59,7 @@ const TEXT_CLASSES =
 
 /** Marquee pace in px/sec — duration scales with content width so
  *  the strip always scrolls at this speed. */
-const MARQUEE_SPEED_PX_PER_S = 45;
+const MARQUEE_SPEED_PX_PER_S = 40;
 
 /** Slack (px) added to the fit test so the marquee engages *before*
  *  the line is jammed edge-to-edge: it slides whenever the content
