@@ -37,11 +37,20 @@ import { cn } from "@/lib/utils";
  *   users (the line rests left-aligned).
  */
 
-const MESSAGES = ["LIMITED TIME DEAL", "BUY 2 SAVE 20%", "BUY 3 SAVE 30%"];
+const MESSAGES = ["LIMITED TIME DEALS", "BUY 2 SAVE 20%", "BUY 3 SAVE 30%"];
 
-/** Joined with a non-breaking-space-padded middle dot so the
+/** Non-breaking-space-padded middle dot between messages, so the
  *  separators never collapse or wrap away from their neighbours. */
-const LINE = MESSAGES.join("\u00A0\u00A0\u00A0\u00A0·\u00A0\u00A0\u00A0\u00A0");
+const SEPARATOR = "\u00A0\u00A0\u00A0\u00A0·\u00A0\u00A0\u00A0\u00A0";
+
+/** The static (centred) line — no trailing separator. */
+const LINE = MESSAGES.join(SEPARATOR);
+
+/** One marquee repetition: the line plus a trailing separator. Two of
+ *  these back-to-back put an identical dot + gap at every junction
+ *  including the wrap point (…30% · LIMITED TIME DEALS…), so the loop
+ *  reads as one continuous ticker rather than restarting. */
+const MARQUEE_SEGMENT = `${LINE}${SEPARATOR}`;
 
 /** Shared type styling for the visible copies and the hidden probe,
  *  so the width measurement matches what's painted to the pixel. */
@@ -50,7 +59,7 @@ const TEXT_CLASSES =
 
 /** Marquee pace in px/sec — duration scales with content width so
  *  the strip always scrolls at this speed. */
-const MARQUEE_SPEED_PX_PER_S = 60;
+const MARQUEE_SPEED_PX_PER_S = 45;
 
 /** Slack (px) added to the fit test so the marquee engages *before*
  *  the line is jammed edge-to-edge: it slides whenever the content
@@ -108,11 +117,12 @@ export function AnnouncementBar() {
           className="flex w-max"
           style={{ animation: `marquee ${durationS}s linear infinite` }}
         >
-          {/* Two copies, each padded so the gap between repetitions is
-              even; `-50%` lands copy 2 where copy 1 started. */}
-          <span className={cn(TEXT_CLASSES, "px-6")}>{LINE}</span>
-          <span className={cn(TEXT_CLASSES, "px-6")} aria-hidden>
-            {LINE}
+          {/* Two identical copies (each ending in a separator);
+              `-50%` lands copy 2 exactly where copy 1 started, so the
+              dot + gap at the wrap matches the internal ones. */}
+          <span className={TEXT_CLASSES}>{MARQUEE_SEGMENT}</span>
+          <span className={TEXT_CLASSES} aria-hidden>
+            {MARQUEE_SEGMENT}
           </span>
         </div>
       ) : (
