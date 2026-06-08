@@ -119,10 +119,7 @@ function DesktopSiteHeader({
 }: DesktopSiteHeaderProps) {
   return (
     <header
-      /* `top-[var(--announcement-h)]` pins the header directly below
-       *  the sticky announcement bar so the two stack without
-       *  overlapping. */
-      className="site-header sticky top-[var(--announcement-h)] hidden border-b border-[color:var(--color-border)] xl-desktop:block"
+      className="site-header sticky top-0 hidden border-b border-[color:var(--color-border)] xl-desktop:block"
       style={{ zIndex: "var(--z-header)" }}
     >
       <div className="page-container flex h-16 items-center gap-4">

@@ -173,10 +173,9 @@ export function CartPageBody({ initialCart }: CartPageBodyProps) {
            *  line list. `self-start` overrides the grid's default
            *  `stretch` so the card claims only its natural
            *  height (sticky needs a finite height to anchor
-           *  against). `top-[calc(var(--announcement-h)+5rem)]` clears
-           *  the sticky header (4rem + 1px border, 5rem breathing gap)
-           *  plus the sticky announcement bar above it. */}
-          <div className="md:sticky md:top-[calc(var(--announcement-h)+5rem)] md:self-start">
+           *  against). `top-20` (5rem) clears the sticky header
+           *  (4rem + 1px border) with a small breathing gap. */}
+          <div className="md:sticky md:top-20 md:self-start">
             <div className={PANEL_SURFACE_THIN_CLASSES}>
               <CartFooter
                 subtotalCents={subtotalCents}
@@ -234,7 +233,7 @@ function CartPageSkeleton() {
         </ul>
       </div>
 
-      <div className="md:sticky md:top-[calc(var(--announcement-h)+5rem)] md:self-start">
+      <div className="md:sticky md:top-20 md:self-start">
         <div className={cn(PANEL_SURFACE_THIN_CLASSES, "flex flex-col gap-4 p-5")}>
           {/* Free-shipping bar shimmer */}
           <div className="h-2 w-full animate-pulse rounded-full bg-[color:var(--color-surface-muted)]" />

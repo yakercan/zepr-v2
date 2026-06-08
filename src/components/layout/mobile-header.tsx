@@ -110,9 +110,7 @@ export function MobileHeader({
          * CartTrigger / nav state. This header shows unless the viewport
          * is ≥1280px AND driven by a desktop pointer, so a touch tablet
          * in landscape keeps the mobile header at any width. */
-        /* `top-[var(--announcement-h)]` pins the header just below the
-         * sticky announcement bar so the two stack without overlap. */
-        className="sticky top-[var(--announcement-h)] border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)] xl-desktop:hidden"
+        className="sticky top-0 border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)] xl-desktop:hidden"
         style={{ zIndex: "var(--z-header)" }}
       >
         <div className="flex h-14 items-center gap-2 px-3">

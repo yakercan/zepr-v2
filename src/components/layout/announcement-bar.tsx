@@ -1,114 +1,125 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
 /**
- * Sticky promo announcement bar pinned above the site header.
+ * Promo announcement bar — a black strip above the site header
+ * (scrolls away with the page; not sticky, so only the header pins).
  *
- * A black strip that cycles a short, fixed list of marketing lines
- * with a vertical "roll-up" transition between them — each message
- * slides up and out as the next slides up into place.
+ * Shows all promo lines on one row, joined by a middle dot:
  *
- * # Sticky stacking
+ *   LIMITED TIME DEAL · BUY 2 SAVE 20% · BUY 3 SAVE 30%
  *
- * The bar pins at `top-0`; the header pins right below it at
- * `top-[var(--announcement-h)]` (see `site-header` / `mobile-header`).
- * Both stay on screen while scrolling — the bar is always the
- * topmost strip. The shared `--announcement-h` token keeps the
- * bar's height and the header's offset in lockstep.
+ * # Fit vs. scroll
  *
- * # Roll-up mechanic
+ * When the line fits the viewport it's simply centred and static.
+ * When it doesn't (narrow screens), it becomes a right-to-left
+ * marquee so every word stays readable instead of clipping. The
+ * decision is measured from a hidden probe span against the bar's
+ * width and re-checked on resize via a `ResizeObserver`.
  *
- * A vertical track holds the messages stacked top-to-bottom and is
- * translated by `-index × 100%`. To loop seamlessly *in one
- * direction* (always upward), the first message is duplicated at the
- * end: the track animates 0 → 1 → 2 → 3 (the clone), and on reaching
- * the clone it snaps back to 0 with the transition disabled for that
- * single frame, so the rewind is invisible. Index advances on a
- * fixed interval, not per-item, so the cadence is uniform.
+ * # Marquee mechanic
  *
- * # Performance / correctness
+ * The track holds two identical copies; the `marquee` keyframe
+ * translates it by `-50%` (one copy width) on a loop, so copy 2
+ * slides into copy 1's place seamlessly. Duration is derived from
+ * the content width for a constant scroll speed regardless of how
+ * far the line overflows.
  *
- * - Transform-only animation (GPU compositor; no layout/paint).
- * - All real messages live in the DOM for crawlers/SEO; the clone is
- *   `aria-hidden`.
- * - SSR-safe: first paint shows message 0 with the track at 0; the
- *   interval only starts after mount, so no hydration mismatch.
- * - `motion-reduce:transition-none` honours reduced-motion — messages
- *   still rotate, they just hard-cut instead of sliding.
+ * # Correctness
+ *
+ * - SSR-safe: first paint is the static (non-marquee) branch on both
+ *   server and client; the marquee only turns on after mount, so no
+ *   hydration mismatch.
+ * - `motion-reduce:animate-none` halts the scroll for reduced-motion
+ *   users (the line rests left-aligned).
  */
 
 const MESSAGES = ["LIMITED TIME DEAL", "BUY 2 SAVE 20%", "BUY 3 SAVE 30%"];
 
-/** Dwell time per message before it rolls to the next. */
-const INTERVAL_MS = 3000;
+/** Joined with a non-breaking-space-padded middle dot so the
+ *  separators never collapse or wrap away from their neighbours. */
+const LINE = MESSAGES.join("\u00A0\u00A0\u00A0\u00A0·\u00A0\u00A0\u00A0\u00A0");
 
-/** Roll transition duration — also the window we wait before the
- *  invisible clone→first snap-back. Keep in sync with the
- *  `duration-[…]` utility on the track. */
-const ROLL_MS = 600;
+/** Shared type styling for the visible copies and the hidden probe,
+ *  so the width measurement matches what's painted to the pixel. */
+const TEXT_CLASSES =
+  "whitespace-nowrap text-sm font-semibold uppercase tracking-wide";
+
+/** Marquee pace in px/sec — duration scales with content width so
+ *  the strip always scrolls at this speed. */
+const MARQUEE_SPEED_PX_PER_S = 60;
+
+/** Slack (px) added to the fit test so the marquee engages *before*
+ *  the line is jammed edge-to-edge: it slides whenever the content
+ *  comes within this many px of the bar's width, not only when it
+ *  strictly overflows. Larger value → slides across a wider range of
+ *  viewport widths. */
+const MARQUEE_FIT_BUFFER_PX = 48;
 
 export function AnnouncementBar() {
-  /* `index` walks 0 … MESSAGES.length (inclusive). The terminal
-   * value lands on the appended clone of message 0; `animate` is
-   * flipped off for the single frame that snaps it back to a real 0
-   * so the reset never shows a reverse scroll. */
-  const [index, setIndex] = useState(0);
-  const [animate, setAnimate] = useState(true);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const probeRef = useRef<HTMLSpanElement>(null);
+  const [marquee, setMarquee] = useState(false);
+  const [durationS, setDurationS] = useState(0);
 
   useEffect(() => {
-    const id = window.setInterval(() => {
-      setIndex((i) => i + 1);
-    }, INTERVAL_MS);
-    return () => window.clearInterval(id);
+    const viewport = viewportRef.current;
+    const probe = probeRef.current;
+    if (!viewport || !probe) return;
+
+    const update = () => {
+      const contentWidth = probe.scrollWidth;
+      setMarquee(contentWidth > viewport.clientWidth - MARQUEE_FIT_BUFFER_PX);
+      setDurationS(contentWidth / MARQUEE_SPEED_PX_PER_S);
+    };
+    update();
+
+    const observer = new ResizeObserver(update);
+    observer.observe(viewport);
+    return () => observer.disconnect();
   }, []);
-
-  useEffect(() => {
-    if (index !== MESSAGES.length) return;
-    /* We've rolled onto the clone. After the slide finishes, kill the
-     * transition, jump to the real first message, then re-enable the
-     * transition on the next frame for the following roll. */
-    const snap = window.setTimeout(() => {
-      setAnimate(false);
-      setIndex(0);
-      requestAnimationFrame(() => setAnimate(true));
-    }, ROLL_MS);
-    return () => window.clearTimeout(snap);
-  }, [index]);
 
   return (
     <div
-      className="sticky top-0 flex items-center justify-center overflow-hidden bg-black text-white"
-      style={{ height: "var(--announcement-h)", zIndex: "var(--z-header)" }}
+      ref={viewportRef}
+      className="relative flex h-9 items-center overflow-hidden bg-black text-white"
       role="region"
       aria-label="Announcements"
     >
-      <div
-        className={cn(
-          "w-full transition-transform duration-[600ms] ease-[cubic-bezier(0.16,1,0.3,1)]",
-          /* Disabled for the single clone→first snap-back frame, and
-           * always under reduced-motion (messages hard-cut). */
-          "motion-reduce:transition-none",
-          !animate && "!transition-none",
-        )}
-        style={{
-          height: "var(--announcement-h)",
-          transform: `translateY(-${index * 100}%)`,
-        }}
+      {/* Hidden width probe — never painted, no layout footprint;
+          only its `scrollWidth` is read to decide fit vs. scroll. */}
+      <span
+        ref={probeRef}
+        aria-hidden
+        className={cn(TEXT_CLASSES, "pointer-events-none invisible absolute")}
       >
-        {[...MESSAGES, MESSAGES[0]].map((message, i) => (
-          <div
-            key={i}
-            aria-hidden={i === MESSAGES.length ? true : undefined}
-            className="flex w-full items-center justify-center px-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em]"
-            style={{ height: "var(--announcement-h)" }}
-          >
-            {message}
-          </div>
-        ))}
-      </div>
+        {LINE}
+      </span>
+
+      {marquee ? (
+        <div
+          /* Animation set inline (not via a Tailwind utility) so it
+             can't be silently dropped by the OS "reduce motion"
+             setting — when the line overflows, the slide is the only
+             way to read the whole message, so it always runs. */
+          className="flex w-max"
+          style={{ animation: `marquee ${durationS}s linear infinite` }}
+        >
+          {/* Two copies, each padded so the gap between repetitions is
+              even; `-50%` lands copy 2 where copy 1 started. */}
+          <span className={cn(TEXT_CLASSES, "px-6")}>{LINE}</span>
+          <span className={cn(TEXT_CLASSES, "px-6")} aria-hidden>
+            {LINE}
+          </span>
+        </div>
+      ) : (
+        <div className="flex w-full justify-center px-4">
+          <span className={TEXT_CLASSES}>{LINE}</span>
+        </div>
+      )}
     </div>
   );
 }
