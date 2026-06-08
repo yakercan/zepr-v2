@@ -1,6 +1,12 @@
+import { formatMarketAmount } from "@/config/markets";
 import { ZEPR_ICONS, ZeprIcon } from "@/components/ui/icons";
 import { qualifiesForFreeShipping } from "@/lib/badges";
 import { cn } from "@/lib/utils";
+
+/** Late-delivery goodwill credit, in minor units. A flat 5 in the
+ *  visitor's market currency (shown via `formatMarketAmount`), mirroring
+ *  the free-shipping threshold's "flat local amount" model. */
+const DELAY_CREDIT_CENTS = 500;
 
 /**
  * "Free Shipping / Arrives Jun 5 – Jun 10 / $5 credit for delay"
@@ -68,16 +74,22 @@ export interface DeliveryBadgeProps {
   /** Active variant / product price in cents — drives the
    *  free-shipping headline. */
   priceCents: number;
+  /** Presentment currency for `priceCents` — gates the market's
+   *  free-shipping threshold and formats the delay-credit amount in
+   *  the visitor's currency. */
+  currency: string;
   className?: string;
 }
 
 export function DeliveryBadge({
   deliveryTime = DEFAULT_DELIVERY_TIME,
   priceCents,
+  currency,
   className,
 }: DeliveryBadgeProps) {
-  const free = qualifiesForFreeShipping(priceCents);
+  const free = qualifiesForFreeShipping(priceCents, currency);
   const arrivalLabel = formatDeliveryRange(deliveryTime);
+  const creditLabel = formatMarketAmount(DELAY_CREDIT_CENTS, currency);
 
   return (
     <div
@@ -143,8 +155,8 @@ export function DeliveryBadge({
             parent's `flex-wrap`) so a word never orphans onto its own
             row. */}
         <span className="whitespace-nowrap text-sm font-medium">
-          $5.00<span className="hidden @min-[24rem]:inline"> credit</span> for
-          delay
+          {creditLabel}
+          <span className="hidden @min-[24rem]:inline"> credit</span> for delay
         </span>
       </span>
     </div>

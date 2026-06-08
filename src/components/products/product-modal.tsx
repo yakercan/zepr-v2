@@ -308,6 +308,7 @@ export function ProductModal({
         <DeliveryBadge
           deliveryTime={detail.deliveryTime}
           priceCents={priceMinCents}
+          currency={detail.currency}
         />
 
         <div className="flex flex-wrap items-baseline gap-3">

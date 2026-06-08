@@ -8,8 +8,8 @@
  *      Salespace API's `badges` array. At most ONE renders per card,
  *      picked by `PRODUCT_BADGE_PRIORITY`.
  *
- *   2. **Free shipping** is computed client-side from price ≥
- *      `FREE_SHIPPING_THRESHOLD_CENTS`. It's allowed to render
+ *   2. **Free shipping** is computed from price ≥ the market's
+ *      `freeShippingThresholdCents(currency)`. It's allowed to render
  *      alongside the product badge — they answer different
  *      questions ("what's special?" vs "will it ship free?").
  *
@@ -132,20 +132,42 @@ export function pickProductBadge(
 /* ------------------------------------------------------------------ */
 /* Free shipping (computed, additive)                                  */
 /* ------------------------------------------------------------------ */
-/** Single free-shipping threshold for the whole storefront. Lives
- *  here so the card badge, the PDP delivery badge, the cart-progress
- *  bar, and any landing-page CTA all trace back to one number.
+/**
+ * Free-shipping thresholds, in minor units, keyed by presentment
+ * currency. The single source of truth for the card badge, the PDP
+ * delivery badge, the cart-progress bar, and the FAQ copy.
  *
- *  Currency model: this is a flat **50 units of the visitor's market
- *  currency**, NOT a fixed USD amount converted per market. It works
- *  because every price compared against it is already the market's
- *  presentment price in minor units (Salespace per-market columns /
- *  Shopify `@inContext`), and all supported markets (USD/GBP/CAD/SGD/
- *  NZD/AUD) are 2-decimal — so `5000` reads as $50 / £50 / CA$50 / …
- *  for the matching visitor, and every display formats with that same
- *  market currency. Keep both sides market-priced and this stays
- *  correct with no conversion step. */
-export const FREE_SHIPPING_THRESHOLD_CENTS = 5000;
+ * Per-market rule (mirrors the Shopify shipping config): the US and
+ * UK sit at 50; every other market at 35.
+ *
+ * Currency model: each value is a flat amount in **the visitor's
+ * market currency**, NOT a USD amount converted per market. It works
+ * because every price compared against it is already the market's
+ * presentment price in minor units (Salespace per-market columns /
+ * Shopify `@inContext`), and all supported markets are 2-decimal — so
+ * `5000` reads as $50 / £50 and `3500` as $35 / CA$35 for the matching
+ * visitor, with no conversion step.
+ */
+const FREE_SHIPPING_THRESHOLD_BY_CURRENCY: Readonly<Record<string, number>> = {
+  USD: 5000,
+  GBP: 5000,
+  CAD: 3500,
+  SGD: 3500,
+  NZD: 3500,
+  AUD: 3500,
+};
+
+/** Fallback for an unknown currency — the USA baseline (50). */
+const DEFAULT_FREE_SHIPPING_THRESHOLD_CENTS = 5000;
+
+/** Free-shipping threshold (minor units) for a presentment currency.
+ *  US/UK → 5000, all other supported markets → 3500. */
+export function freeShippingThresholdCents(currency: string): number {
+  return (
+    FREE_SHIPPING_THRESHOLD_BY_CURRENCY[currency.toUpperCase()] ??
+    DEFAULT_FREE_SHIPPING_THRESHOLD_CENTS
+  );
+}
 
 export const FREE_SHIPPING_BADGE: BadgeView = {
   label: "Free Shipping",
@@ -156,10 +178,14 @@ export const FREE_SHIPPING_BADGE: BadgeView = {
   theme: { accent: "var(--color-success)" },
 };
 
-/** True when `priceCents` clears the free-shipping bar. `priceCents`
- *  MUST be in the visitor's market currency (the same presentment
- *  currency the rest of the UI shows), so the comparison means "≥ 50
- *  in the local currency" — see `FREE_SHIPPING_THRESHOLD_CENTS`. */
-export function qualifiesForFreeShipping(priceCents: number): boolean {
-  return priceCents >= FREE_SHIPPING_THRESHOLD_CENTS;
+/** True when `priceCents` clears the free-shipping bar for its market.
+ *  Both `priceCents` and the threshold are in `currency`'s minor units
+ *  (the same presentment currency the rest of the UI shows), so the
+ *  comparison means "≥ the local threshold" — see
+ *  `freeShippingThresholdCents`. */
+export function qualifiesForFreeShipping(
+  priceCents: number,
+  currency: string,
+): boolean {
+  return priceCents >= freeShippingThresholdCents(currency);
 }

@@ -2,7 +2,10 @@ import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
-import { FAQ_SECTIONS, type FaqSection } from "@/lib/faq/entries";
+import { formatMarketAmount } from "@/config/markets";
+import { freeShippingThresholdCents } from "@/lib/badges";
+import { resolveFaqSections, type FaqSection } from "@/lib/faq/entries";
+import { getServerMarket } from "@/lib/market/server";
 
 /**
  * FAQ page body.
@@ -33,11 +36,23 @@ import { FAQ_SECTIONS, type FaqSection } from "@/lib/faq/entries";
  * plain text (search consumers don't need our routing) but
  * keeps the prose intact.
  */
-export function FaqList() {
+export async function FaqList() {
+  /* Resolve the visitor's market so the shipping-cost answer reads
+   * the right threshold + currency (US/UK $50/£50, others $35). Same
+   * geo resolution the currency / cookie-banner logic uses. Whole-unit
+   * format (no ".00") keeps the prose clean. */
+  const market = await getServerMarket();
+  const shippingThreshold = formatMarketAmount(
+    freeShippingThresholdCents(market.currency),
+    market.currency,
+    0,
+  );
+  const sections = resolveFaqSections(shippingThreshold);
+
   return (
     <div className="flex flex-col gap-10 md:gap-12">
-      <FaqJsonLd sections={FAQ_SECTIONS} />
-      {FAQ_SECTIONS.map((section) => (
+      <FaqJsonLd sections={sections} />
+      {sections.map((section) => (
         <FaqSectionBlock key={section.id} section={section} />
       ))}
     </div>

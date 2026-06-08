@@ -1,4 +1,4 @@
-import { localeForCurrency } from "@/config/markets";
+import { formatMarketAmount } from "@/config/markets";
 import { ShopPayLogo } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 
@@ -45,10 +45,7 @@ export function ShopPayBadge({
   /* Not an installment market → no badge. */
   if (minCents === undefined) return null;
 
-  const minLabel = new Intl.NumberFormat(localeForCurrency(currency), {
-    style: "currency",
-    currency,
-  }).format(minCents / 100);
+  const minLabel = formatMarketAmount(minCents, currency);
 
   return (
     <p

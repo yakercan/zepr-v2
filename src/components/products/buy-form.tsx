@@ -399,6 +399,7 @@ export function BuyForm({
       <DeliveryBadge
         deliveryTime={product.deliveryTime}
         priceCents={priceMinCents}
+        currency={product.currency}
       />
 
       <div className="flex flex-wrap items-baseline gap-3">

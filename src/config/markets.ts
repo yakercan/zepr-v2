@@ -97,3 +97,26 @@ const CURRENCY_LOCALE: Readonly<Record<string, string>> = {
 export function localeForCurrency(currency: string): string {
   return CURRENCY_LOCALE[currency.toUpperCase()] ?? "en-US";
 }
+
+/**
+ * Locale-aware currency formatter — resolves the locale from the
+ * currency the same way `<Price>` does, so prose amounts (the FAQ
+ * shipping threshold, the delivery-badge "$5 credit") read in the
+ * visitor's native currency format and sign rather than a fixed
+ * `en-US` rendering.
+ *
+ * `fractionDigits` defaults to 2 (money). Pass `0` for clean whole-
+ * unit prose like "$50" / "£35" where trailing ".00" adds noise.
+ */
+export function formatMarketAmount(
+  cents: number,
+  currency: string,
+  fractionDigits = 2,
+): string {
+  return new Intl.NumberFormat(localeForCurrency(currency), {
+    style: "currency",
+    currency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(cents / 100);
+}

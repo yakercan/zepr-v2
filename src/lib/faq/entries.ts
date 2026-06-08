@@ -47,6 +47,14 @@ export interface FaqSection {
 }
 
 /**
+ * Placeholder in answer copy, swapped at render for the visitor
+ * market's formatted free-shipping threshold (e.g. `$50` / `£50` /
+ * `$35`). Keeps the catalog static + currency-agnostic while letting
+ * the one money-bearing answer track the active market — see
+ * `resolveFaqSections`. */
+export const SHIPPING_THRESHOLD_TOKEN = "{shippingThreshold}";
+
+/**
  * Canonical FAQ catalog. Order is the order shoppers see it on
  * `/faq`. Sections are grouped by "what part of the journey is
  * the shopper asking about" — Orders / Delivery / Returns is the
@@ -79,8 +87,7 @@ export const FAQ_SECTIONS: ReadonlyArray<FaqSection> = [
       {
         id: "shipping-cost",
         question: "How much will shipping be?",
-        answer:
-          "Shipping is completely free for orders over $50. Shipping costs for orders below $50 are calculated at checkout.",
+        answer: `Shipping is completely free for orders over ${SHIPPING_THRESHOLD_TOKEN}. Shipping costs for orders below ${SHIPPING_THRESHOLD_TOKEN} are calculated at checkout.`,
       },
       {
         id: "delivery-regions",
@@ -128,3 +135,30 @@ export const FAQ_SECTIONS: ReadonlyArray<FaqSection> = [
     ],
   },
 ];
+
+/**
+ * Resolve the static catalog for a specific visitor by substituting
+ * dynamic tokens into answer copy. Today that's only the market's
+ * free-shipping threshold (`SHIPPING_THRESHOLD_TOKEN`); answers
+ * without a token pass through untouched (same object reused), so the
+ * map stays cheap. Called server-side in `<FaqList>` where the market
+ * is resolved.
+ */
+export function resolveFaqSections(
+  shippingThreshold: string,
+): ReadonlyArray<FaqSection> {
+  return FAQ_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.map((item) =>
+      item.answer.includes(SHIPPING_THRESHOLD_TOKEN)
+        ? {
+            ...item,
+            answer: item.answer.replaceAll(
+              SHIPPING_THRESHOLD_TOKEN,
+              shippingThreshold,
+            ),
+          }
+        : item,
+    ),
+  }));
+}

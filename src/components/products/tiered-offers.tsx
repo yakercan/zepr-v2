@@ -96,6 +96,7 @@ export function TieredOffers({
    * whole picker or suppressed across it, consistently. */
   const baseAlreadyShipsFree = qualifiesForFreeShipping(
     tierPricings[0]?.discountedTotalCents ?? 0,
+    currency,
   );
 
   return (
@@ -172,7 +173,8 @@ function OfferRow({
    * uses, so the perk reads identically wherever the shopper
    * sees it. */
   const tierUnlocksFreeShipping =
-    !baseAlreadyShipsFree && qualifiesForFreeShipping(discountedTotalCents);
+    !baseAlreadyShipsFree &&
+    qualifiesForFreeShipping(discountedTotalCents, currency);
 
   return (
     /* Outer wrapper owns the border, selection state, and floating

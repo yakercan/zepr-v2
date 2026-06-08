@@ -1,7 +1,7 @@
 "use client";
 
 import { Price } from "@/components/ui/price";
-import { FREE_SHIPPING_THRESHOLD_CENTS } from "@/lib/badges";
+import { freeShippingThresholdCents } from "@/lib/badges";
 import {
   useCartBundleSavingsCents,
   useCartCheckoutUrl,
@@ -168,7 +168,7 @@ function FreeShippingProgress({
   subtotalCents: number;
   currency: string;
 }) {
-  const threshold = FREE_SHIPPING_THRESHOLD_CENTS;
+  const threshold = freeShippingThresholdCents(currency);
   const remaining = Math.max(0, threshold - subtotalCents);
   const pct = Math.min(100, (subtotalCents / threshold) * 100);
   const unlocked = remaining === 0;

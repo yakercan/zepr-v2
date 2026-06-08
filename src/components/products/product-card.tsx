@@ -101,7 +101,10 @@ export function ProductCard({
   // different question ("will this ship for free?" vs "what's
   // special about this product?").
   const productBadge = pickProductBadge(product.badges);
-  const showFreeShipping = qualifiesForFreeShipping(product.price_min_cents);
+  const showFreeShipping = qualifiesForFreeShipping(
+    product.price_min_cents,
+    product.currency,
+  );
 
   return (
     <Link
