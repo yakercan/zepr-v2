@@ -1,5 +1,5 @@
 /**
- * Tiered Offers — the "Buy 1 / Buy 2 Save 15% / Buy 3 Save 20%"
+ * Tiered Offers — the "Buy 1 / Buy 2 Save 20% / Buy 3 Save 30%"
  * picker that can replace the legacy quantity stepper on PDPs.
  *
  * Activation is per-product, driven by Shopify's `custom.offers`
@@ -33,7 +33,11 @@
  *   - The legacy storefront uses cart attribute `_offer` keyed
  *     to the tier id (`buy_2_save_15`, `buy_3_save_20`). When
  *     we wire the Shopify cart API up, this file's `id` strings
- *     are the contract — keep them stable.
+ *     are the contract — keep them stable. NOTE: the ids are
+ *     opaque keys, intentionally NOT renamed when the savings
+ *     moved to 20% / 30% — the trailing number is historical, not
+ *     the live discount. The real percentages live in
+ *     `savingsPercent` below and `CART_BUNDLE_TIERS`.
  */
 
 import { bundleUnitSavingsCents } from "./cart/bundle";
@@ -58,7 +62,7 @@ export const BUY_3_TIER_ID = "buy_3_save_20";
  *   - `headline` / `accent` / `accentSuffix` together compose the
  *     title — `headline` + `<accent in brand orange>` +
  *     `accentSuffix`. Keeping just the percentage in `accent`
- *     ("Buy 2, Get **15%** OFF") lets the brand orange highlight
+ *     ("Buy 2, Get **20%** OFF") lets the brand orange highlight
  *     the savings number and nothing else.
  *   - `badge` floats above the tile ("MOST POPULAR" / "BEST
  *     VALUE"). `null` to suppress.
@@ -87,9 +91,9 @@ const BUY_2_TIER: OfferTier = {
   id: BUY_2_TIER_ID,
   quantity: 2,
   headline: "Buy 2, Get ",
-  accent: "15%",
+  accent: "20%",
   accentSuffix: " OFF",
-  savingsPercent: 15,
+  savingsPercent: 20,
   badge: "MOST POPULAR",
 };
 
@@ -97,9 +101,9 @@ const BUY_3_TIER: OfferTier = {
   id: BUY_3_TIER_ID,
   quantity: 3,
   headline: "Buy 3, Get ",
-  accent: "20%",
+  accent: "30%",
   accentSuffix: " OFF",
-  savingsPercent: 20,
+  savingsPercent: 30,
   badge: "BEST VALUE",
 };
 

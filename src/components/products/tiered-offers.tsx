@@ -17,8 +17,8 @@ export interface TierPricing {
 }
 
 /**
- * Tiered offers picker — the "Buy 1 / Buy 2 Save 15% / Buy 3
- * Save 20%" tile stack that replaces the qty stepper on PDPs
+ * Tiered offers picker — the "Buy 1 / Buy 2 Save 20% / Buy 3
+ * Save 30%" tile stack that replaces the qty stepper on PDPs
  * whose `custom.offers` metafield opts in.
  *
  * Layout:

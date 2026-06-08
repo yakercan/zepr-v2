@@ -51,7 +51,7 @@ import type { CartLine } from "@/types/cart";
  *     the stepper on the left and the trash on the right.
  */
 export function CartLineRow({ line }: { line: CartLine }) {
-  /* Cart-wide bundle percent (2 units → 15%, 3+ → 20%). Read here so
+  /* Cart-wide bundle percent (2 units → 20%, 3+ → 30%). Read here so
    * every row reflects the same "applies to all items" discount the
    * footer totals; re-renders only when the tier itself changes. */
   const bundlePercent = useCartBundlePercent();

@@ -6,8 +6,8 @@
  * two), and applies uniformly to every line:
  *
  *   - 1 unit    → no discount
- *   - 2 units   → 15% off everything
- *   - 3+ units  → 20% off everything
+ *   - 2 units   → 20% off everything
+ *   - 3+ units  → 30% off everything
  *
  * This is the in-cart PREVIEW of the matching Shopify quantity-break
  * automatic discount, which charges it for real at checkout. Because
@@ -23,8 +23,8 @@ export const CART_BUNDLE_TIERS: ReadonlyArray<{
   minQuantity: number;
   percent: number;
 }> = [
-  { minQuantity: 3, percent: 20 },
-  { minQuantity: 2, percent: 15 },
+  { minQuantity: 3, percent: 30 },
+  { minQuantity: 2, percent: 20 },
 ];
 
 /**
@@ -63,11 +63,11 @@ export function cartBundlePercent(totalQuantity: number): number {
  * charged at least the discounted price and the store never
  * over-discounts by a fraction of a cent:
  *
- *   $25.99 @ 15% → 25.99 × 0.15 = 3.8985 → floor to $3.89 off
+ *   $25.99 @ 20% → 25.99 × 0.20 = 5.198 → floor to $5.19 off
  *
  * Flooring PER UNIT (rather than on a grouped subtotal) is the whole
- * point: 2 × $25.99 saves exactly 2 × $3.89 = $7.78, not
- * floor($51.98 × 15%) = $7.79. Keeping the floor at the unit level is
+ * point: 2 × $25.99 saves exactly 2 × $5.19 = $10.38, not
+ * floor($51.98 × 20%) = $10.39. Keeping the floor at the unit level is
  * what lets the cart line, the cart footer, and the PDP tiered-offer
  * tile all agree to the cent. `0`% → no savings.
  */

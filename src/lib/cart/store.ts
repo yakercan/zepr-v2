@@ -763,7 +763,7 @@ export function useCartSubtotalCents(): number {
 }
 
 /** Cart-wide "Bundle & Save" percentage for the current cart, driven
- *  by total unit count (2 → 15%, 3+ → 20%). Drives the per-line
+ *  by total unit count (2 → 20%, 3+ → 30%). Drives the per-line
  *  discounted-total preview in `<CartLineRow>` and the footer's
  *  "Bundle savings" math. `0` for a single-item cart. */
 export function useCartBundlePercent(): number {
