@@ -152,16 +152,18 @@ export function ProductLayout({ product, extraLeft }: ProductLayoutProps) {
        *     - `lg-desktop:self-start` → take only the form's natural
        *       height (grid items default to `stretch`, which would lock
        *       the form to the full row height and break sticky).
-       *     - `lg-desktop:sticky lg-desktop:top-20` → cling to `5rem` (header is
-       *       4rem + 1px border; 5rem leaves a small breathing gap).
-       *       When the left column scrolls past its end the grid row
-       *       ends, the sticky context releases, and the page slides
-       *       on into whatever comes next. */}
+       *     - `lg-desktop:sticky lg-desktop:top-[calc(var(--announcement-h)+5rem)]`
+       *       → cling 5rem below the header (header is 4rem + 1px border;
+       *       5rem leaves a small breathing gap), plus the sticky
+       *       announcement bar's height on top so it clears both. When
+       *       the left column scrolls past its end the grid row ends,
+       *       the sticky context releases, and the page slides on into
+       *       whatever comes next. */}
       <div
         className={cn(
           PANEL_SURFACE_CLASSES,
           PDP_PANEL_PADDING,
-          "contents lg-desktop:block lg-desktop:sticky lg-desktop:top-20 lg-desktop:self-start",
+          "contents lg-desktop:block lg-desktop:sticky lg-desktop:top-[calc(var(--announcement-h)+5rem)] lg-desktop:self-start",
         )}
       >
         <div className="order-2 min-w-0 lg-desktop:order-none">

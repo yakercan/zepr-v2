@@ -297,6 +297,13 @@
   --page-max-px: 1400px;
   --page-gutter-px: 1.5rem;
 
+  /* Sticky announcement bar height. The bar pins at `top-0` and the
+   * site header pins right below it at `top-[var(--announcement-h)]`,
+   * so this single token keeps the two stacked sticky surfaces in
+   * lockstep — retune the bar height here and the header offset
+   * tracks automatically. */
+  --announcement-h: 2.25rem;
+
   /* Animation tokens registered through Tailwind 4's theme so the
    * `animate-*` utilities are available everywhere. Each is GPU-only
    * (transform / opacity, no layout-affecting properties), so they

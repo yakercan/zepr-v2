@@ -30,13 +30,11 @@
  *     tier id when the cart wiring lands). Display drift between
  *     the preview and the cart can't quietly overcharge because
  *     the cart math stays server-authoritative.
- *   - The legacy storefront uses cart attribute `_offer` keyed
- *     to the tier id (`buy_2_save_15`, `buy_3_save_20`). When
- *     we wire the Shopify cart API up, this file's `id` strings
- *     are the contract — keep them stable. NOTE: the ids are
- *     opaque keys, intentionally NOT renamed when the savings
- *     moved to 20% / 30% — the trailing number is historical, not
- *     the live discount. The real percentages live in
+ *   - These tier ids (`buy_2_save_20`, `buy_3_save_30`) are
+ *     frontend-only: the `custom.offers` metafield connects by
+ *     count/format (see `parseOffersMetafield`), not by id, so the
+ *     id strings aren't an external contract and are free to track
+ *     the savings percentage. The live percentages still live in
  *     `savingsPercent` below and `CART_BUNDLE_TIERS`.
  */
 
@@ -52,8 +50,8 @@ export const TIERED_OFFERS_ENABLED = true;
 export const OFFER_CART_ATTRIBUTE_KEY = "_offer";
 
 export const BUY_1_TIER_ID = "buy_1";
-export const BUY_2_TIER_ID = "buy_2_save_15";
-export const BUY_3_TIER_ID = "buy_3_save_20";
+export const BUY_2_TIER_ID = "buy_2_save_20";
+export const BUY_3_TIER_ID = "buy_3_save_30";
 
 /**
  * One tile in the picker.

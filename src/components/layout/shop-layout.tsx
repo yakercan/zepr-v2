@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { ShopifyAnalytics } from "@/components/analytics/shopify-analytics";
+import { AnnouncementBar } from "@/components/layout/announcement-bar";
 import { AttributionHydrator } from "@/components/attribution/attribution-hydrator";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { CartLoginHandoff } from "@/components/cart/cart-login-handoff";
@@ -105,6 +106,7 @@ export async function ShopLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
       <CartMetaHydrator mode={mode} checkoutDomain={checkoutDomain} />
+      <AnnouncementBar />
       <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
