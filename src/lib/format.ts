@@ -3,21 +3,20 @@
  *
  * Salespace stores money as integer cents in a product currency
  * code. `formatPrice(cents, currency)` converts to a localized
- * display string using `Intl.NumberFormat`, which is fast (cached
- * internally by the engine) and gives us correct symbols, decimals,
- * and grouping per locale at no extra runtime cost.
+ * display string.
  *
- * Locale is fixed to `en-US` for now — the rest of the storefront
- * follows the same convention. Swap to a request-derived locale
- * once i18n lands.
+ * Single source of truth: this delegates to `formatMarketAmount`
+ * (in `config/markets.ts`), which derives the `Intl.NumberFormat`
+ * locale from the currency via `localeForCurrency` — so every money
+ * string in the app (cart, orders, badges, the `<Price>` component)
+ * renders the same native symbol for a given currency: `S$35.00`,
+ * `£35.00`, `CA$50.00`, not the ISO-code fallback (`SGD 35.00`) a
+ * fixed `en-US` locale would produce for non-US currencies.
  */
-const DEFAULT_LOCALE = "en-US";
+import { formatMarketAmount } from "@/config/markets";
 
 export function formatPrice(cents: number, currency: string): string {
-  return new Intl.NumberFormat(DEFAULT_LOCALE, {
-    style: "currency",
-    currency,
-  }).format(cents / 100);
+  return formatMarketAmount(cents, currency);
 }
 
 /**
