@@ -99,8 +99,8 @@
    *                       play for their families.
    *   - `brand-border` — the hairline that pairs with `brand-light`
    *                       on outlined-bubble surfaces. */
-  --color-brand: #f65f14;
-  --color-brand-hover: #e65510;
+  --color-brand: #ff5000;
+  --color-brand-hover: #f44b00;
   --color-brand-light: #fff4ed;
   --color-brand-border: #ffd4b8;
 

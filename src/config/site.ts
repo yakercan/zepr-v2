@@ -25,7 +25,11 @@ export const site = {
    *  subdomain; without it the cookies go host-only and Admin
    *  Analytics can't stitch pre-checkout sessions to conversions. */
   cookieDomain: "zepr.com",
-  themeColor: "#f65f14",
+  /** Browser-chrome `<meta name="theme-color">`. Must be a literal
+   *  hex (the browser can't read CSS vars here), so keep it in sync
+   *  with `--color-brand` in `globals.css` — that token stays the
+   *  single source of truth for everything rendered in-app. */
+  themeColor: "#ff5000",
   /** Public path to the brand mark. Doubles as the favicon
    *  (`metadata.icons`) and the `Organization` JSON-LD logo, so the
    *  tab icon, social card, and structured data can't drift. */
