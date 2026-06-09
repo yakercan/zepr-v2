@@ -192,10 +192,10 @@ function Logo() {
       <Image
         src="/zepr-logo.svg"
         alt={site.name}
-        width={44}
-        height={44}
+        width={40}
+        height={40}
         priority
-        className="h-11 w-11"
+        className="h-10 w-10"
       />
     </Link>
   );
