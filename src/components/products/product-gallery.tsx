@@ -16,6 +16,7 @@ import {
   type LightboxMediaItem,
 } from "@/components/products/media-lightbox";
 import { PlayBadgeIcon, SmoothCaretIcon } from "@/components/ui/icons";
+import { shopifyImageLoader } from "@/lib/shopify/image-loader";
 import { useActiveVideoControl } from "@/lib/hooks/use-active-video-control";
 import { useCrossfade } from "@/lib/hooks/use-crossfade";
 import {
@@ -511,6 +512,7 @@ function GalleryMain({
           >
             {item.kind === "image" ? (
               <Image
+                loader={shopifyImageLoader}
                 src={item.preview.url}
                 alt={item.preview.altText ?? title}
                 width={item.preview.width}
@@ -699,6 +701,7 @@ function GalleryThumbs({
             )}
           >
             <Image
+              loader={shopifyImageLoader}
               src={item.preview.url}
               alt={item.preview.altText ?? title}
               width={item.preview.width}
