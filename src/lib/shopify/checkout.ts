@@ -1,15 +1,12 @@
 /**
- * Shopify "Buy Now" cart-permalink builder — the URL that powers
- * the PDP's "Buy Now - Fast Checkout" CTA and the guest-mode
- * checkout button in the cart drawer.
+ * Shopify cart-permalink builder — the URL that powers the
+ * guest-mode checkout button in the cart drawer.
  *
  * Pattern: `https://<checkout-domain>/cart/<v1>:<q1>,<v2>:<q2>,…`
  *
  * Tapping this URL drops the shopper straight into Shopify's
- * hosted checkout with the lines pre-populated, bypassing the
- * local cart entirely. Matches the legacy storefront's
- * `buildCheckoutPermalinkUrl` behaviour and is why the Buy Now
- * path doesn't go through `addCartLine()`.
+ * hosted checkout with the lines pre-populated. Matches the legacy
+ * storefront's `buildCheckoutPermalinkUrl` behaviour.
  *
  * Each line takes the Storefront API variant gid
  * (`gid://shopify/ProductVariant/12345`); the gid is split down
@@ -21,9 +18,9 @@
  * Optional `attributes` are appended as `attributes[<key>]=<v>`
  * query params — Shopify natively reads them off the permalink
  * URL and stamps them on the resulting cart (same path
- * `cartAttributesUpdate` writes to). The Buy Now / guest
- * checkout flows use this hook to carry UTM attribution into
- * checkout even though they never touch the Cart API.
+ * `cartAttributesUpdate` writes to). The guest checkout flow uses
+ * this hook to carry UTM attribution into checkout even though it
+ * never touches the Cart API.
  *
  * `checkoutDomain` is the bare hostname (no scheme, no path).
  * `https://` is prepended unconditionally.

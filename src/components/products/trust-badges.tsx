@@ -5,7 +5,7 @@ import { ExternalLinkIcon } from "@/components/ui/icons";
 /**
  * PDP trust strip — the three "feel safe buying here" badges
  * (money-back guarantee, secure checkout, customer support)
- * that sit below the Buy Now CTA + Shop Pay installment promise.
+ * that sit below the Add-to-Cart CTA + Shop Pay installment promise.
  *
  * Each badge is a `[green circle icon] [title (+ optional info)
  * + body line]` row. The 30-day guarantee carries an InfoTooltip

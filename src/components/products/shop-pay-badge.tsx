@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * "Pay in 4 interest-free installments for orders over <min> with
- * [Shop Pay]" — the installment promise under the Buy Now CTA.
+ * [Shop Pay]" — the installment promise under the Add-to-Cart CTA.
  *
  * # Eligibility (market-gated)
  *

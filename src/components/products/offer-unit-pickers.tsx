@@ -86,8 +86,8 @@ export interface UnitSlotConfig {
  * offer units.
  *
  * Pure presentation. All state lives in `<BuyForm>` because the
- * Add-to-cart + Buy Now CTAs need it to compose the cart payload;
- * this component is purely controlled.
+ * Add-to-Cart CTA needs it to compose the cart payload; this
+ * component is purely controlled.
  */
 
 export interface OfferUnitPickersProps {

@@ -11,14 +11,11 @@ import {
 import { resolveFirstVariantGidAction } from "@/app/products/actions";
 import { trackAddToCart } from "@/lib/analytics/events";
 import { attributionToCartAttributes } from "@/lib/attribution/format";
-import {
-  getCurrentAttribution,
-  useAttribution,
-} from "@/lib/attribution/store";
+import { useAttribution } from "@/lib/attribution/store";
 import { bundleSavingsCents, cartBundlePercent } from "@/lib/cart/bundle";
 import { openCart } from "@/lib/cart/drawer-store";
 import { createStore } from "@/lib/external-store";
-import { buildCartPermalink, type CheckoutLine } from "@/lib/shopify/checkout";
+import { buildCartPermalink } from "@/lib/shopify/checkout";
 import type { Cart } from "@/lib/shopify/cart";
 import type { CartLine } from "@/types/cart";
 import type { SearchProduct } from "@/types/product";
@@ -272,11 +269,11 @@ export function hydrateCart(input: HydrateCartInput): void {
  * without touching the cart-line snapshot.
  *
  * Mounted earlier than `<CartHydrator>` (in `<ShopLayout>`, not
- * `<SiteHeader>`) so Buy Now and guest checkout permalinks have
- * a real domain to splice into their URLs from the first frame —
- * before the header's slow Shopify cart fetch resolves. Without
- * this, a shopper who lands on a PDP and clicks "Buy Now" while
- * the header is still streaming would get `https://undefined/cart/…`.
+ * `<SiteHeader>`) so the guest checkout permalink has a real
+ * domain to splice into its URL from the first frame — before the
+ * header's slow Shopify cart fetch resolves. Without this, a guest
+ * who opens the cart and taps "Checkout" while the header is still
+ * streaming would get `https://undefined/cart/…`.
  *
  * Server-mode also clears `linesStore` here so the localStorage
  * residue from a prior guest session (or a logout snapshot)
@@ -692,44 +689,6 @@ export function clearCart(): void {
   }
 
   void dispatchServerAction(() => clearCartAction());
-}
-
-/**
- * Buy Now — send the shopper directly to Shopify's hosted
- * checkout with the given lines, bypassing the local cart.
- *
- * Used by:
- *
- *   - PDP "Buy Now - Fast Checkout" CTA (`<BuyActions>`).
- *   - Product modal Buy Now button — same single-variant flow
- *     but launched from a card click rather than the PDP.
- *   - Any future "express checkout" entry point that wants to
- *     skip the cart drawer.
- *
- * Mode-agnostic by design: server-mode users get the same
- * `cart/<variant>:<qty>` permalink as guests, with the current
- * attribution attached as `attributes[_utm_*]` query params.
- * Buy Now is intentionally NOT a "add to my cart then go" flow —
- * the shopper picks one product and goes; their existing cart
- * stays as-is for later.
- *
- * Returns nothing — synchronously navigates via
- * `window.location.href` on success. A `null` permalink (no
- * checkout domain configured, every line failed to parse) is a
- * silent no-op; the caller's button should have been disabled
- * before we got here.
- */
-export function buyNow(lines: ReadonlyArray<CheckoutLine>): void {
-  if (typeof window === "undefined") return;
-  const meta = metaStore.get();
-  if (!meta.checkoutDomain || lines.length === 0) return;
-
-  const attribution = getCurrentAttribution();
-  const url = buildCartPermalink(meta.checkoutDomain, lines, {
-    attributes: attributionToCartAttributes(attribution),
-  });
-  if (!url) return;
-  window.location.href = url;
 }
 
 /* ------------------------------------------------------------------ */

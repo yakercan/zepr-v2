@@ -145,7 +145,7 @@ export function CartFooter({
            * drawer needs to keep alive after handoff. Lets the
            * browser tear down our SPA context cleanly. */
         >
-          Checkout
+          Continue to checkout
         </a>
       ) : (
         <button
@@ -154,7 +154,7 @@ export function CartFooter({
           className={cn("btn-primary mt-4 w-full")}
           aria-disabled="true"
         >
-          Checkout
+          Continue to checkout
         </button>
       )}
     </div>

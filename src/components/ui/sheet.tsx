@@ -290,6 +290,10 @@ export function Sheet({
       ),
       handle: "mx-auto !mt-2.5 !h-1 !w-9",
       showHandle: true,
+      /* Footer sits at the panel's bottom edge, which is flush
+       * with the viewport (panel rounds only its top) — no
+       * corner to mirror. */
+      footerRound: "",
     },
     top: {
       panel: cn(
@@ -299,6 +303,7 @@ export function Sheet({
       ),
       handle: "mx-auto !mb-2.5 !mt-0 !h-1 !w-9",
       showHandle: true,
+      footerRound: "rounded-b-2xl",
     },
     right: {
       /* Side-drawer width is `88vw` capped at `max-w-sm` (384px).
@@ -315,6 +320,7 @@ export function Sheet({
       ),
       handle: "",
       showHandle: false,
+      footerRound: "rounded-bl-2xl",
     },
     left: {
       panel: cn(
@@ -324,6 +330,7 @@ export function Sheet({
       ),
       handle: "",
       showHandle: false,
+      footerRound: "rounded-br-2xl",
     },
   }[direction];
 
@@ -455,9 +462,25 @@ export function Sheet({
               line list / filter set / form scrolls. The padding-
               bottom safe-area-inset means the CTA clears the
               iOS home-indicator without the caller having to
-              wire it. */}
+              wire it.
+
+              `chrome.footerRound` mirrors the panel's inboard
+              bottom corner (e.g. `rounded-bl-2xl` for the
+              right-anchored drawer). We can't lean on an
+              `overflow-hidden` clip from the panel: Vaul drives
+              the slide with a `transform` on `Drawer.Content`,
+              and a transformed element's `overflow` + radius
+              doesn't reliably clip descendants in Chrome/Safari
+              (composited-layer bug). Rounding the footer's *own*
+              border box always clips its own surface bg, so it
+              can't paint a square over the panel's curve. */}
           {footer && (
-            <div className="border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)] pb-[env(safe-area-inset-bottom,0px)]">
+            <div
+              className={cn(
+                "border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)] pb-[env(safe-area-inset-bottom,0px)]",
+                chrome.footerRound,
+              )}
+            >
               {footer}
             </div>
           )}

@@ -37,8 +37,7 @@ import type {
 /**
  * The "buy side" of a product — title, delivery promise, price
  * band, discount badge, variant pickers, the tiered-offers picker
- * (when opted in via `custom.offers`), and the Add-to-cart /
- * Buy Now CTA stack.
+ * (when opted in via `custom.offers`), and the Add-to-Cart CTA.
  *
  * Lives in `components/products/` (not under `app/products/`)
  * because two surfaces will render it:
@@ -467,10 +466,13 @@ export function BuyForm({
         />
       )}
 
+      {/* Inline Add-to-Cart from `lg` up; a viewport-pinned bottom
+       *  bar takes over below `lg` (see `mobileStickyBar`). */}
       <BuyActions
         product={product}
         selectedVariant={selectedVariant}
         units={buyUnits}
+        mobileStickyBar
       />
 
       <TrustBadges />

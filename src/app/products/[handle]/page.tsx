@@ -162,8 +162,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const breadcrumbItems = buildBreadcrumb(product);
   const analyticsProduct = toAnalyticsProduct(product);
 
+  /* Mobile sticky add-to-cart bar clearance is handled by the bar
+   * itself (it reserves its height as `<body>` padding so the footer
+   * clears too — see `<BuyActions mobileStickyBar>`), so the page
+   * keeps its normal vertical rhythm here. */
   return (
-    <main className="page-container pt-3 pb-8 md:pt-4 md:pb-12">
+    <main className="page-container pt-3 pb-12 md:pt-4">
       <ProductViewTracker product={analyticsProduct} />
       {/* Product rich result (price, availability, brand, hero
           image — plus a star rating when reviews exist) and the

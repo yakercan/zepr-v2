@@ -31,11 +31,20 @@ import { cn } from "@/lib/utils";
  *   - **Non-required market** → never shows; analytics stays on by
  *     default (US/CA/NZ/AU), exactly as before.
  *
- * Conversion-safe by construction: `modal={false}` means no
- * backdrop and the page stays fully scrollable / clickable behind
- * it, so the banner never blocks shopping. It's `dismissible={false}`
- * (no drag / Escape close) so the shopper makes an explicit
- * Accept / Decline choice rather than an ambiguous swipe-away.
+ * Reuses our Vaul bottom-drawer dialect — the same chrome `<Sheet>`
+ * gives every storefront drawer: a `black/40` backdrop, a
+ * `rounded-t-2xl` surface, hairline border, and soft top shadow. We
+ * don't render `<Sheet>` itself (it's compact-viewport-only and
+ * always drag/backdrop-dismissible); we drive the same Vaul drawer
+ * directly so the banner shows at every width and stays
+ * non-dismissible. The backdrop is the point: it sits above the
+ * mobile sticky add-to-cart bar instead of stacking awkwardly
+ * against it, so the two bottom-pinned surfaces never contradict.
+ *
+ * `modal` (backdrop blocks + locks scroll) + `dismissible={false}`
+ * (no drag / Escape / backdrop-tap close) means the shopper makes an
+ * explicit Accept / Decline choice rather than an ambiguous
+ * swipe-away.
  *
  * Mounted once in `<ShopLayout>`, ordered *before* `<ShopifyAnalytics>`
  * so its consent-off effect runs before the first page-view fires in
@@ -97,16 +106,23 @@ export function CookieConsent({
       open={open}
       onOpenChange={setOpen}
       direction="bottom"
-      modal={false}
       dismissible={false}
     >
       <Drawer.Portal>
+        {/* Backdrop — same tint as the shared `<Backdrop>` / `<Sheet>`
+         *  overlay, one tier below the panel. No `onClick` close: the
+         *  banner is non-dismissible, so a backdrop tap is inert and
+         *  the shopper must pick Accept / Decline. */}
+        <Drawer.Overlay
+          className="fixed inset-0 bg-black/40"
+          style={{ zIndex: "calc(var(--z-cookie-banner) - 1)" }}
+        />
         <Drawer.Content
           aria-describedby={undefined}
           style={{ zIndex: "var(--z-cookie-banner)" }}
           className={cn(
             "fixed inset-x-0 bottom-0 flex flex-col outline-none",
-            "border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
+            "rounded-t-2xl border border-b-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)]",
             "shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.18)]",
             "pb-[env(safe-area-inset-bottom,0px)]",
           )}

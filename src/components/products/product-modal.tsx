@@ -57,15 +57,14 @@ type FetchStatus = "idle" | "loading" | "success" | "error";
  *   ├─ footer (sticky) ─────────────────┤
  *   │ <BuyActions>                      │
  *   │  [qty] [ Add to Cart  ]           │
- *   │        [ Buy Now      ]           │
  *   └───────────────────────────────────┘
  *
  * Single column, gallery first. The modal is "decide fast" —
  * there's no value in splitting attention between two side-by-
  * side columns when the whole frame is already a focused
  * dialog. Vertical scroll inside the body handles tall option
- * stacks; the buy CTAs ride a pinned footer so the Add / Buy
- * actions are always one click away regardless of scroll
+ * stacks; the Add-to-Cart CTA rides a pinned footer so it's
+ * always one click away regardless of scroll
  * position. Border on top of the footer renders only when the
  * body actually overflows — same dialect `<MediaFormModal>`
  * uses for the review / return-request forms — so a short
@@ -100,19 +99,16 @@ type FetchStatus = "idle" | "loading" | "success" | "error";
  *   - Skeleton state until the detail lands so the modal feels
  *     responsive even on a cold cache.
  *
- * Add / Buy paths:
+ * Add path:
  *
- *   - `<BuyActions>` owns the qty stepper, Add-to-Cart, Buy Now,
- *     and the Shop Pay installment promise. It writes to the cart
- *     store directly via `addCartLine` / `buyNow`, so the modal
- *     itself doesn't need to know about those primitives.
+ *   - `<BuyActions>` owns the qty stepper and Add-to-Cart button
+ *     (plus the Shop Pay promise, suppressed here). It writes to
+ *     the cart store directly via `addCartLine`, so the modal
+ *     itself doesn't need to know about that primitive.
  *   - On a successful Add to Cart we dismiss the modal via the
  *     `onAdded` callback — the cart drawer pops next as the
  *     shopper's confirmation, and stacking modal-over-drawer
  *     would just hide the drawer behind the overlay.
- *   - Buy Now navigates away (Shopify-hosted checkout), so we
- *     don't need to actively close — the modal unmounts with the
- *     page.
  *
  * Stays mounted (even when closed) so the option state survives
  * a reopen without re-fetching. The `<Modal>` shell owns
@@ -518,16 +514,15 @@ function BodySkeleton({ product }: { product: SearchProduct }) {
 }
 
 /**
- * Footer half of the skeleton — two CTA placeholders matching
- * `<BuyActions>`'s eventual height (qty + Add-to-Cart row, then
- * Buy Now below). Keeps the pinned footer's height stable
- * between the loading and loaded states so the body's scroll
- * geometry doesn't jump under the shopper.
+ * Footer half of the skeleton — one CTA placeholder matching
+ * `<BuyActions>`'s eventual height (the qty + Add-to-Cart row).
+ * Keeps the pinned footer's height stable between the loading and
+ * loaded states so the body's scroll geometry doesn't jump under
+ * the shopper.
  */
 function FooterSkeleton() {
   return (
     <div className="flex flex-col gap-3">
-      <div className="h-12 w-full animate-pulse rounded-lg bg-[color:var(--color-surface-muted)]" />
       <div className="h-12 w-full animate-pulse rounded-lg bg-[color:var(--color-surface-muted)]" />
     </div>
   );

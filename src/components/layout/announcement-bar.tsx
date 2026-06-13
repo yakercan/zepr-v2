@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  *
  * Shows all promo lines on one row, joined by a middle dot:
  *
- *   LIMITED TIME DEAL · BUY 2 SAVE 20% · BUY 3 SAVE 30%
+ *   LIMITED TIME DEAL · BUY 2 GET 20% OFF · BUY 3 GET 30% OFF
  *
  * # Fit vs. scroll
  *
@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
  *   users (the line rests left-aligned).
  */
 
-const MESSAGES = ["LIMITED TIME DEALS", "BUY 2 SAVE 20%", "BUY 3 SAVE 30%"];
+const MESSAGES = ["LIMITED TIME DEALS", "BUY 2 GET 20% OFF", "BUY 3 GET 30% OFF"];
 
 /** Non-breaking-space-padded middle dot between messages, so the
  *  separators never collapse or wrap away from their neighbours. */

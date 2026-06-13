@@ -1,56 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShopPayBadge } from "@/components/products/shop-pay-badge";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
-import { addCartLine, buyNow } from "@/lib/cart/store";
+import { addCartLine } from "@/lib/cart/store";
+import { cn } from "@/lib/utils";
 import type { CartLine } from "@/types/cart";
 import type { ProductDetail, ProductVariant } from "@/types/product";
 
 /**
- * PDP buy-stack CTAs — the pair of buttons (Add to cart +
- * Buy Now) plus the Shop Pay installment promise underneath.
+ * Add-to-Cart CTA — an "Add to Cart" button (optionally preceded by
+ * a quantity stepper) plus the Shop Pay installment promise.
  *
  * Layout:
  *
  *   [Qty]  [          Add to Cart          ]
- *   [          Buy Now - Fast Checkout     ]
  *   Pay in 4 interest-free… [Shop Pay]
  *
  * Two operating modes:
  *
  *   1. **Uncontrolled (single line)** — pass `selectedVariant`
  *      with no `units`. The internal stepper drives the quantity
- *      and both CTAs operate on a single cart line built from
- *      the anchor product.
+ *      and the button adds a single cart line built from the
+ *      anchor product.
  *   2. **Controlled multi-line** — pass `units`, a pre-built
  *      list of `{ cartLineSeed, variantGid, quantity }`. The
- *      stepper hides and both CTAs operate on the multi-line
- *      payload — Buy 2 mixed (Blue × 1 + Red × 1) adds two cart
- *      lines and Buy Now opens a multi-line Shopify cart
- *      permalink. Companion-bundle units travel here too: the
- *      parent embeds the companion's product context inside
- *      `cartLineSeed`, so this component never has to know about
- *      `CompanionProduct`.
+ *      stepper hides and the button adds the whole payload — Buy 2
+ *      mixed (Blue × 1 + Red × 1) adds two cart lines. Companion-
+ *      bundle units travel here too: the parent embeds the
+ *      companion's product context inside `cartLineSeed`, so this
+ *      component never has to know about `CompanionProduct`.
  *
-   * Buy Now uses a Shopify hosted-checkout permalink — bypasses the
- * local cart entirely so the shopper goes from intent to paid
- * order in one click. The permalink construction lives in the
- * cart store's `buyNow()` so the same code path attaches the
- * current UTM attribution (`attributes[_utm_*]=…`) on the way
- * out, regardless of whether this CTA or a card / modal CTA
- * fires it. Add to Cart loops `addCartLine`, suppressing the
- * drawer pop on every line but the first so the drawer opens
- * exactly once as the confirmation signal.
+ * Add to Cart loops `addCartLine`, suppressing the drawer pop on
+ * every line but the first so the drawer opens exactly once as the
+ * confirmation signal.
+ *
+ * `mobileStickyBar` (PDP) swaps the inline button for a viewport-
+ * pinned bottom bar below `lg`, and shows the inline button from
+ * `lg` up — pure Tailwind breakpoints, so the mobile CTA paints on
+ * first render with no device-detection / hydration delay.
  *
  * Disabled / label states:
  *
  *   - No `selectedVariant` (matrix-unavailable combo on the top
- *     picker) — Add-to-cart reads "Select options" and both CTAs
- *     disable. Defensive — cascading selection should prevent it.
+ *     picker) — reads "Select options", disabled. Defensive —
+ *     cascading selection should prevent it.
  *   - Any unit unavailable (controlled) OR top variant sold out
- *     (uncontrolled) — Add-to-cart reads "Sold out", both CTAs
- *     disable, Shop Pay badge hides.
+ *     (uncontrolled) — reads "Sold out", disabled, Shop Pay badge
+ *     hides.
  */
 
 export interface BuyUnit {
@@ -85,11 +82,17 @@ export interface BuyActionsProps {
    *  visible after the drawer pops). */
   onAdded?: () => void;
   /** Whether to render the Shop Pay "Pay in 4…" promise below
-   *  the Buy Now CTA. Defaults to `true` (PDP behaviour); pass
-   *  `false` for compact surfaces like the quick-add modal where
-   *  the installment line adds vertical noise to a CTA stack
+   *  the Add-to-Cart button. Defaults to `true` (PDP behaviour);
+   *  pass `false` for compact surfaces like the quick-add modal
+   *  where the installment line adds vertical noise to a CTA stack
    *  that's already inside a dialog frame. */
   showInstallmentBadge?: boolean;
+  /** PDP only. Below `lg` the inline button hides and an Amazon-
+   *  style viewport-pinned bottom bar takes over; from `lg` up the
+   *  inline button shows and the bar hides. Left `false` in the
+   *  modal, which keeps the inline button at every width inside its
+   *  own pinned footer. */
+  mobileStickyBar?: boolean;
 }
 
 export function BuyActions({
@@ -98,8 +101,35 @@ export function BuyActions({
   units: controlledUnits,
   onAdded,
   showInstallmentBadge = true,
+  mobileStickyBar = false,
 }: BuyActionsProps) {
   const [internalQuantity, setInternalQuantity] = useState(1);
+  const stickyBarRef = useRef<HTMLDivElement>(null);
+
+  /* Reserve the pinned bar's height as `<body>` padding so the page
+   * (including the global site footer, which is a sibling of the
+   * PDP `<main>`) can scroll fully clear of it — a `pb` on `<main>`
+   * alone only pads above the footer, leaving its bottom edge under
+   * the bar. We mirror the bar's live `offsetHeight`: it's
+   * `lg:hidden` (so `display:none`, height `0`, on desktop) and its
+   * box already includes the safe-area inset, so the reservation
+   * tracks the breakpoint + notch with no JS media query. */
+  useEffect(() => {
+    if (!mobileStickyBar) return;
+    const bar = stickyBarRef.current;
+    if (!bar) return;
+
+    const sync = () => {
+      document.body.style.paddingBottom = `${bar.offsetHeight}px`;
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      document.body.style.paddingBottom = "";
+    };
+  }, [mobileStickyBar]);
 
   const isControlled = controlledUnits !== undefined;
   const effectiveUnits: ReadonlyArray<BuyUnit> = isControlled
@@ -130,16 +160,6 @@ export function BuyActions({
     onAdded?.();
   };
 
-  const handleBuyNow = () => {
-    if (!sellable) return;
-    buyNow(
-      effectiveUnits.map((u) => ({
-        variantGid: u.variantGid,
-        quantity: u.quantity,
-      })),
-    );
-  };
-
   const addLabel = !selectedVariant
     ? "Select options"
     : sellable
@@ -148,13 +168,19 @@ export function BuyActions({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-stretch gap-3">
+      {/* Inline button row. On the PDP it's desktop-only (`lg` and
+       *  up) — the pinned bar below owns the mobile CTA; in the
+       *  modal (`mobileStickyBar` false) it shows at every width. */}
+      <div
+        className={cn(
+          "items-stretch gap-3",
+          mobileStickyBar ? "hidden lg:flex" : "flex",
+        )}
+      >
         {!isControlled && (
           <QuantityStepper
             quantity={internalQuantity}
-            onDecrement={() =>
-              setInternalQuantity((q) => Math.max(1, q - 1))
-            }
+            onDecrement={() => setInternalQuantity((q) => Math.max(1, q - 1))}
             onIncrement={() => setInternalQuantity((q) => q + 1)}
             size="md"
           />
@@ -163,21 +189,41 @@ export function BuyActions({
           type="button"
           onClick={handleAddToCart}
           disabled={!sellable}
-          className="btn-secondary flex-1"
+          className="btn-primary flex-1"
         >
           {addLabel}
         </button>
       </div>
-      <button
-        type="button"
-        onClick={handleBuyNow}
-        disabled={!sellable}
-        className="btn-primary w-full"
-      >
-        Buy Now - Fast Checkout
-      </button>
+
       {sellable && showInstallmentBadge && (
         <ShopPayBadge currency={product.currency} className="mt-1" />
+      )}
+
+      {/* Mobile sticky add-to-cart bar (PDP). `position: fixed`
+       *  pins it to the viewport and `lg:hidden` drops it on
+       *  desktop — pure CSS, so it paints immediately with no JS
+       *  gate. Reuses `handleAddToCart` / `sellable` / `addLabel`,
+       *  so it honours tiered-offer units + sold-out state.
+       *  Rounded-top + hairline match our Vaul bottom-drawer
+       *  dialect (`<Sheet>` / cookie banner); the shadow is a touch
+       *  softer since this bar is always present rather than a
+       *  transient overlay. */}
+      {mobileStickyBar && (
+        <div
+          ref={stickyBarRef}
+          className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-b-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-10px_34px_-14px_rgba(0,0,0,0.16)] lg:hidden"
+        >
+          <div className="py-3">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={!sellable}
+              className="btn-primary w-full"
+            >
+              {addLabel}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

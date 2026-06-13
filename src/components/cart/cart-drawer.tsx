@@ -255,13 +255,12 @@ function CartDrawerMobile({
       footer={
         lines.length > 0 ? (
           /* Sheet's footer slot already supplies the border-t and
-           * surface bg, so we strip those from `<CartFooter>` here
-           * to avoid doubling them up. */
-          <CartFooter
-            subtotalCents={subtotalCents}
-            currency={currency}
-            className="bg-[color:var(--color-surface)]"
-          />
+           * surface bg, so we let `<CartFooter>` stay transparent
+           * here to avoid doubling them up. This also matters for
+           * the rounded inboard-bottom corner: the slot rounds its
+           * own surface bg, so a second opaque bg on `<CartFooter>`
+           * would paint a square back over that curve. */
+          <CartFooter subtotalCents={subtotalCents} currency={currency} />
         ) : undefined
       }
     >
