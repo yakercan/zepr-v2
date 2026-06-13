@@ -207,13 +207,25 @@ export function BuyActions({
        *  Rounded-top + hairline match our Vaul bottom-drawer
        *  dialect (`<Sheet>` / cookie banner); the shadow is a touch
        *  softer since this bar is always present rather than a
-       *  transient overlay. */}
+       *  transient overlay.
+       *
+       *  The `after:` element bleeds the surface colour straight
+       *  down past the bar's bottom edge (off-screen at rest). On
+       *  mobile, fast scrolling animates the browser's dynamic
+       *  toolbar (Safari's bottom chrome / Chrome's URL bar), and a
+       *  `bottom-0` fixed element can momentarily lift off the
+       *  viewport edge — exposing a sliver of the page behind it.
+       *  The bleed fills that transient gap with the bar's own
+       *  surface so it reads as solid instead of flickering. */}
       {mobileStickyBar && (
         <div
           ref={stickyBarRef}
-          className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-b-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-10px_34px_-14px_rgba(0,0,0,0.16)] lg:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-b-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-10px_34px_-14px_rgba(0,0,0,0.16)] after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-20 after:bg-[color:var(--color-surface)] lg:hidden"
         >
-          <div className="py-3">
+          {/* Tighter bottom than top so the CTA sits low in the bar
+           *  (the safe-area inset below already adds system space on
+           *  notched devices). */}
+          <div className="pt-3 pb-1">
             <button
               type="button"
               onClick={handleAddToCart}
