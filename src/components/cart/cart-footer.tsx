@@ -7,7 +7,6 @@ import {
   useCartCheckoutUrl,
   useCartCompareAtSavingsCents,
 } from "@/lib/cart/store";
-import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,10 +29,10 @@ import { cn } from "@/lib/utils";
  *
  * Three rows, top-to-bottom:
  *
- *   1. **Free-shipping progress bar** — visible while the subtotal
- *      is under the threshold; flips to a "you've unlocked free
- *      shipping" pill once cleared. The bar is a single filled
- *      `<div>` inside a track, so width transitions GPU-cheaply.
+ *   1. **Free-shipping confirmation** — only rendered once the
+ *      subtotal clears the threshold (no "X away" nudge). It eases
+ *      in via the shared `fade-in` keyframe as the cart total
+ *      crosses over, then a full success bar reads as "completed".
  *   2. **Subtotal row** — left label + right amount, both bold.
  *      Taxes / shipping / discounts are deferred to checkout, so
  *      we don't surface them here.
@@ -78,12 +77,15 @@ export function CartFooter({
   const totalSavingsCents = bundleSavingsCents + compareSavingsCents;
   const hasSavings = totalSavingsCents > 0;
 
+  /* The free-shipping line only appears once the cart clears the
+   * threshold; gate it here so the subtotal row below can drop its
+   * top margin when there's nothing above it (otherwise the footer's
+   * own top padding + a `mt-4` would stack into a doubled gap). */
+  const showFreeShipping = subtotalCents >= freeShippingThresholdCents(currency);
+
   return (
     <div className={cn("px-5 py-4", className)}>
-      <FreeShippingProgress
-        subtotalCents={subtotalCents}
-        currency={currency}
-      />
+      {showFreeShipping && <FreeShippingUnlocked />}
 
       {/* Bundle savings row — itemised breakdown intentionally hidden
           for now. The bundle discount IS applied (it's folded into the
@@ -105,7 +107,7 @@ export function CartFooter({
       <div
         className={cn(
           "flex items-baseline justify-between",
-          bundleSavingsCents > 0 ? "mt-1.5" : "mt-4",
+          bundleSavingsCents > 0 ? "mt-1.5" : showFreeShipping ? "mt-4" : "",
         )}
       >
         <span className="text-sm font-semibold text-[color:var(--color-ink)]">
@@ -161,50 +163,29 @@ export function CartFooter({
   );
 }
 
-function FreeShippingProgress({
-  subtotalCents,
-  currency,
-}: {
-  subtotalCents: number;
-  currency: string;
-}) {
-  const threshold = freeShippingThresholdCents(currency);
-  const remaining = Math.max(0, threshold - subtotalCents);
-  const pct = Math.min(100, (subtotalCents / threshold) * 100);
-  const unlocked = remaining === 0;
-
+/**
+ * Free-shipping confirmation. Rendered by `CartFooter` only once the
+ * subtotal clears the threshold, so it carries no "X away" progress
+ * state and needs no amount/currency. Mounting on cross-over lets the
+ * shared `fade-in` keyframe ease it in smoothly; the full success bar
+ * reads as a completed progress track rather than live progress.
+ */
+function FreeShippingUnlocked() {
   return (
-    <div>
+    <div className="animate-fade-in">
       <p className="text-xs leading-snug text-[color:var(--color-ink-secondary)]">
-        {unlocked ? (
-          <span className="font-semibold text-[color:var(--color-success)]">
-            You&rsquo;ve unlocked free shipping.
-          </span>
-        ) : (
-          <>
-            You&rsquo;re{" "}
-            <span className="font-semibold text-[color:var(--color-ink)]">
-              {formatPrice(remaining, currency)}
-            </span>{" "}
-            away from{" "}
-            <span className="font-semibold text-[color:var(--color-success)]">
-              free shipping
-            </span>
-            .
-          </>
-        )}
+        <span className="font-semibold text-[color:var(--color-success)]">
+          You&rsquo;ve unlocked free shipping.
+        </span>
       </p>
       <div
         role="progressbar"
-        aria-valuenow={Math.round(pct)}
+        aria-valuenow={100}
         aria-valuemin={0}
         aria-valuemax={100}
         className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--color-surface-muted)]"
       >
-        <div
-          className="h-full rounded-full bg-[color:var(--color-success)] transition-[width] duration-300 ease-out"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-full w-full rounded-full bg-[color:var(--color-success)]" />
       </div>
     </div>
   );
