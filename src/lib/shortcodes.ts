@@ -79,7 +79,7 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
   "138": "/products/pet-nail-clippers-with-led-light",
   "139": "/products/magic-shadow-air-humidifier",
   "140": "/products/fluffy-plush-coat",
-  "141": "/products/mosquito-killer-lamp",
+  "141": "/products/mosquito-trap-lamp",
   "142": "/products/56-grid-ice-cube-tray-with-press-release",
   "143": "/products/portable-clip-on-cooling-fan",
   "144": "/products/batwing-sleeve-trench-coat",
