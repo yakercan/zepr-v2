@@ -140,25 +140,19 @@ export function BuyForm({
   );
   const offersActive = offerTiers.length > 0;
 
-  /* When the metafield carries bundle companions ("2:<pid>" /
-   * "3:[<p1>,<p2>]"), default-select Buy 2 instead of Buy 1 —
-   * the bundle is the merchant's intent, so the picker should
-   * land pre-committed to it instead of asking the shopper to
-   * click. Anchor-only tiers ("2" / "3") still default to Buy 1
-   * since there's no upsell story to lead with. */
-  const defaultTierIndex =
-    offersActive && product.offers.bundleCompanionIds.length > 0 ? 1 : 0;
+  /* Buy 1 (the anchor tier) is always the default selection,
+   * whether or not the product carries bundle companions — the
+   * shopper opts up to Buy 2 / Buy 3 themselves. */
+  const defaultTierIndex = 0;
 
   const [tierIndex, setTierIndex] = useState(defaultTierIndex);
   const activeTier = offerTiers[tierIndex];
 
   /* Per-unit selections for units #2..#N. Length matches
    * `activeTier.quantity - 1`; resizes inline on tier change so
-   * the picker never reads past the array. Lazy initialiser
-   * seeds entries that match the default tier — so when we
-   * default-select Buy 2, unit #2 already has a real selection
-   * from first render and the cart payload is complete without
-   * waiting for a user click. */
+   * the picker never reads past the array. With Buy 1 as the
+   * default tier this seeds empty and fills in as the shopper
+   * opts up to a higher tier. */
   const [extraUnitSelections, setExtraUnitSelections] = useState<
     OptionSelection[]
   >(() => {
