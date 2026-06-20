@@ -48,8 +48,8 @@ export interface FaqSection {
 
 /**
  * Placeholder in answer copy, swapped at render for the visitor
- * market's formatted free-shipping threshold (e.g. `$50` / `£50` /
- * `S$60` / `$70`). Keeps the catalog static + currency-agnostic while letting
+ * market's formatted free-shipping threshold (e.g. `$35` / `£35` /
+ * `S$50` / `$50`). Keeps the catalog static + currency-agnostic while letting
  * the one money-bearing answer track the active market — see
  * `resolveFaqSections`. */
 export const SHIPPING_THRESHOLD_TOKEN = "{shippingThreshold}";

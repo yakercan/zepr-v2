@@ -41,9 +41,3 @@ export function hydrateAttribution(attribution: Attribution | null): void {
 export function useAttribution(): Attribution | null {
   return store.use();
 }
-
-/** Imperative read — for event handlers (`buyNow()`) that need
- *  the current attribution at click time without subscribing. */
-export function getCurrentAttribution(): Attribution | null {
-  return store.get();
-}

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ShopPayBadge } from "@/components/products/shop-pay-badge";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { addCartLine } from "@/lib/cart/store";
-import { cn } from "@/lib/utils";
 import type { CartLine } from "@/types/cart";
 import type { ProductDetail, ProductVariant } from "@/types/product";
 
@@ -35,10 +34,8 @@ import type { ProductDetail, ProductVariant } from "@/types/product";
  * every line but the first so the drawer opens exactly once as the
  * confirmation signal.
  *
- * `mobileStickyBar` (PDP) swaps the inline button for a viewport-
- * pinned bottom bar below `lg`, and shows the inline button from
- * `lg` up — pure Tailwind breakpoints, so the mobile CTA paints on
- * first render with no device-detection / hydration delay.
+ * The button is inline at every width on both surfaces (PDP buy
+ * column + quick-add modal) — no viewport-pinned variant.
  *
  * Disabled / label states:
  *
@@ -87,12 +84,6 @@ export interface BuyActionsProps {
    *  where the installment line adds vertical noise to a CTA stack
    *  that's already inside a dialog frame. */
   showInstallmentBadge?: boolean;
-  /** PDP only. Below `lg` the inline button hides and an Amazon-
-   *  style viewport-pinned bottom bar takes over; from `lg` up the
-   *  inline button shows and the bar hides. Left `false` in the
-   *  modal, which keeps the inline button at every width inside its
-   *  own pinned footer. */
-  mobileStickyBar?: boolean;
 }
 
 export function BuyActions({
@@ -101,35 +92,8 @@ export function BuyActions({
   units: controlledUnits,
   onAdded,
   showInstallmentBadge = true,
-  mobileStickyBar = false,
 }: BuyActionsProps) {
   const [internalQuantity, setInternalQuantity] = useState(1);
-  const stickyBarRef = useRef<HTMLDivElement>(null);
-
-  /* Reserve the pinned bar's height as `<body>` padding so the page
-   * (including the global site footer, which is a sibling of the
-   * PDP `<main>`) can scroll fully clear of it — a `pb` on `<main>`
-   * alone only pads above the footer, leaving its bottom edge under
-   * the bar. We mirror the bar's live `offsetHeight`: it's
-   * `lg:hidden` (so `display:none`, height `0`, on desktop) and its
-   * box already includes the safe-area inset, so the reservation
-   * tracks the breakpoint + notch with no JS media query. */
-  useEffect(() => {
-    if (!mobileStickyBar) return;
-    const bar = stickyBarRef.current;
-    if (!bar) return;
-
-    const sync = () => {
-      document.body.style.paddingBottom = `${bar.offsetHeight}px`;
-    };
-    sync();
-    const observer = new ResizeObserver(sync);
-    observer.observe(bar);
-    return () => {
-      observer.disconnect();
-      document.body.style.paddingBottom = "";
-    };
-  }, [mobileStickyBar]);
 
   const isControlled = controlledUnits !== undefined;
   const effectiveUnits: ReadonlyArray<BuyUnit> = isControlled
@@ -168,15 +132,7 @@ export function BuyActions({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Inline button row. On the PDP it's desktop-only (`lg` and
-       *  up) — the pinned bar below owns the mobile CTA; in the
-       *  modal (`mobileStickyBar` false) it shows at every width. */}
-      <div
-        className={cn(
-          "items-stretch gap-3",
-          mobileStickyBar ? "hidden lg:flex" : "flex",
-        )}
-      >
+      <div className="flex items-stretch gap-3">
         {!isControlled && (
           <QuantityStepper
             quantity={internalQuantity}
@@ -197,45 +153,6 @@ export function BuyActions({
 
       {sellable && showInstallmentBadge && (
         <ShopPayBadge currency={product.currency} className="mt-1" />
-      )}
-
-      {/* Mobile sticky add-to-cart bar (PDP). `position: fixed`
-       *  pins it to the viewport and `lg:hidden` drops it on
-       *  desktop — pure CSS, so it paints immediately with no JS
-       *  gate. Reuses `handleAddToCart` / `sellable` / `addLabel`,
-       *  so it honours tiered-offer units + sold-out state.
-       *  Rounded-top + hairline match our Vaul bottom-drawer
-       *  dialect (`<Sheet>` / cookie banner); the shadow is a touch
-       *  softer since this bar is always present rather than a
-       *  transient overlay.
-       *
-       *  The `after:` element bleeds the surface colour straight
-       *  down past the bar's bottom edge (off-screen at rest). On
-       *  mobile, fast scrolling animates the browser's dynamic
-       *  toolbar (Safari's bottom chrome / Chrome's URL bar), and a
-       *  `bottom-0` fixed element can momentarily lift off the
-       *  viewport edge — exposing a sliver of the page behind it.
-       *  The bleed fills that transient gap with the bar's own
-       *  surface so it reads as solid instead of flickering. */}
-      {mobileStickyBar && (
-        <div
-          ref={stickyBarRef}
-          className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-b-0 border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-10px_34px_-14px_rgba(0,0,0,0.16)] after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-20 after:bg-[color:var(--color-surface)] lg:hidden"
-        >
-          {/* Tighter bottom than top so the CTA sits low in the bar
-           *  (the safe-area inset below already adds system space on
-           *  notched devices). */}
-          <div className="pt-3 pb-1">
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={!sellable}
-              className="btn-primary w-full"
-            >
-              {addLabel}
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );

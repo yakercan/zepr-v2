@@ -26,6 +26,7 @@ import {
   findVariant,
   type OptionSelection,
 } from "@/lib/variants";
+import { cn } from "@/lib/utils";
 import type { CartLine } from "@/types/cart";
 import type {
   CompanionProduct,
@@ -47,11 +48,17 @@ import type {
  *      button when the product has variants — same chrome inside
  *      a modal shell.
  *
- * Client island. Three pieces of state:
+ * Client island. Four pieces of state:
  *
  *   - `selection`           — top picker / unit #1 (shared)
  *   - `tierIndex`           — which tiered-offers tile is active
  *   - `extraUnitSelections` — units #2..#N, indexed by `slot - 1`
+ *   - `bundleMode`          — for bundle-enabled products, whether
+ *                             the multi-unit tiers compose as "Same
+ *                             Item" (anchor × N) or "Best Match"
+ *                             (anchor + companion). No effect on
+ *                             anchor-only offers (no companion to
+ *                             swap in), where the toggle is hidden.
  *
  * Unit #1 is intentionally the top variant picker, not a separate
  * card with synced state — bidirectional `useEffect` syncs are a
@@ -68,10 +75,9 @@ import type {
  *     smaller tier is currently active. Consumers that only care
  *     about the active tier (`unitSlots`, `buyUnits`) slice it
  *     down to `activeTier.quantity` at the point of use.
- *   - When the metafield carries bundle companions
- *     ("2:<pid>" / "3:[<p1>,<p2>]") the picker defaults to Buy 2
- *     instead of Buy 1, with `extraUnitSelections` lazy-seeded
- *     so the cart payload is complete from first render.
+ *   - The picker defaults to Buy 2 (the lead upsell tier) whenever
+ *     offers are active; `extraUnitSelections` lazy-seeds unit #2
+ *     from first render and resizes as the shopper changes tier.
  */
 export interface BuyFormProps {
   product: ProductDetail;
@@ -140,27 +146,49 @@ export function BuyForm({
   );
   const offersActive = offerTiers.length > 0;
 
-  /* Buy 1 (the anchor tier) is always the default selection,
-   * whether or not the product carries bundle companions — the
-   * shopper opts up to Buy 2 / Buy 3 themselves. */
-  const defaultTierIndex = 0;
+  /* Buy 2 (the second tier) is the default selection whenever offers
+   * are active — it's the merchant's lead upsell, so the picker lands
+   * pre-committed to it rather than the bare anchor. Falls back to
+   * index 0 only if there's no second tier (offers inactive). */
+  const defaultTierIndex = offerTiers.length > 1 ? 1 : 0;
 
   const [tierIndex, setTierIndex] = useState(defaultTierIndex);
   const activeTier = offerTiers[tierIndex];
 
+  /* Bundle-enabled products (a companion resolved off the
+   * `custom.offers` metafield) let the shopper choose how the
+   * multi-unit tiers compose:
+   *
+   *   - "best" (Best Match) → anchor + companion(s); the merchant's
+   *     curated pairing, so it's the default.
+   *   - "same" (Same Item)  → anchor × N; just stock up on this one.
+   *
+   * `useBundle` is the boolean the slot resolver keys off. The toggle
+   * only renders when there's a *resolved* companion to swap in
+   * (`hasBundleOption`); anchor-only offers ("2" / "3") — and ones
+   * whose companion ids failed to resolve (positional `null`s) —
+   * ignore the mode entirely since both options would be identical. */
+  const hasBundleOption =
+    offersActive && product.bundleCompanions.some((c) => c != null);
+  const [bundleMode, setBundleMode] = useState<"same" | "best">("best");
+  const useBundle = bundleMode === "best";
+
   /* Per-unit selections for units #2..#N. Length matches
    * `activeTier.quantity - 1`; resizes inline on tier change so
-   * the picker never reads past the array. With Buy 1 as the
-   * default tier this seeds empty and fills in as the shopper
-   * opts up to a higher tier. */
+   * the picker never reads past the array. With Buy 2 as the
+   * default tier, this lazily seeds unit #2 from first render so
+   * the cart payload is complete before the shopper touches the
+   * picker. */
   const [extraUnitSelections, setExtraUnitSelections] = useState<
     OptionSelection[]
   >(() => {
     const tier = offerTiers[defaultTierIndex];
     if (!tier) return [];
     const out: OptionSelection[] = [];
+    /* Seeds against the default "best" mode (the toggle's default),
+     * matching the slot resolver's first-render output. */
     for (let i = 1; i < tier.quantity; i++) {
-      const source = resolveSlotSource(product, i);
+      const source = resolveSlotSource(product, i, true);
       out.push(
         source.kind === "companion"
           ? defaultSelection(source.product.variants)
@@ -180,11 +208,14 @@ export function BuyForm({
    * length matches `product.offers.tilesCount`, not the active
    * tier's quantity. We need full coverage even when Buy 1 is
    * the active tier, so the Buy 2 / Buy 3 preview rows can total
-   * `anchor + companion(s)` without missing slots. Slot 0 is
-   * always the anchor; slot k looks up `bundleCompanions[k-1]`,
-   * falling back to anchor when the merchant didn't configure
-   * (or the loader couldn't resolve) a companion for that
-   * position.
+   * their slots without missing any. Slot 0 is always the anchor.
+   *
+   * In "Best Match" mode (`useBundle`) slot k looks up
+   * `bundleCompanions[k-1]`, falling back to anchor when no
+   * companion is configured/resolved for that position. In "Same
+   * Item" mode every slot is the anchor — so flipping the toggle
+   * re-points the whole picker (previews, unit cards, and the cart
+   * payload all derive from here).
    *
    * Consumers that only care about the active tier (the unit
    * picker grid, the cart payload composer) slice this down to
@@ -193,9 +224,9 @@ export function BuyForm({
   const slotSources = useMemo<ReadonlyArray<SlotSource>>(() => {
     if (!offersActive) return [];
     return Array.from({ length: product.offers.tilesCount }, (_, i) =>
-      resolveSlotSource(product, i),
+      resolveSlotSource(product, i, useBundle),
     );
-  }, [offersActive, product]);
+  }, [offersActive, product, useBundle]);
 
   const handleTierChange = (idx: number) => {
     setTierIndex(idx);
@@ -207,7 +238,7 @@ export function BuyForm({
       const padded = prev.slice();
       while (padded.length < nextExtraCount) {
         const slotIdx = padded.length + 1; /* 0-based slot index */
-        const source = resolveSlotSource(product, slotIdx);
+        const source = resolveSlotSource(product, slotIdx, useBundle);
         padded.push(
           source.kind === "companion"
             ? defaultSelection(source.product.variants)
@@ -215,6 +246,31 @@ export function BuyForm({
         );
       }
       return padded;
+    });
+  };
+
+  /* Switching Same Item ⇄ Best Match re-points every extra slot to
+   * the other mode's source product, so the previously-picked
+   * selections (e.g. a companion's colourway) no longer apply — we
+   * re-seed all of the active tier's extra units against the new
+   * mode. Anchor slots mirror the top pick; companion slots take the
+   * companion's default selection. */
+  const handleModeChange = (next: "same" | "best") => {
+    if (next === bundleMode) return;
+    setBundleMode(next);
+    const nextUseBundle = next === "best";
+    const extraCount = Math.max(0, (activeTier?.quantity ?? 1) - 1);
+    setExtraUnitSelections(() => {
+      const out: OptionSelection[] = [];
+      for (let slotIdx = 1; slotIdx <= extraCount; slotIdx++) {
+        const source = resolveSlotSource(product, slotIdx, nextUseBundle);
+        out.push(
+          source.kind === "companion"
+            ? defaultSelection(source.product.variants)
+            : { ...selection },
+        );
+      }
+      return out;
     });
   };
 
@@ -440,33 +496,41 @@ export function BuyForm({
       />
 
       {offersActive && selectedVariant && (
-        <TieredOffers
-          tiers={offerTiers}
-          tierPricings={tierPricings}
-          selectedIndex={tierIndex}
-          onSelect={handleTierChange}
-          currency={product.currency}
-          /* Skip the expansion when there's nothing for it to show —
-           * a Buy 2 of an option-less anchor with no companions
-           * would otherwise render two blank thumbnail cards. */
-          selectedTierContent={
-            unitSlots.length > 1 &&
-            unitSlots.some(
-              (s) => s.kind === "companion" || s.options.length > 0,
-            ) ? (
-              <OfferUnitPickers slots={unitSlots} />
-            ) : null
-          }
-        />
+        <div className="flex flex-col gap-3">
+          {hasBundleOption && (
+            <OfferModeToggle mode={bundleMode} onChange={handleModeChange} />
+          )}
+          <TieredOffers
+            tiers={offerTiers}
+            tierPricings={tierPricings}
+            selectedIndex={tierIndex}
+            onSelect={handleTierChange}
+            currency={product.currency}
+            /* Render the per-unit selection inside the selected tile
+             * for *every* tier (Buy 1 included) so the in-tile picking
+             * experience stays consistent as the shopper moves between
+             * tiers. Still skipped when there's nothing to pick — an
+             * option-less anchor with no companion would otherwise
+             * render blank thumbnail cards. */
+            selectedTierContent={
+              unitSlots.some(
+                (s) => s.kind === "companion" || s.options.length > 0,
+              ) ? (
+                <OfferUnitPickers slots={unitSlots} />
+              ) : null
+            }
+          />
+        </div>
       )}
 
-      {/* Inline Add-to-Cart from `lg` up; a viewport-pinned bottom
-       *  bar takes over below `lg` (see `mobileStickyBar`). */}
+      {/* Inline Add-to-Cart at every width. With tiered offers the
+       *  tier picker drives quantity (controlled mode, no stepper);
+       *  without them `buyUnits` is `undefined`, so it falls back to
+       *  the uncontrolled path with a quantity stepper. */}
       <BuyActions
         product={product}
         selectedVariant={selectedVariant}
         units={buyUnits}
-        mobileStickyBar
       />
 
       <TrustBadges />
@@ -474,11 +538,66 @@ export function BuyForm({
   );
 }
 
-/** Source-product resolution for a tier slot. Slot 0 is anchor;
- *  slot k>=1 is the `k-1`-th bundle companion when configured,
- *  otherwise anchor (the merchant left that slot to "same product
- *  again", or the companion lookup failed and we silently degrade
- *  to anchor for that position). */
+/**
+ * Same Item ⇄ Best Match segmented toggle, shown above the tier rows
+ * for bundle-enabled products. A two-segment radiogroup styled as a
+ * pill: the active segment wears the brand fill, the idle one stays
+ * muted. Order follows the shopper's mental model — "just this one"
+ * (Same Item) before the upsell (Best Match).
+ */
+const OFFER_MODES = [
+  { value: "same", label: "Same Item" },
+  { value: "best", label: "Best Match" },
+] as const;
+
+function OfferModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: "same" | "best";
+  onChange: (next: "same" | "best") => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Offer type"
+      className="grid grid-cols-2 gap-1 rounded-full border border-[color:var(--color-border-strong)] p-1"
+    >
+      {OFFER_MODES.map((option) => {
+        const selected = option.value === mode;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option.value)}
+            className={cn(
+              "rounded-full px-3 py-2 text-sm font-semibold transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2",
+              "focus-visible:ring-[color:var(--color-brand)] focus-visible:ring-offset-1",
+              selected
+                ? "bg-[color:var(--color-brand)] text-white"
+                : "text-[color:var(--color-ink-secondary)] hover:text-[color:var(--color-ink)]",
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Source-product resolution for a tier slot. Slot 0 is always the
+ *  anchor. For slots k>=1:
+ *
+ *    - `useBundle` false ("Same Item" mode) → anchor again, so the
+ *      tier is just N of the PDP product.
+ *    - `useBundle` true ("Best Match" mode) → the `k-1`-th bundle
+ *      companion when configured, otherwise anchor (the merchant
+ *      left that slot to "same product again", or the companion
+ *      lookup failed and we silently degrade to anchor). */
 type SlotSource =
   | { kind: "anchor"; product: ProductDetail }
   | { kind: "companion"; product: CompanionProduct };
@@ -486,8 +605,9 @@ type SlotSource =
 function resolveSlotSource(
   product: ProductDetail,
   slotIdx: number,
+  useBundle: boolean,
 ): SlotSource {
-  if (slotIdx === 0) return { kind: "anchor", product };
+  if (slotIdx === 0 || !useBundle) return { kind: "anchor", product };
   const companion = product.bundleCompanions[slotIdx - 1];
   if (!companion) return { kind: "anchor", product };
   return { kind: "companion", product: companion };

@@ -38,8 +38,8 @@ import { getServerMarket } from "@/lib/market/server";
  */
 export async function FaqList() {
   /* Resolve the visitor's market so the shipping-cost answer reads
-   * the right threshold + currency (US/UK $50/£50, SG S$60, CA/NZ/AU
-   * $70). Same geo resolution the currency / cookie-banner logic uses.
+   * the right threshold + currency (US/UK $35/£35, SG/CA/AU/NZ 50).
+   * Same geo resolution the currency / cookie-banner logic uses.
    * Whole-unit format (no ".00") keeps the prose clean. */
   const market = await getServerMarket();
   const shippingThreshold = formatMarketAmount(
