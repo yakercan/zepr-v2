@@ -561,7 +561,7 @@ function OfferModeToggle({
     <div
       role="radiogroup"
       aria-label="Offer type"
-      className="grid grid-cols-2 gap-1 rounded-full border border-[color:var(--color-border-strong)] p-1"
+      className="grid grid-cols-2 gap-1 rounded-full border-2 border-[color:var(--color-border-strong)] p-1"
     >
       {OFFER_MODES.map((option) => {
         const selected = option.value === mode;
