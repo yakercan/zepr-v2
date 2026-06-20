@@ -4,13 +4,12 @@ import Image from "next/image";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
-import { useIsTouch } from "@/components/device/device-provider";
+import { useIsCompact, useIsTouch } from "@/components/device/device-provider";
 import {
   MediaLightbox,
   type LightboxMediaItem,
@@ -19,122 +18,21 @@ import { PlayBadgeIcon, SmoothCaretIcon } from "@/components/ui/icons";
 import { shopifyImageLoader } from "@/lib/shopify/image-loader";
 import { useActiveVideoControl } from "@/lib/hooks/use-active-video-control";
 import { useCrossfade } from "@/lib/hooks/use-crossfade";
+import { useHydrated } from "@/lib/hooks/use-hydrated";
 import {
-  crossfadeLayerClasses,
-  MEDIA_HOVER_ZOOM_CLASSES,
   MEDIA_OVERLAY_BUBBLE_CLASSES,
   MEDIA_STAGE_CLASSES,
 } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { ProductMedia } from "@/types/product";
 
-/* The image's hover-zoom inherits a 300ms cadence from
- * `MEDIA_HOVER_ZOOM_CLASSES` (tuned for product cards). The PDP
- * runs a snappier 200ms to match the layer crossfade so the two
- * motions read as one; tailwind-merge collapses the duplicate
- * `duration-*` to the latter value. */
-const MEDIA_DURATION_CLASS = "duration-200";
-
-/* How far the finger has to travel horizontally before we treat
- * a touch gesture as a navigation swipe rather than a tap. 50px
- * is the same threshold native iOS / Material galleries settle
- * on — small enough that a deliberate swipe registers without
- * effort, big enough that an accidental scroll-induced drift
- * doesn't trigger a page-through. */
-const SWIPE_THRESHOLD_PX = 50;
-
-/**
- * Single-pointer horizontal swipe detector for the gallery's
- * main viewer. Returns handler props the caller spreads onto
- * the media-stage container; on mobile a touch swipe fires
- * `onLeft` (= next) or `onRight` (= previous), exactly the same
- * way native carousel galleries paginate.
- *
- * Why the explicit `enabled` gate (rather than just no-op'ing
- * inside the handlers): we still want the handlers attached on
- * the desktop branch's render path so React can re-use the same
- * element across renders, but we want them functionally inert
- * — desktop pages through with the on-canvas prev / next
- * bubbles and the keyboard arrows handled by the lightbox; a
- * mouse drag here would compete with the cursor-zoom intent.
- *
- * Three details that keep this from misfiring:
- *
- *   1. **Touch only** (`pointerType === "touch"`). Desktop
- *      pointer drags reach this same code path when the dev-
- *      tools "device" emulator is engaged; the guard keeps
- *      ambient mouse input from page-throughing the gallery.
- *   2. **Horizontal dominance** (`|dx| > |dy|`). A secondary
- *      guard behind the stage's `touch-action: pan-y` (which
- *      already stops the page from scrolling during a
- *      horizontal swipe): a vertical scroll cancels the pointer
- *      before pointerup, but if the browser ever hands us a
- *      diagonal gesture, the dominance check still keeps a
- *      mostly-vertical drag from registering as a page-through.
- *   3. **Video opt-out.** `<video controls>` has its own
- *      horizontal-drag gestures (seekbar scrub); intercepting
- *      pointer events there would steal the seek interaction.
- *      `target.closest("video")` skips the swipe whenever the
- *      gesture starts inside any video subtree.
- *
- * After a real swipe fires we set `swipedRef.current` and catch
- * the upcoming click event in capture phase — otherwise the
- * `click` synthesized at touch end (when `dx` is small enough
- * for the browser to also fire a click after a slow drag) would
- * open the lightbox on top of the page we just navigated to.
- */
-function usePointerSwipe({
-  onLeft,
-  onRight,
-  enabled,
-}: {
-  onLeft: (() => void) | undefined;
-  onRight: (() => void) | undefined;
-  enabled: boolean;
-}) {
-  const startRef = useRef<{ x: number; y: number } | null>(null);
-  const swipedRef = useRef(false);
-
-  const onPointerDown = useCallback(
-    (e: ReactPointerEvent<HTMLElement>) => {
-      if (!enabled || e.pointerType !== "touch") return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest("video")) return;
-      startRef.current = { x: e.clientX, y: e.clientY };
-      swipedRef.current = false;
-    },
-    [enabled],
-  );
-
-  const onPointerUp = useCallback(
-    (e: ReactPointerEvent<HTMLElement>) => {
-      const start = startRef.current;
-      if (!start) return;
-      startRef.current = null;
-      const dx = e.clientX - start.x;
-      const dy = e.clientY - start.y;
-      if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
-      if (Math.abs(dx) < Math.abs(dy)) return;
-      swipedRef.current = true;
-      if (dx < 0) onLeft?.();
-      else onRight?.();
-    },
-    [onLeft, onRight],
-  );
-
-  const onPointerCancel = useCallback(() => {
-    startRef.current = null;
-  }, []);
-
-  const onClickCapture = useCallback((e: ReactMouseEvent<HTMLElement>) => {
-    if (!swipedRef.current) return;
-    swipedRef.current = false;
-    e.stopPropagation();
-    e.preventDefault();
-  }, []);
-
-  return { onPointerDown, onPointerUp, onPointerCancel, onClickCapture };
-}
+/* Runs before paint on the client (so a scroll reposition can't
+ * flash a wrong frame), falls back to `useEffect` on the server to
+ * skip React's "useLayoutEffect does nothing on the server"
+ * warning. The carousel uses it to seat the rail on the active
+ * slide the instant its loop clones mount. */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /**
  * Product media gallery — images + videos with a thumbnail rail
@@ -196,26 +94,35 @@ function usePointerSwipe({
  *   - Hover a thumb → activate (mouse only; touch falls back to
  *     tap). Legacy storefront idiom — lets a shopper sweep
  *     through the gallery without clicks.
- *   - Prev / next buttons step in order.
+ *   - Prev / next arrows step in order and **wrap around** — prev
+ *     from the first item loops to the last, next from the last to
+ *     the first, so neither arrow is ever dead. Pointer devices
+ *     only (a touch device pages by swipe); gated on hydration so
+ *     they never enter a phone's DOM, and they fade in on desktop.
+ *     See `ViewerNavButton`.
  *   - Stepping past the visible thumbs auto-scrolls the rail so
  *     the active thumb stays in view (`scrollIntoView`).
- *   - **Touch swipe on the main viewer** (mobile only) — drag
- *     left to step to the next media, drag right for the
- *     previous. Threshold + horizontal-dominance gates keep
- *     the gesture from misfiring on a slow vertical scroll.
- *     See `usePointerSwipe` at the top of this file.
+ *   - **Swipe the main viewer** (mobile only) — the viewer is a
+ *     native scroll-snap carousel that **loops infinitely**: a full
+ *     buffer copy of the slides on each side means a continued swipe
+ *     always has real slides ahead and never stalls at an edge; the
+ *     rail recenters invisibly once motion settles (see
+ *     `<GalleryMain>`). The slide under the rail is tracked live
+ *     (rAF, not on settle), so the thumb highlight + active video
+ *     stay in lockstep with the finger.
  *
  * Implementation notes:
  *
  *   - `"use client"` — `useState`-driven active index. Tiny
  *     client island; everything else stays RSC.
  *   - First image gets `priority` so it counts as the LCP.
- *   - Main viewer media stays mounted across navigation; the
- *     visible item is selected via opacity (see `<GalleryMain>`),
- *     so videos don't reload and posters don't flash on switch.
- *     Hover + crossfade chrome are the same classes the product
- *     card uses (`group-hover/media:scale-[1.03]`, opacity swap),
- *     so the two surfaces look and feel identical.
+ *   - Main viewer media stays mounted across navigation; on
+ *     desktop the visible item is selected via opacity (crossfade),
+ *     on mobile it's the snapped carousel slide (see
+ *     `<GalleryMain>`) — either way videos don't reload and posters
+ *     don't flash on switch. On desktop the hover-zoom mirrors the
+ *     product card's lean-in (`group-hover/media:scale-[1.03]`); the
+ *     mobile carousel drops it (no hover on a swipe surface).
  */
 
 export interface ProductGalleryProps {
@@ -348,15 +255,19 @@ export function ProductGallery({
         activeIndex={safeIndex}
         outgoingIndex={outgoingIndex}
         title={title}
+        onNavigate={navigate}
+        /* Wrap-around: prev from the first item loops to the last,
+         * next from the last loops to the first — so the arrows are
+         * never dead and a shopper can keep paging in one direction
+         * through the whole gallery. Modulo keeps it to one line each;
+         * `+ length` guards the negative case before the `%`. */
         onPrev={
-          hasThumbs && safeIndex > 0
-            ? () => navigate(safeIndex - 1)
+          hasThumbs
+            ? () => navigate((safeIndex - 1 + media.length) % media.length)
             : undefined
         }
         onNext={
-          hasThumbs && safeIndex < media.length - 1
-            ? () => navigate(safeIndex + 1)
-            : undefined
+          hasThumbs ? () => navigate((safeIndex + 1) % media.length) : undefined
         }
         onImageClick={openLightbox}
       />
@@ -391,18 +302,20 @@ function toLightboxItem(m: ProductMedia, title: string): LightboxMediaItem {
 /* ------------------------------------------------------------------ */
 
 /**
- * Main viewer — same visual language as `<ProductCardMedia>`:
+ * Main viewer — one set of media items rendered two ways from the
+ * *same DOM*, with the slide classes (not a JS branch) deciding
+ * which presentation a given viewport gets. This is deliberate:
+ * the viewer is the LCP, so anything that swapped its structure
+ * after hydration would flash the most important pixel on the
+ * page. Responsive Tailwind variants keep the markup identical
+ * server- and client-side; `useIsCompact` only governs the scroll
+ * *behaviour* (the two effects below), never the layout.
  *
- *   - Media items are stacked absolutely inside an
- *     `overflow-hidden` square. The active item sits at
- *     `opacity-100`, every other at `opacity-0`, with a 300ms
- *     ease-out opacity transition. Navigation reads as a clean
- *     crossfade rather than a slide.
- *   - The container carries a `group/media` named group so the
- *     active image / video can pick up the same
- *     `group-hover/media:scale-[1.03]` zoom the product card uses
- *     on hover. Reusing the exact classes keeps the hover feel
- *     identical between the card and the PDP hero.
+ * **Desktop** (`lg-desktop:`) — items are stacked absolutely
+ * inside the `overflow-hidden` square and crossfaded by opacity,
+ * the same visual language as `<ProductCardMedia>` (including the
+ * `group-hover/media:scale-[1.03]` lean-in zoom, which is
+ * desktop-only — the mobile carousel has no hover to drive it):
  *
  *     ┌────── viewport ──────┐
  *     │ ┌──────────────────┐ │
@@ -419,6 +332,37 @@ function toLightboxItem(m: ProductMedia, title: string): LightboxMediaItem {
  * incoming one keeps the viewport opaque end-to-end, so the
  * transition fades cleanly from frame A to frame B.
  *
+ * **Mobile** (base) — the same items become full-width in-flow
+ * slides inside a horizontal **scroll-snap carousel**: swipe to
+ * page through, with the browser owning momentum, snapping, and
+ * axis arbitration (horizontal swipe scrolls the rail, vertical
+ * swipe scrolls the page). Native scroll also distinguishes a tap
+ * (opens the lightbox) from a drag (pages the rail) for free — no
+ * pointer-gesture bookkeeping, and noticeably more elegant than a
+ * JS-driven slide. The rail **loops infinitely** via a triple
+ * buffer: a full, pixel-identical copy of the slides is rendered on
+ * each side of the real run, so a continued swipe always has slides
+ * ahead and never stalls at an edge (the failure mode of a single
+ * edge clone, which dead-ends until a reposition fires). Once motion
+ * settles, the rail jumps instantly — and invisibly, the copies
+ * being identical — back onto the middle copy, restoring the buffer
+ * for the next swipe. The copies mount only after hydration — SSR
+ * ships the real slides at offset 0 so the first paint is the right
+ * image, and a layout effect re-seats the scroll onto the middle
+ * copy the instant they appear:
+ *
+ *     ┌──── slide n ────┬──── slide n+1 ──┄
+ *     │                 │
+ *     │   ◄ swipe ─────────────►           snap-mandatory
+ *     │                 │
+ *     └─────────────────┴─────────────────┄
+ *
+ * `activeIndex` is the single source of truth for both modes (it
+ * drives the thumb highlight, arrow availability, lightbox seed,
+ * and active-video playback). On mobile the two effects below keep
+ * it in lockstep with the scroll position in both directions — see
+ * each effect's comment for how they avoid fighting each other.
+ *
  * Video handling: every `<video>` stays mounted so navigation
  * doesn't trigger reloads or poster flashes. An effect drives
  * `play()` / `pause()` imperatively whenever `activeIndex`
@@ -426,16 +370,17 @@ function toLightboxItem(m: ProductMedia, title: string): LightboxMediaItem {
  * the next visit starts from frame zero.
  *
  * LCP: only the first image gets `priority`; the rest fall back
- * to Next/Image's default lazy loading. Because everything sits
- * at the same coordinates, additional images do download up
- * front, but they're typically a handful per product and the
- * trade is instant crossfades with no re-fetch on step.
+ * to Next/Image's default lazy loading. Because everything sits in
+ * one stack / rail, additional images do download up front, but
+ * they're typically a handful per product and the trade is instant
+ * crossfades / slides with no re-fetch on step.
  */
 function GalleryMain({
   media,
   activeIndex,
   outgoingIndex,
   title,
+  onNavigate,
   onPrev,
   onNext,
   onImageClick,
@@ -443,19 +388,26 @@ function GalleryMain({
   media: ReadonlyArray<ProductMedia>;
   activeIndex: number;
   /** Index of the previously-active layer to keep painted at full
-   *  opacity for the duration of the crossfade. `null` outside of
-   *  a transition. */
+   *  opacity for the duration of the desktop crossfade. `null`
+   *  outside of a transition (and irrelevant on the mobile
+   *  carousel, where every slide sits at full opacity). */
   outgoingIndex: number | null;
   title: string;
-  /** Undefined when there's no previous media to step to. */
+  /** Sets the active index. The mobile carousel calls this when a
+   *  swipe settles on a new slide; it's the same `navigate` the
+   *  thumbs and arrows use, so every surface shares one source of
+   *  truth. */
+  onNavigate: (index: number) => void;
+  /** Step to the previous media (wraps to the last). Undefined for
+   *  a single-media gallery, where there's nothing to page. */
   onPrev?: () => void;
-  /** Undefined when there's no next media to step to. */
+  /** Step to the next media (wraps to the first). Undefined for a
+   *  single-media gallery, where there's nothing to page. */
   onNext?: () => void;
-  /** Fires when the user clicks the active *image* layer. The
-   *  PDP wires this to open the shared `<MediaLightbox>`. Only
-   *  images opt in — videos keep their native controls (clicks
-   *  there toggle play/pause, which would conflict with a zoom
-   *  intent). */
+  /** Fires when the user clicks/taps a media *image*. The PDP
+   *  wires this to open the shared `<MediaLightbox>`. Only images
+   *  opt in — videos keep their native controls (clicks there
+   *  toggle play/pause, which would conflict with a zoom intent). */
   onImageClick?: (index: number) => void;
 }) {
   /* One ref slot per video item, populated by an inline callback
@@ -464,53 +416,235 @@ function GalleryMain({
    * behaviour as the lightbox. */
   const videoRefs = useActiveVideoControl(activeIndex);
 
-  /* Mobile-only touch swipe navigation. Left swipe = next media,
-   * right swipe = previous; `onPrev`/`onNext` are already
-   * undefined at the gallery's edges, so swiping past the first /
-   * last item is automatically a no-op without an extra branch
-   * here. */
-  const isTouch = useIsTouch();
-  const swipeProps = usePointerSwipe({
-    onLeft: onNext,
-    onRight: onPrev,
-    enabled: isTouch,
-  });
+  /* Behaviour gate only — the markup is identical on both branches
+   * (see the component doc). Governs whether the scroll-sync
+   * effects below run; on desktop the inner track is
+   * `display: contents` (zero-box), so even if they did run the
+   * `clientWidth === 0` guards would no-op them. */
+  const isCompact = useIsCompact();
+  const hydrated = useHydrated();
+  const trackRef = useRef<HTMLDivElement>(null);
+  /* Tracks the slide we last seated on, so a programmatic jump knows
+   * which image to dissolve *from*; `false` until the first seat so
+   * the initial position (default or deep-linked variant) lands
+   * without an on-load fade. */
+  const prevIndexRef = useRef(activeIndex);
+  const hasSeatedRef = useRef(false);
+  /* Raised by the scroll handlers for the brief window a swipe is
+   * mid-flight, so the alignment effect doesn't yank a rail the finger
+   * is still moving. It's the *secondary* signal (position is primary)
+   * and is dropped unconditionally on settle, so it can't linger and
+   * swallow a later tap. */
+  const scrollDrivenRef = useRef(false);
+  /* Live mirror of `activeIndex` for the scroll handlers, whose
+   * listeners are bound once (not per index, which would thrash them
+   * every frame of a swipe). Lets them skip a redundant navigate when
+   * the rail is already on the slide they'd report. Updated in the
+   * layout effect below (refs mustn't be written during render); that
+   * runs before paint, ahead of any scroll the user could trigger. */
+  const activeIndexRef = useRef(activeIndex);
+  /* The outgoing slide painted over the viewer during a no-slide
+   * navigation (thumb tap, arrow, variant sync), fading out to
+   * reveal the slide the rail has already jumped to — the carousel's
+   * answer to the desktop crossfade. `null` outside a transition and
+   * for swipes, which animate natively. */
+  const [fadeFromIndex, setFadeFromIndex] = useState<number | null>(null);
+
+  /* Infinite carousel ⇔ when the loop is live, the rail renders a
+   * full copy of every slide on *each* side of the real run (a
+   * triple buffer). A continued swipe always has real slides ahead,
+   * so it never dead-ends against an edge; on settle the rail
+   * recenters onto the middle copy with an invisible instant jump
+   * (the copies are identical), restoring the buffer for the next
+   * swipe. Gated on `hydrated` so SSR / first paint ships the real
+   * slides at offset 0 (correct LCP); the copies — which shift the
+   * real run one full width to the right — only mount once we can
+   * immediately re-seat the scroll position (see the layout effect). */
+  const n = media.length;
+  const loop = hydrated && isCompact && n > 1;
+
+  /* Carousel → state. Two jobs on one scroll listener:
+   *
+   *   1. **Live highlight** (rAF-throttled). Map the slide under the
+   *      rail back to its real index (`dom % n`, since each real
+   *      slide appears once per copy) and adopt it, so the thumbnail
+   *      highlight + active video track the finger every frame
+   *      instead of lagging until the scroll settles.
+   *   2. **Recenter** (on settle). Once motion fully stops, jump
+   *      instantly to the same slide in the *middle* copy. The copies
+   *      are pixel-identical, so the jump is invisible — it just
+   *      restores a full buffer on both sides so the next swipe again
+   *      never reaches an edge. Done only on settle (never mid-scroll)
+   *      so momentum is never interrupted. Fired off `scrollend` (the
+   *      event built for "scroll fully settled, momentum + snap
+   *      included"); engines without it fall back to an idle debounce.
+   *
+   * The live path raises `scrollDrivenRef` so the alignment effect
+   * doesn't yank a rail the finger is still moving; the recenter drops
+   * it again on settle so it can't linger and swallow a later tap. */
+  useEffect(() => {
+    if (!loop) return;
+    const track = trackRef.current;
+    if (!track) return;
+    let raf = 0;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const realIndexAt = (w: number) =>
+      ((Math.round(track.scrollLeft / w) % n) + n) % n;
+    const push = (real: number) => {
+      if (real === activeIndexRef.current) return;
+      scrollDrivenRef.current = true;
+      onNavigate(real);
+    };
+    const recenter = () => {
+      const w = track.clientWidth;
+      if (w === 0) return;
+      const real = realIndexAt(w);
+      if (Math.round(track.scrollLeft / w) !== n + real) {
+        track.scrollTo({ left: (n + real) * w, behavior: "auto" });
+      }
+      push(real);
+      /* Motion has fully settled, so the swipe is over: drop the flag
+       * unconditionally. It only ever guards the brief mid-scroll
+       * window, and leaving it raised here is what let a stray scroll
+       * swallow the *next* tap (the "first thumb tap does nothing,
+       * second works" bug). */
+      scrollDrivenRef.current = false;
+    };
+    const hasScrollEnd = "onscrollend" in window;
+    const onScroll = () => {
+      if (!raf) {
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          const w = track.clientWidth;
+          if (w === 0) return;
+          push(realIndexAt(w));
+        });
+      }
+      if (!hasScrollEnd) {
+        if (settle) clearTimeout(settle);
+        settle = setTimeout(recenter, 80);
+      }
+    };
+    track.addEventListener("scroll", onScroll, { passive: true });
+    if (hasScrollEnd) track.addEventListener("scrollend", recenter);
+    return () => {
+      track.removeEventListener("scroll", onScroll);
+      if (hasScrollEnd) track.removeEventListener("scrollend", recenter);
+      if (raf) cancelAnimationFrame(raf);
+      if (settle) clearTimeout(settle);
+    };
+  }, [loop, n, onNavigate]);
+
+  /* State → carousel. Seat the rail on `activeIndex` in the middle
+   * copy (real slide `i` lives at DOM offset `(n + i) * w`) for a
+   * non-scroll navigation — thumb tap, prev/next arrow, variant-image
+   * sync — and once, before paint, the instant the copies mount
+   * (hence a layout effect: it keeps the leading copy from flashing
+   * for a frame). The jump is instant so a thumb tap doesn't scrub
+   * the highlight through every slide it passes. A swipe is left
+   * alone: the rail already sits on the slide (primary check) or the
+   * swipe is still mid-flight (`scrollDrivenRef`), so it's never
+   * yanked back under the finger. */
+  useIsomorphicLayoutEffect(() => {
+    activeIndexRef.current = activeIndex;
+    if (!loop) {
+      prevIndexRef.current = activeIndex;
+      return;
+    }
+    const track = trackRef.current;
+    if (!track) return;
+    const w = track.clientWidth;
+    if (w === 0) return;
+    const from = prevIndexRef.current;
+    prevIndexRef.current = activeIndex;
+    const target = (n + activeIndex) * w;
+    /* First seat after the copies mount → land on the middle copy
+     * without a dissolve (the initial / deep-linked image shouldn't
+     * fade in on load). */
+    if (!hasSeatedRef.current) {
+      hasSeatedRef.current = true;
+      track.scrollTo({ left: target, behavior: "auto" });
+      return;
+    }
+    /* Rail already shows this slide (a settled swipe, the recenter,
+     * or a no-op change) → leave it, and never dissolve a native
+     * landing. This position check is the primary signal, so a stale
+     * flag can't suppress a real tap. */
+    if (((Math.round(track.scrollLeft / w) % n) + n) % n === activeIndex) {
+      return;
+    }
+    /* Still mid-swipe (scroll hasn't settled, the rail sits a frame
+     * ahead of the index) — the recenter will land it; seating now
+     * would yank the rail out from under the finger. */
+    if (scrollDrivenRef.current) return;
+    /* A genuine programmatic move (thumb tap / arrow / variant sync) —
+     * seat onto the middle copy and dissolve from the slide we leave. */
+    if (from !== activeIndex) setFadeFromIndex(from);
+    track.scrollTo({ left: target, behavior: "auto" });
+  }, [loop, n, activeIndex]);
 
   return (
     <div
       className={cn(
         MEDIA_STAGE_CLASSES,
         "rounded-2xl",
-        /* Scroll-axis arbitration for the swipe.
-         *
-         * `touch-action: pan-y` hands the browser exactly one job on
-         * this surface — vertical panning — and reserves the
-         * horizontal axis for us. The compositor then locks each
-         * gesture to a single axis up front: a horizontal-dominant
-         * swipe scrolls *nothing* (so the page can't drift
-         * vertically mid-swipe) and its pointer stream flows to
-         * `usePointerSwipe`; a vertical-dominant drag scrolls the
-         * page natively and fires `pointercancel`, which the hook
-         * treats as "not a swipe". This is the declarative,
-         * compositor-driven fix every modern carousel (Embla,
-         * Swiper) uses — no non-passive `touchmove` listener, no
-         * per-frame `preventDefault`, so it stays jank-free. Scoped
-         * to `touch:` (coarse-pointer devices) because it only governs
-         * touch input and a pointer never swipes here. */
-        "touch:[touch-action:pan-y]",
+        /* Frame the viewer with the same 2px strong border the
+         * thumbnails rest at, so the gallery reads as one bordered
+         * family rather than a borderless image above bordered chips. */
+        "border-2 border-[color:var(--color-border-strong)]",
       )}
-      {...swipeProps}
     >
-      {media.map((item, i) => {
-        const isActive = i === activeIndex;
-        const isOutgoing = !isActive && i === outgoingIndex;
-        return (
-          <div
-            key={item.id}
-            aria-hidden={!isActive}
-            className={crossfadeLayerClasses(isActive, isOutgoing)}
-          >
-            {item.kind === "image" ? (
+      <div
+        ref={trackRef}
+        className={cn(
+          /* Mobile: a horizontal scroll-snap carousel filling the
+           * stage. `overscroll-x-contain` stops a swipe past the
+           * last slide from triggering the browser's back-gesture;
+           * the scrollbar chrome is hidden so the rail reads clean. */
+          "flex h-full w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain",
+          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          /* Desktop: dissolve the track (`display: contents`) so the
+           * slides become *direct* crossfade layers of the stage —
+           * absolutely positioned against it, opacity-swapped. The
+           * flex/scroll/snap utilities above are inert once the box
+           * is gone. */
+          "lg-desktop:contents",
+        )}
+      >
+        {/* Leading buffer — a full copy of every slide before the real
+         * run, so a swipe off the first item rolls straight into the
+         * last (and several more) with no edge. Carousel-only; hidden
+         * on desktop, where the real slides crossfade instead. */}
+        {loop &&
+          media.map((item) => (
+            <CarouselClone key={`lead-${item.id}`} item={item} />
+          ))}
+        {media.map((item, i) => {
+          const isActive = i === activeIndex;
+          const isOutgoing = !isActive && i === outgoingIndex;
+          return (
+            <div
+              key={item.id}
+              aria-hidden={!isActive}
+              className={cn(
+                /* Mobile slide: one viewport-width in-flow item that
+                 * snaps to the rail's start edge. */
+                "relative h-full w-full shrink-0 snap-start",
+                /* Desktop: lift it out of flow into the crossfade
+                 * stack. Active fades in on top (z-10); the outgoing
+                 * layer holds at full opacity directly below (z-0) so
+                 * the backdrop can't bleed through mid-fade; the rest
+                 * sit hidden and tucked away (-z-10). 200ms matches
+                 * `CROSSFADE_DURATION_MS`. */
+                "lg-desktop:absolute lg-desktop:inset-0 lg-desktop:transition-opacity lg-desktop:duration-200 lg-desktop:ease-out",
+                isActive
+                  ? "lg-desktop:z-10 lg-desktop:opacity-100"
+                  : isOutgoing
+                    ? "lg-desktop:z-0 lg-desktop:opacity-100"
+                    : "lg-desktop:-z-10 lg-desktop:opacity-0",
+              )}
+            >
+              {item.kind === "image" ? (
               <Image
                 loader={shopifyImageLoader}
                 src={item.preview.url}
@@ -519,21 +653,21 @@ function GalleryMain({
                 height={item.preview.height}
                 priority={i === 0}
                 sizes="(min-width: 768px) 45vw, 100vw"
-                /* Only the active layer reacts to clicks. The
-                 * other layers sit at `-z-10` so they can't be
-                 * hit visually anyway, but skipping the handler
-                 * altogether means we don't even pretend to be
-                 * clickable from an accessibility-tree
-                 * perspective when we aren't. */
-                onClick={
-                  isActive && onImageClick
-                    ? () => onImageClick(i)
-                    : undefined
-                }
+                /* Tap/click → lightbox at this item. Desktop stacks
+                 * the inactive layers behind the active one (-z-10),
+                 * so only the visible image is ever hit; on mobile
+                 * the snapped slide is the one under the finger. */
+                onClick={onImageClick ? () => onImageClick(i) : undefined}
                 className={cn(
-                  MEDIA_HOVER_ZOOM_CLASSES,
-                  MEDIA_DURATION_CLASS,
-                  isActive && onImageClick ? "cursor-zoom-in" : "",
+                  "h-full w-full object-cover",
+                  /* Hover-zoom is a desktop-crossfade flourish only —
+                   * the same lean-in the product card uses, scoped to
+                   * `lg-desktop`. The mobile carousel skips it: a swipe
+                   * surface has no hover, and on a narrow desktop
+                   * window a scale on a snapping slide reads as jitter.
+                   * 200ms matches the crossfade (CROSSFADE_DURATION_MS). */
+                  "lg-desktop:transition-transform lg-desktop:duration-200 lg-desktop:ease-out lg-desktop:group-hover/media:scale-[1.03]",
+                  onImageClick ? "cursor-zoom-in" : "",
                 )}
               />
             ) : (
@@ -562,9 +696,81 @@ function GalleryMain({
           </div>
         );
       })}
+        {/* Trailing buffer — mirror of the leading copy, so a swipe
+         * off the last item rolls into the first, second, … with no
+         * edge to stall against. */}
+        {loop &&
+          media.map((item) => (
+            <CarouselClone key={`trail-${item.id}`} item={item} />
+          ))}
+      </div>
 
+      {/* No-slide dissolve. The rail jumps instantly on a thumb tap /
+       * arrow / variant sync (so the active highlight never scrubs);
+       * this paints the outgoing slide over the viewer and fades it
+       * out to reveal the new one underneath — the carousel's take on
+       * the desktop crossfade. Reuses the app-wide `animate-fade-out`
+       * token (same one the lightbox close rides) — single source for
+       * the keyframe, duration, and easing. Keyed by the transition so
+       * each navigation restarts the fade clean; `pointer-events-none`
+       * lets a swipe/tap mid-fade fall through to the rail; desktop
+       * runs its own crossfade so this is hidden there. */}
+      {fadeFromIndex != null && (
+        <div
+          key={`fade-${fadeFromIndex}-${activeIndex}`}
+          aria-hidden
+          onAnimationEnd={() => setFadeFromIndex(null)}
+          className="animate-fade-out pointer-events-none absolute inset-0 z-10 lg-desktop:hidden"
+        >
+          <Image
+            loader={shopifyImageLoader}
+            src={media[fadeFromIndex].preview.url}
+            alt=""
+            width={media[fadeFromIndex].preview.width}
+            height={media[fadeFromIndex].preview.height}
+            sizes="100vw"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      )}
+
+      {/* Prev / next arrows — pointer devices only, decided in pure
+       * CSS (`desktop:` on the button), so no JS / hydration gate to
+       * flash on phones or lag in on desktop. On a full desktop they
+       * paint with the page; on a narrow pointer window (the compact
+       * carousel) they ease in; a touch device never gets them and
+       * pages by swipe (see `ViewerNavButton`). Siblings of the scroll
+       * track (not children) so they stay pinned over the rail. */}
       {onPrev && <ViewerNavButton direction="prev" onClick={onPrev} />}
       {onNext && <ViewerNavButton direction="next" onClick={onNext} />}
+    </div>
+  );
+}
+
+/* One slide of an infinite-carousel buffer copy — a decorative,
+ * identical twin of a real slide rendered in the leading / trailing
+ * run so a swipe always has slides ahead and never dead-ends; the
+ * rail recenters onto the real run once motion settles. Image-only
+ * (no `<video>` or click target): a buffer slide is only ever on
+ * screen in passing between settles, so a static poster suffices,
+ * and skipping a second `<video>` keeps the active-video control
+ * mapping one-to-one with the real slides. `lg-desktop:hidden` keeps
+ * the buffer out of the desktop crossfade stack. */
+function CarouselClone({ item }: { item: ProductMedia }) {
+  return (
+    <div
+      aria-hidden
+      className="relative h-full w-full shrink-0 snap-start lg-desktop:hidden"
+    >
+      <Image
+        loader={shopifyImageLoader}
+        src={item.preview.url}
+        alt=""
+        width={item.preview.width}
+        height={item.preview.height}
+        sizes="100vw"
+        className="h-full w-full object-cover"
+      />
     </div>
   );
 }
@@ -583,6 +789,15 @@ function ViewerNavButton({
       aria-label={direction === "prev" ? "Previous media" : "Next media"}
       className={cn(
         MEDIA_OVERLAY_BUBBLE_CLASSES,
+        /* Pointer devices only, in pure CSS: hidden by default
+         * (overriding the bubble's `flex`), shown as `flex` on the
+         * `desktop:` input variant. No hydration wait, no touch flash. */
+        "hidden desktop:flex",
+        /* Ease in on the compact carousel (device detection is the only
+         * tell there), but appear instantly on a full desktop, where
+         * the layout already implies a pointer — no reason to wait out
+         * a fade. */
+        "animate-fade-in lg-desktop:animate-none",
         /* Sits above every media layer (active is z-10) so the
          * controls stay clickable through the crossfade. */
         "absolute top-1/2 z-20 -translate-y-1/2",
