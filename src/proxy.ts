@@ -184,9 +184,9 @@ function stampAttributionIfPresent(
 
 /* ─── Temporary pricing A/B test ───────────────────────────────────
  *
- * One product sold at three price points, each a separate Shopify
+ * One product sold at two price points, each a separate Shopify
  * product. A visitor landing on the canonical handle is bucketed once
- * — equal thirds — and that choice is pinned in a cookie, so the same
+ * — a 50/50 split — and that choice is pinned in a cookie, so the same
  * person always sees the same price. The winning handle is rendered
  * *in place* via a rewrite: the URL stays `/products/mosquito-trap-lamp`
  * for everyone, there's no redirect round-trip (so it adds no
@@ -206,7 +206,6 @@ const PRICING_TEST = {
   buckets: [
     "mosquito-trap-lamp",
     "mosquito-trap-lamp-2",
-    "mosquito-trap-lamp-3",
   ] as readonly string[],
 } as const;
 
