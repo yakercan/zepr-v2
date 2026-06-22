@@ -75,16 +75,50 @@ import {
 const REFRESH_SKEW_MS = 60_000;
 
 export async function proxy(req: NextRequest) {
-  const response = await handleSession(req);
+  /* Resolve the price A/B bucket first — a sticky cookie read that,
+   * only for the one product under test, decides which handle to
+   * render. Its rewrite target threads into the session pass so the
+   * page renders in place (no redirect hop) and any session /
+   * attribution cookies still land on the same response. */
+  const ab = resolvePricingTest(req);
+
+  const response = await handleSession(req, ab.rewriteUrl);
+  if (ab.bucket) {
+    response.cookies.set(
+      PRICING_TEST_COOKIE,
+      ab.bucket,
+      PRICING_TEST_COOKIE_OPTIONS,
+    );
+  }
   return stampAttributionIfPresent(req, response);
 }
 
 /** Existing session-refresh logic, refactored to return a
  *  `NextResponse` so the attribution-capture step (below) can
- *  layer onto every exit path uniformly. */
-async function handleSession(req: NextRequest): Promise<NextResponse> {
+ *  layer onto every exit path uniformly. `rewriteUrl`, when set by
+ *  the price test, makes every exit a same-URL rewrite to the
+ *  bucketed handle instead of a plain pass-through — cookie writes
+ *  still attach to it. */
+async function handleSession(
+  req: NextRequest,
+  rewriteUrl?: URL,
+): Promise<NextResponse> {
+  const base = () =>
+    rewriteUrl ? NextResponse.rewrite(rewriteUrl) : NextResponse.next();
+
+  /* Clear the session cookie and pass through. Shared by the
+   * "tampered cookie" and "refresh token revoked" exit paths. */
+  const clearAndContinue = () => {
+    const response = base();
+    response.cookies.set(SESSION_COOKIE, "", {
+      ...SESSION_COOKIE_OPTIONS,
+      maxAge: 0,
+    });
+    return response;
+  };
+
   const cookie = req.cookies.get(SESSION_COOKIE);
-  if (!cookie) return NextResponse.next();
+  if (!cookie) return base();
 
   const session = open<Session>(cookie.value, SESSION_PURPOSE);
   if (!session) {
@@ -96,7 +130,7 @@ async function handleSession(req: NextRequest): Promise<NextResponse> {
   }
 
   if (Date.now() < session.tokens.expiresAt - REFRESH_SKEW_MS) {
-    return NextResponse.next();
+    return base();
   }
 
   try {
@@ -107,7 +141,7 @@ async function handleSession(req: NextRequest): Promise<NextResponse> {
      * refresh — the new value MUST replace the old one in the
      * cookie or the next refresh attempt will get invalid_grant. */
     const next: Session = { ...session, tokens: refreshed };
-    const response = NextResponse.next();
+    const response = base();
     response.cookies.set(
       SESSION_COOKIE,
       seal(next, SESSION_PURPOSE),
@@ -126,7 +160,7 @@ async function handleSession(req: NextRequest): Promise<NextResponse> {
      * Keep the existing cookie — the access_token is still valid
      * for the remaining skew window, the next request retries. */
     console.error("[auth] proxy refresh failed:", err);
-    return NextResponse.next();
+    return base();
   }
 }
 
@@ -148,16 +182,79 @@ function stampAttributionIfPresent(
   return response;
 }
 
-/** Clear the session cookie and pass the request through. Used
- *  by both the "tampered cookie" and "refresh token revoked"
- *  exit paths; same shape, same options, one place to maintain. */
-function clearAndContinue(): NextResponse {
-  const response = NextResponse.next();
-  response.cookies.set(SESSION_COOKIE, "", {
-    ...SESSION_COOKIE_OPTIONS,
-    maxAge: 0,
-  });
-  return response;
+/* ─── Temporary pricing A/B test ───────────────────────────────────
+ *
+ * One product sold at three price points, each a separate Shopify
+ * product. A visitor landing on the canonical handle is bucketed once
+ * — equal thirds — and that choice is pinned in a cookie, so the same
+ * person always sees the same price. The winning handle is rendered
+ * *in place* via a rewrite: the URL stays `/products/mosquito-trap-lamp`
+ * for everyone, there's no redirect round-trip (so it adds no
+ * meaningful latency), and add-to-cart / checkout naturally use the
+ * bucketed product's variant + price.
+ *
+ * Self-contained on purpose: to end the test, delete this block and
+ * the `resolvePricingTest(req)` call in `proxy()`. (To make the URL
+ * actually change instead of rewriting in place, swap the
+ * `NextResponse.rewrite` thread for a `NextResponse.redirect`.)
+ */
+const PRICING_TEST = {
+  /** Canonical handle visitors land on; also the control bucket. */
+  base: "mosquito-trap-lamp",
+  /** Equal-weighted buckets. Index 0 is the control (renders as-is);
+   *  the rest are the alternate-price products, rendered via rewrite. */
+  buckets: [
+    "mosquito-trap-lamp",
+    "mosquito-trap-lamp-2",
+    "mosquito-trap-lamp-3",
+  ] as readonly string[],
+} as const;
+
+const PRICING_TEST_COOKIE = "ab_mtl";
+const PRICING_TEST_COOKIE_OPTIONS = {
+  /* Server-only: only this proxy ever reads the bucket. */
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax",
+  path: "/",
+  /* 90 days — comfortably outlasts the test so a visitor keeps their
+   * price across the whole run. */
+  maxAge: 60 * 60 * 24 * 90,
+} as const;
+
+/** Decide (or recall) the price bucket for a request. A single
+ *  pathname compare for the 99.99% of traffic that isn't the product
+ *  under test, so it costs effectively nothing globally. Returns the
+ *  rewrite target (absent for the control / non-test paths) and the
+ *  bucket to persist (absent when the existing cookie is already
+ *  correct, so we don't re-set it on every navigation). */
+function resolvePricingTest(req: NextRequest): {
+  rewriteUrl?: URL;
+  bucket?: string;
+} {
+  if (req.nextUrl.pathname !== `/products/${PRICING_TEST.base}`) {
+    return {};
+  }
+
+  const existing = req.cookies.get(PRICING_TEST_COOKIE)?.value;
+  const bucket =
+    existing && PRICING_TEST.buckets.includes(existing)
+      ? existing
+      : PRICING_TEST.buckets[
+          Math.floor(Math.random() * PRICING_TEST.buckets.length)
+        ];
+
+  /* Control renders the matched page untouched; alternates rewrite to
+   * their own handle while the browser URL stays put. */
+  let rewriteUrl: URL | undefined;
+  if (bucket !== PRICING_TEST.base) {
+    rewriteUrl = req.nextUrl.clone();
+    rewriteUrl.pathname = `/products/${bucket}`;
+  }
+
+  /* Persist only when missing or stale (first visit, or a tampered /
+   * retired bucket value), so a steady visitor pays no Set-Cookie. */
+  return { rewriteUrl, bucket: existing === bucket ? undefined : bucket };
 }
 
 export const config = {
