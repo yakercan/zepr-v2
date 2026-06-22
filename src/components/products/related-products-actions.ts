@@ -62,19 +62,6 @@ import type {
  */
 
 const SORT = "best_sellers:desc";
-
-/* ─── Temporary: hide the pricing A/B duplicates ───────────────────
- * `mosquito-trap-lamp-2` / `-3` are alternate-price clones of
- * `mosquito-trap-lamp` that exist only for the price test (see
- * `proxy.ts`). Keep them out of every "You may also like" rail so a
- * shopper can't stumble onto a second listing of the same product at
- * a different price. Seeded into the dedup set below, so it covers
- * both the initial batch and every "See more". Delete this constant
- * and its use to end the test. */
-const HIDDEN_RELATED_HANDLES = [
-  "mosquito-trap-lamp-2",
-  "mosquito-trap-lamp-3",
-];
 /* One Salespace page per pool per call — keeps each "See more"
  * batch to a single fetch per still-needed pool instead of fanning
  * out into retry pages we'd mostly discard. */
@@ -95,10 +82,7 @@ const POOL_FETCH_LIMIT = RELATED_PRODUCTS_PAGE_SIZE + 5;
 export async function loadRelatedProducts(
   params: LoadRelatedProductsParams,
 ): Promise<LoadRelatedProductsResult> {
-  const seen = new Set<string>([
-    ...params.shownHandles,
-    ...HIDDEN_RELATED_HANDLES,
-  ]);
+  const seen = new Set<string>(params.shownHandles);
   const out: SearchProduct[] = [];
   const want = RELATED_PRODUCTS_PAGE_SIZE;
 
