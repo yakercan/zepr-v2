@@ -93,7 +93,7 @@ export const FAQ_SECTIONS: ReadonlyArray<FaqSection> = [
         id: "delivery-regions",
         question: "Where do you deliver to?",
         answer:
-          "We currently deliver to the United States, United Kingdom, Canada, Singapore, New Zealand, Australia, and Malaysia. For availability in other countries, subscribe to our newsletter — we’ll let you know as soon as we expand.",
+          "We currently deliver to the United States, United Kingdom, Canada, Singapore, New Zealand, Australia, Malaysia, the United Arab Emirates, and the Philippines. For availability in other countries, subscribe to our newsletter — we’ll let you know as soon as we expand.",
       },
       {
         id: "delivery-time",

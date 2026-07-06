@@ -139,7 +139,8 @@ export function pickProductBadge(
  *
  * Per-market rule (mirrors the Shopify shipping config): US and UK sit
  * at 35; Singapore, Canada, Australia, and New Zealand at 50; Malaysia
- * at 150 (a flat RM amount tuned to its lower "Cheap"-catalog pricing).
+ * at 150 and UAE at 150 (flat local amounts tuned to their pricing);
+ * the Philippines at 2000 (PHP is a low-value unit).
  *
  * Currency model: each value is a flat amount in **the visitor's
  * market currency**, NOT a USD amount converted per market. It works
@@ -147,8 +148,8 @@ export function pickProductBadge(
  * presentment price in minor units (Salespace per-market columns /
  * Shopify `@inContext`), and all supported markets are 2-decimal — so
  * `3500` reads as $35 / £35, `5000` as S$50 / CA$50 / A$50 / NZ$50,
- * and `15000` as RM 150 for the matching visitor, with no conversion
- * step.
+ * `15000` as RM 150 / AED 150, and `200000` as ₱2,000 for the matching
+ * visitor, with no conversion step.
  */
 const FREE_SHIPPING_THRESHOLD_BY_CURRENCY: Readonly<Record<string, number>> = {
   USD: 3500,
@@ -158,6 +159,8 @@ const FREE_SHIPPING_THRESHOLD_BY_CURRENCY: Readonly<Record<string, number>> = {
   AUD: 5000,
   NZD: 5000,
   MYR: 15000,
+  AED: 15000,
+  PHP: 200000,
 };
 
 /** Fallback for an unknown currency — the 50 baseline. */

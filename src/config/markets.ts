@@ -3,8 +3,9 @@
  * of truth that maps a visitor's country onto everything the
  * storefront needs to price and format for that market.
  *
- * Seven live markets today: the USA baseline plus AU · CA · GB · MY ·
- * NZ · SG. Country codes are ISO 3166-1 alpha-2, which is exactly what
+ * Nine live markets today: the USA baseline plus AE · AU · CA · GB ·
+ * MY · NZ · PH · SG. Country codes are ISO 3166-1 alpha-2, which is
+ * exactly what
  * both Shopify's `CountryCode` enum (`@inContext(country:)`) and the
  * Salespace per-market columns key off — so `country` doubles as the
  * Shopify context code with no translation table.
@@ -31,7 +32,16 @@
 /** ISO 3166-1 alpha-2 codes for the markets we serve. `GB` (not
  *  `UK`) is correct — it's the alpha-2 code Shopify and Meta both
  *  use for the United Kingdom. */
-export type MarketCountry = "US" | "GB" | "CA" | "SG" | "NZ" | "AU" | "MY";
+export type MarketCountry =
+  | "US"
+  | "GB"
+  | "CA"
+  | "SG"
+  | "NZ"
+  | "AU"
+  | "MY"
+  | "AE"
+  | "PH";
 
 export interface Market {
   country: MarketCountry;
@@ -41,8 +51,8 @@ export interface Market {
   salespaceSuffix: string;
   /** Whether this market legally requires opt-in cookie consent
    *  before analytics fire. Drives the cookie banner (UK → UK GDPR,
-   *  Singapore → PDPA). Markets without it (US/CA/NZ/AU/MY) never see
-   *  the banner and keep analytics on by default. Piggybacks on the
+   *  Singapore → PDPA). Markets without it (US/CA/NZ/AU/MY/AE/PH)
+   *  never see the banner and keep analytics on by default. Piggybacks on the
    *  same geo resolution the currency logic already uses, so there's
    *  no second geo path to maintain. */
   requiresCookieConsent: boolean;
@@ -60,6 +70,11 @@ export const MARKETS: Readonly<Record<MarketCountry, Market>> = {
   // matching listing prices. No cookie banner — PDPA doesn't mandate
   // the opt-in gate the UK/SG banners cover.
   MY: { country: "MY", currency: "MYR", locale: "en-MY", salespaceSuffix: "_my", requiresCookieConsent: false },
+  // UAE (AED) and the Philippines (PHP). `en-AE` renders the dirham
+  // as the "AED" ISO tag, `en-PH` uses the peso sign (₱). Neither
+  // mandates an opt-in cookie banner.
+  AE: { country: "AE", currency: "AED", locale: "en-AE", salespaceSuffix: "_ae", requiresCookieConsent: false },
+  PH: { country: "PH", currency: "PHP", locale: "en-PH", salespaceSuffix: "_ph", requiresCookieConsent: false },
 } as const;
 
 /** USA is the baseline: unsuffixed Salespace columns, no shortcode,
@@ -70,7 +85,7 @@ export const DEFAULT_MARKET: Market = MARKETS.US;
 /**
  * Resolve a raw country code (Vercel geo header, override cookie,
  * Shopify context) to a supported `Market`. Case-insensitive;
- * anything outside the seven live markets falls back to the USA
+ * anything outside the nine live markets falls back to the USA
  * default so callers never have to null-check.
  */
 export function resolveMarket(
@@ -98,6 +113,8 @@ const CURRENCY_LOCALE: Readonly<Record<string, string>> = {
   NZD: "en-NZ",
   AUD: "en-AU",
   MYR: "en-MY",
+  AED: "en-AE",
+  PHP: "en-PH",
 };
 
 export function localeForCurrency(currency: string): string {

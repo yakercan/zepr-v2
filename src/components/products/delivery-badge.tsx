@@ -19,13 +19,16 @@ const useIsomorphicLayoutEffect =
  * Late-delivery goodwill credit, in minor units, keyed by presentment
  * currency — a flat local amount (not a converted USD figure), the
  * same "flat amount per market" model the free-shipping threshold
- * uses. Most markets sit at 5; Malaysia at 20, since MYR is a
- * lower-value unit where a flat RM 5 wouldn't read as a meaningful
- * gesture. Formatted per market via `formatMarketAmount`, so the
- * symbol follows the currency (RM 20.00, $5.00, £5.00, …).
+ * uses. Most markets sit at 5; the lower-value-unit markets carry a
+ * larger flat figure so the gesture still reads as meaningful:
+ * Malaysia RM 20, UAE AED 20, and the Philippines ₱200. Formatted per
+ * market via `formatMarketAmount`, so the symbol follows the currency
+ * (RM 20.00, AED 20.00, ₱200.00, $5.00, £5.00, …).
  */
 const DELAY_CREDIT_BY_CURRENCY: Readonly<Record<string, number>> = {
   MYR: 2000,
+  AED: 2000,
+  PHP: 20000,
 };
 
 /** Fallback credit for any market without an override — the flat 5. */
