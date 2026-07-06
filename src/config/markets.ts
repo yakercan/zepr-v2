@@ -3,8 +3,8 @@
  * of truth that maps a visitor's country onto everything the
  * storefront needs to price and format for that market.
  *
- * Six live markets today: the USA baseline plus AU · CA · GB · NZ ·
- * SG. Country codes are ISO 3166-1 alpha-2, which is exactly what
+ * Seven live markets today: the USA baseline plus AU · CA · GB · MY ·
+ * NZ · SG. Country codes are ISO 3166-1 alpha-2, which is exactly what
  * both Shopify's `CountryCode` enum (`@inContext(country:)`) and the
  * Salespace per-market columns key off — so `country` doubles as the
  * Shopify context code with no translation table.
@@ -31,7 +31,7 @@
 /** ISO 3166-1 alpha-2 codes for the markets we serve. `GB` (not
  *  `UK`) is correct — it's the alpha-2 code Shopify and Meta both
  *  use for the United Kingdom. */
-export type MarketCountry = "US" | "GB" | "CA" | "SG" | "NZ" | "AU";
+export type MarketCountry = "US" | "GB" | "CA" | "SG" | "NZ" | "AU" | "MY";
 
 export interface Market {
   country: MarketCountry;
@@ -41,7 +41,7 @@ export interface Market {
   salespaceSuffix: string;
   /** Whether this market legally requires opt-in cookie consent
    *  before analytics fire. Drives the cookie banner (UK → UK GDPR,
-   *  Singapore → PDPA). Markets without it (US/CA/NZ/AU) never see
+   *  Singapore → PDPA). Markets without it (US/CA/NZ/AU/MY) never see
    *  the banner and keep analytics on by default. Piggybacks on the
    *  same geo resolution the currency logic already uses, so there's
    *  no second geo path to maintain. */
@@ -55,6 +55,11 @@ export const MARKETS: Readonly<Record<MarketCountry, Market>> = {
   SG: { country: "SG", currency: "SGD", locale: "en-SG", salespaceSuffix: "_sg", requiresCookieConsent: true },
   NZ: { country: "NZ", currency: "NZD", locale: "en-NZ", salespaceSuffix: "_nz", requiresCookieConsent: false },
   AU: { country: "AU", currency: "AUD", locale: "en-AU", salespaceSuffix: "_au", requiresCookieConsent: false },
+  // Malaysia is served from the separate "Cheap" Shopify catalog
+  // (lower local pricing); the `_my` Salespace columns carry the
+  // matching listing prices. No cookie banner — PDPA doesn't mandate
+  // the opt-in gate the UK/SG banners cover.
+  MY: { country: "MY", currency: "MYR", locale: "en-MY", salespaceSuffix: "_my", requiresCookieConsent: false },
 } as const;
 
 /** USA is the baseline: unsuffixed Salespace columns, no shortcode,
@@ -65,7 +70,7 @@ export const DEFAULT_MARKET: Market = MARKETS.US;
 /**
  * Resolve a raw country code (Vercel geo header, override cookie,
  * Shopify context) to a supported `Market`. Case-insensitive;
- * anything outside the six live markets falls back to the USA
+ * anything outside the seven live markets falls back to the USA
  * default so callers never have to null-check.
  */
 export function resolveMarket(
@@ -92,6 +97,7 @@ const CURRENCY_LOCALE: Readonly<Record<string, string>> = {
   SGD: "en-SG",
   NZD: "en-NZ",
   AUD: "en-AU",
+  MYR: "en-MY",
 };
 
 export function localeForCurrency(currency: string): string {

@@ -3,10 +3,28 @@ import { ZEPR_ICONS, ZeprIcon } from "@/components/ui/icons";
 import { qualifiesForFreeShipping } from "@/lib/badges";
 import { cn } from "@/lib/utils";
 
-/** Late-delivery goodwill credit, in minor units. A flat 5 in the
- *  visitor's market currency (shown via `formatMarketAmount`), mirroring
- *  the free-shipping threshold's "flat local amount" model. */
-const DELAY_CREDIT_CENTS = 500;
+/**
+ * Late-delivery goodwill credit, in minor units, keyed by presentment
+ * currency — a flat local amount (not a converted USD figure), the
+ * same "flat amount per market" model the free-shipping threshold
+ * uses. Most markets sit at 5; Malaysia at 20, since MYR is a
+ * lower-value unit where a flat RM 5 wouldn't read as a meaningful
+ * gesture. Formatted per market via `formatMarketAmount`, so the
+ * symbol follows the currency (RM 20.00, $5.00, £5.00, …).
+ */
+const DELAY_CREDIT_BY_CURRENCY: Readonly<Record<string, number>> = {
+  MYR: 2000,
+};
+
+/** Fallback credit for any market without an override — the flat 5. */
+const DEFAULT_DELAY_CREDIT_CENTS = 500;
+
+function delayCreditCents(currency: string): number {
+  return (
+    DELAY_CREDIT_BY_CURRENCY[currency.toUpperCase()] ??
+    DEFAULT_DELAY_CREDIT_CENTS
+  );
+}
 
 /**
  * "Free Shipping / Arrives Jun 5 – Jun 10 / $5 credit for delay"
@@ -89,7 +107,7 @@ export function DeliveryBadge({
 }: DeliveryBadgeProps) {
   const free = qualifiesForFreeShipping(priceCents, currency);
   const arrivalLabel = formatDeliveryRange(deliveryTime);
-  const creditLabel = formatMarketAmount(DELAY_CREDIT_CENTS, currency);
+  const creditLabel = formatMarketAmount(delayCreditCents(currency), currency);
 
   return (
     <div
