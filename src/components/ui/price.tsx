@@ -1,4 +1,4 @@
-import { localeForCurrency } from "@/config/markets";
+import { currencySign, localeForCurrency } from "@/config/markets";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,13 +21,15 @@ import { cn } from "@/lib/utils";
  *     Callers never have to remember "is this dollars or cents?".
  *   - Multi-market formatting is driven entirely by the `currency`
  *     prop: the locale is derived from it via `localeForCurrency`,
- *     so a GBP amount renders `£1,234.56` (en-GB) and a CAD amount
- *     `CA$1,234.56` (en-CA) with no context, no prop-drilling, and
- *     no client-side FX conversion — the amount is already the
- *     market's presentment price (Salespace per-market column or
- *     Shopify `@inContext`), we only localise its *display*. Each
- *     geo-targeted visitor sees a single currency, so the locale's
- *     native symbol is unambiguous to them.
+ *     so a GBP amount renders `£1,234.56` (en-GB) with no context,
+ *     no prop-drilling, and no client-side FX conversion — the
+ *     amount is already the market's presentment price (Salespace
+ *     per-market column or Shopify `@inContext`), we only localise
+ *     its *display*. The one tweak on top of the raw locale output
+ *     is the dollar sign: the non-US dollar markets would each
+ *     format as a bare `$` in their own locale, so `currencySign`
+ *     swaps in the disambiguated `CA$` / `AU$` / `S$` / `NZ$` (USA
+ *     stays a plain `$`).
  *   - We run `Intl.NumberFormat` (cached internally by the JS
  *     engine) for the symbol + grouping, then regex-split the
  *     result. Currencies whose format doesn't match
@@ -53,7 +55,10 @@ function splitPrice(cents: number, currency: string): PriceParts | null {
   }).format(cents / 100);
   const match = formatted.match(/^(\D*)(\d[\d,]*)\.(\d+)$/);
   if (!match) return null;
-  return { symbol: match[1], dollars: match[2], cents: match[3] };
+  /* Prefer the storefront's disambiguated dollar sign (CA$ / AU$ /
+   * S$ / NZ$) over the native locale's bare `$`; non-overridden
+   * currencies keep the symbol Intl produced. */
+  return { symbol: currencySign(currency) ?? match[1], dollars: match[2], cents: match[3] };
 }
 
 export type PriceVariant = "regular" | "compare";

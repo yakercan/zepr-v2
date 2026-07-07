@@ -122,6 +122,30 @@ export function localeForCurrency(currency: string): string {
 }
 
 /**
+ * Disambiguated currency signs for the dollar markets. In their own
+ * native locale every dollar currency formats as a bare `$`
+ * (`en-CA`/`en-AU`/`en-SG`/`en-NZ` all give `$50.00`), which is
+ * indistinguishable from USD once a shopper compares markets — so we
+ * override the sign for the non-US dollar markets. The USA stays a
+ * plain `$` (home market, intentionally not `US$`), and every
+ * non-dollar currency (£, RM, AED, ₱) is absent here and keeps its
+ * native Intl symbol. Single source of truth for both the prose
+ * formatter (`formatMarketAmount`) and the `<Price>` component.
+ */
+const CURRENCY_SIGN: Readonly<Record<string, string>> = {
+  CAD: "CA$",
+  AUD: "AU$",
+  SGD: "S$",
+  NZD: "NZ$",
+};
+
+/** The storefront sign to print for a currency, or `null` to use the
+ *  locale's native Intl symbol. See `CURRENCY_SIGN`. */
+export function currencySign(currency: string): string | null {
+  return CURRENCY_SIGN[currency.toUpperCase()] ?? null;
+}
+
+/**
  * Locale-aware currency formatter — resolves the locale from the
  * currency the same way `<Price>` does, so prose amounts (the FAQ
  * shipping threshold, the delivery-badge "$5 credit") read in the
@@ -136,10 +160,18 @@ export function formatMarketAmount(
   currency: string,
   fractionDigits = 2,
 ): string {
-  return new Intl.NumberFormat(localeForCurrency(currency), {
+  const formatter = new Intl.NumberFormat(localeForCurrency(currency), {
     style: "currency",
     currency,
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
-  }).format(cents / 100);
+  });
+  const sign = currencySign(currency);
+  if (!sign) return formatter.format(cents / 100);
+  /* Swap only the currency glyph, leaving the locale's grouping,
+   * decimals, and symbol placement untouched. */
+  return formatter
+    .formatToParts(cents / 100)
+    .map((part) => (part.type === "currency" ? sign : part.value))
+    .join("");
 }

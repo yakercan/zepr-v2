@@ -84,6 +84,24 @@ function delayCreditCents(currency: string): number {
 
 const DEFAULT_DELIVERY_TIME = "7-14";
 
+/**
+ * Fast-delivery markets — locally fulfilled, so the arrival window is
+ * a fixed, tighter range than the product's default metafield time.
+ * Keyed by presentment currency, which is 1:1 with a market (so it
+ * doubles as the market key the same way the free-shipping and
+ * delay-credit maps do). Malaysia (MYR) only for now; add a currency
+ * here to enroll another market. The "Arrives …" line uses this
+ * fixed window in place of the metafield time for these markets.
+ */
+const FAST_DELIVERY_TIME = "3-7";
+const FAST_DELIVERY_CURRENCIES: ReadonlySet<string> = new Set(["MYR"]);
+
+function effectiveDeliveryTime(deliveryTime: string, currency: string): string {
+  return FAST_DELIVERY_CURRENCIES.has(currency.toUpperCase())
+    ? FAST_DELIVERY_TIME
+    : deliveryTime;
+}
+
 function formatDeliveryRange(deliveryTime: string): string {
   const parts = deliveryTime.split("-").map((s) => Number.parseInt(s.trim(), 10));
   const minDays = Number.isFinite(parts[0]) && parts[0] > 0 ? parts[0] : 7;
@@ -125,7 +143,9 @@ export function DeliveryBadge({
   className,
 }: DeliveryBadgeProps) {
   const free = qualifiesForFreeShipping(priceCents, currency);
-  const arrivalLabel = formatDeliveryRange(deliveryTime);
+  const arrivalLabel = formatDeliveryRange(
+    effectiveDeliveryTime(deliveryTime, currency),
+  );
   const creditLabel = formatMarketAmount(delayCreditCents(currency), currency);
 
   /* Hide the divider when the credit block has wrapped onto its own
