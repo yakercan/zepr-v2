@@ -151,8 +151,8 @@ export const HOME_BANNERS: readonly HomeBanner[] = [
   },
   {
     id: "best-rated",
-    image: "https://cdn.salespace.com/zepr-desktop-banner-3.webp",
-    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-3.webp",
+    image: "https://cdn.salespace.com/zepr-desktop-banner-3-v2.webp",
+    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-3-v2.webp",
     alt: "Shop best rated",
     href: buildSearchHref({
       sort: "best_rated:desc",
