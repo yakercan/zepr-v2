@@ -11,9 +11,13 @@ import { cn } from "@/lib/utils";
  * Shop Pay Installments (serviced by Affirm) is only offered in the
  * US, Canada, and the UK, each with its own order minimum. We gate
  * on the product's presentment `currency`, which maps 1:1 to the
- * visitor's market (USD → US, CAD → CA, GBP → UK); the remaining
- * markets (SGD / NZD / AUD) aren't eligible, so the badge renders
- * nothing for them. Minimums follow Shopify's published thresholds:
+ * visitor's market (USD → US, CAD → CA, GBP → UK). The other six
+ * markets — Singapore, New Zealand, Australia, Malaysia, the UAE,
+ * and the Philippines (SGD / NZD / AUD / MYR / AED / PHP) — aren't
+ * eligible, so the badge renders nothing for them: absence from
+ * `INSTALLMENT_MIN_CENTS` is the whole eligibility check, and a new
+ * market is opted out by default until it's added there. Minimums
+ * follow Shopify's published thresholds:
  *
  *   US → $35 USD     CA → $35 CAD     UK → £50 GBP
  *
@@ -23,6 +27,12 @@ import { cn } from "@/lib/utils";
  * actual eligibility at checkout — this line is the marketing
  * promise, not a hard price check on the current product.
  */
+
+/* TEMPORARY: installment messaging is switched off in every market.
+ * Flip this back to `true` to restore it — the eligible markets and
+ * their minimums are untouched below, so US / CA / UK return exactly
+ * as before with no other edit needed. */
+const INSTALLMENTS_ENABLED = false;
 
 /** Per-currency installment minimum, in minor units. Presence in
  *  this map == "Shop Pay Installments available for this market". */
@@ -41,6 +51,9 @@ export function ShopPayBadge({
   currency: string;
   className?: string;
 }) {
+  /* Temporarily off everywhere — see `INSTALLMENTS_ENABLED`. */
+  if (!INSTALLMENTS_ENABLED) return null;
+
   const minCents = INSTALLMENT_MIN_CENTS[currency];
   /* Not an installment market → no badge. */
   if (minCents === undefined) return null;
