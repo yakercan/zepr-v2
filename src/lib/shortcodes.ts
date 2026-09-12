@@ -52,7 +52,6 @@ export const SHORTCODE_REDIRECTS: Readonly<Record<string, string>> = {
   "112": "/products/volcano-diffuser",
   "113": "/products/laptop-stand-for-bed-portable-lap-desk",
   "114": "/products/hand-grip-strength-trainer-with-counter",
-  "115": "/products/frownies-anti-wrinkle-beauty-stickers",
   "116": "/products/cat-slippers",
   "117": "/products/retractable-dog-leash-with-light-bag-dispenser",
   "118": "/products/head-massager-for-migraine-relief",
