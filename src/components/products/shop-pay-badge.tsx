@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
  * Flip this back to `true` to restore it — the eligible markets and
  * their minimums are untouched below, so US / CA / UK return exactly
  * as before with no other edit needed. */
-const INSTALLMENTS_ENABLED = false;
+const INSTALLMENTS_ENABLED = true;
 
 /** Per-currency installment minimum, in minor units. Presence in
  *  this map == "Shop Pay Installments available for this market". */
