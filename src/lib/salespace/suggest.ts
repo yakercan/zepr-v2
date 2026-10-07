@@ -30,7 +30,7 @@ import type { SearchProduct } from "@/types/product";
  * hammer the upstream.
  */
 
-const SALESPACE_API_BASE = "https://api.salespace.com";
+const SALESPACE_API_BASE = "https://api.zepr.com";
 const DEFAULT_REVALIDATE_SEC = 60;
 const MAX_KEYWORDS = 5;
 const MAX_PRODUCTS = 5;

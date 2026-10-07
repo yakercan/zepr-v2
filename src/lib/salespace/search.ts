@@ -33,7 +33,7 @@ import type {
  * issues still surface in server logs.
  */
 
-const SALESPACE_API_BASE = "https://api.salespace.com";
+const SALESPACE_API_BASE = "https://api.zepr.com";
 const DEFAULT_REVALIDATE_SEC = 60;
 // One source of truth for batch size lives in `lib/pagination` so
 // the homepage, search, and collection surfaces all use the same

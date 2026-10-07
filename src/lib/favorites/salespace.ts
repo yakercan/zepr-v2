@@ -49,7 +49,7 @@ import type { FavoriteItem } from "@/lib/favorites/types";
  * back the heart on failure. Logs go to the server console.
  */
 
-const SALESPACE_API_BASE = "https://api.salespace.com";
+const SALESPACE_API_BASE = "https://api.zepr.com";
 
 /* Default pull size for the favorites listing. Salespace
  * supports `?page=&limit=`; v2 pulls the full set in one shot

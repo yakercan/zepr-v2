@@ -13,7 +13,7 @@ import type { TaxonomyResponse } from "@/types/taxonomy";
  * list so the header always renders something useful.
  */
 
-const SALESPACE_API_BASE = "https://api.salespace.com";
+const SALESPACE_API_BASE = "https://api.zepr.com";
 const DEFAULT_REVALIDATE_SEC = 60 * 60; // 1 hour
 
 export async function getTaxonomy(
