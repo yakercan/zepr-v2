@@ -57,7 +57,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.shopify.com", pathname: "/s/files/**" },
       { protocol: "https", hostname: "**.myshopify.com" },
-      { protocol: "https", hostname: "cdn.salespace.com" },
+      { protocol: "https", hostname: "cdn.zepr.com" },
       /* Supabase public storage — user-uploaded review photos
        * served straight from the storage CDN. Scoped to the
        * public objects path so the optimizer never proxies the

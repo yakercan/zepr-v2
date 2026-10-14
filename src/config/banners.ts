@@ -137,22 +137,22 @@ const BEST_RATED_SUBCATEGORIES: readonly string[] = [
 export const HOME_BANNERS: readonly HomeBanner[] = [
   {
     id: "hot-deals",
-    image: "https://cdn.salespace.com/zepr-desktop-banner-1.webp",
-    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-1.webp",
+    image: "https://cdn.zepr.com/zepr-desktop-banner-1.webp",
+    mobileImage: "https://cdn.zepr.com/zepr-mobile-banner-1.webp",
     alt: "Shop hot deals",
     href: buildSearchHref({ sort: "hot_deals:desc" }),
   },
   {
     id: "featured",
-    image: "https://cdn.salespace.com/zepr-desktop-banner-2.webp",
-    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-2.webp",
+    image: "https://cdn.zepr.com/zepr-desktop-banner-2.webp",
+    mobileImage: "https://cdn.zepr.com/zepr-mobile-banner-2.webp",
     alt: "Shop featured categories",
     href: buildSearchHref({ subcategories: FEATURED_SUBCATEGORIES }),
   },
   {
     id: "best-rated",
-    image: "https://cdn.salespace.com/zepr-desktop-banner-3-v2.webp",
-    mobileImage: "https://cdn.salespace.com/zepr-mobile-banner-3-v2.webp",
+    image: "https://cdn.zepr.com/zepr-desktop-banner-3-v2.webp",
+    mobileImage: "https://cdn.zepr.com/zepr-mobile-banner-3-v2.webp",
     alt: "Shop best rated",
     href: buildSearchHref({
       sort: "best_rated:desc",
